@@ -18,7 +18,7 @@ Use this template when you're building:
 ## What's Included
 
 This template configures Claude Code to:
-- Follow Vertical Slice Architecture with feature folders
+- Choose an architecture (VSA, Clean Architecture, or DDD) via the architecture-advisor skill
 - Use .NET 10 / C# 14 modern patterns
 - Prefer minimal APIs with `TypedResults` and `MapGroup`
 - Use EF Core directly (no repository pattern)

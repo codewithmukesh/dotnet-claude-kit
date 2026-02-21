@@ -116,6 +116,7 @@ public sealed class OrderCreatedConsumer(
 Load these dotnet-claude-kit skills for context:
 
 - `modern-csharp` — C# 14 language features and idioms
+- `architecture-advisor` — Architecture guidance for structuring worker internals
 - `messaging` — MassTransit consumers, outbox, saga patterns, broker configuration
 - `logging` — Serilog, structured logging, OpenTelemetry
 - `docker` — Multi-stage Dockerfile, health checks, Docker Compose

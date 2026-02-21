@@ -2,9 +2,11 @@
 name: caching
 description: >
   Caching strategies for .NET 10 applications. Covers HybridCache (the default),
-  output caching, response caching, and distributed cache patterns. Load this
-  skill when implementing caching, optimizing read performance, or reducing
-  database load.
+  output caching, response caching, and distributed cache patterns.
+  Load this skill when implementing caching, optimizing read performance, reducing
+  database load, or when the user mentions "cache", "HybridCache", "Redis",
+  "output cache", "response cache", "distributed cache", "IMemoryCache",
+  "cache invalidation", "stampede protection", or "cache-aside".
 ---
 
 # Caching

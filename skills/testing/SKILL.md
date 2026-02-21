@@ -3,8 +3,11 @@ name: testing
 description: >
   Testing strategy for .NET 10 applications. Covers xUnit v3, WebApplicationFactory
   for integration tests, Testcontainers for real database testing, Verify for
-  snapshot testing, and the AAA pattern. Load this skill when writing tests,
-  setting up test infrastructure, or reviewing test coverage.
+  snapshot testing, and the AAA pattern.
+  Load this skill when writing tests, setting up test infrastructure, reviewing
+  test coverage, or when the user mentions "test", "xUnit", "WebApplicationFactory",
+  "Testcontainers", "integration test", "unit test", "bUnit", "snapshot test",
+  "Verify", "test coverage", "AAA pattern", "WireMock", or "FakeTimeProvider".
 ---
 
 # Testing (.NET 10)

@@ -2,7 +2,9 @@
 
 ## Status
 
-Accepted
+Superseded by [ADR-005](005-multi-architecture.md)
+
+> **Note:** VSA remains a fully supported architecture in dotnet-claude-kit. It is no longer the hardcoded default — the `architecture-advisor` skill now recommends the best fit based on project context. See ADR-005 for details.
 
 ## Context
 

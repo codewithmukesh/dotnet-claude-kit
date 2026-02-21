@@ -22,7 +22,7 @@ Use this template when you're building:
 
 This template configures Claude Code to:
 
-- Follow a module-per-project structure with Vertical Slice Architecture inside each module
+- Follow a module-per-project structure with each module using its own internal architecture
 - Enforce strict module boundaries — no direct cross-module references
 - Use one DbContext per module with separate database schemas
 - Use MassTransit integration events for inter-module communication with the transactional outbox

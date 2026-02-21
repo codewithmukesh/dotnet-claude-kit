@@ -3,8 +3,11 @@ name: authentication
 description: >
   Authentication and authorization for ASP.NET Core. Covers JWT bearer tokens,
   OpenID Connect, ASP.NET Identity, authorization policies, role and claim-based
-  authorization, and API key authentication. Load this skill when implementing
-  login, protecting endpoints, or designing authorization rules.
+  authorization, and API key authentication.
+  Load this skill when implementing login, protecting endpoints, designing
+  authorization rules, or when the user mentions "auth", "JWT", "bearer token",
+  "OIDC", "OpenID Connect", "Identity", "claims", "roles", "authorize",
+  "RequireAuthorization", "API key", or "cookie auth".
 ---
 
 # Authentication & Authorization

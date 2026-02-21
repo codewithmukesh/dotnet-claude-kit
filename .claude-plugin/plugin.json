@@ -1,0 +1,21 @@
+{
+  "name": "dotnet-claude-kit",
+  "version": "0.3.0",
+  "description": "The definitive Claude Code companion for .NET developers. 20 skills, 8 agents, Roslyn MCP server for modern .NET 10 / C# 14.",
+  "author": {
+    "name": "Mukesh Murugan",
+    "url": "https://codewithmukesh.com"
+  },
+  "repository": "https://github.com/codewithmukesh/dotnet-claude-kit",
+  "license": "MIT",
+  "keywords": [
+    "dotnet",
+    "csharp",
+    "aspnet",
+    "efcore",
+    "architecture",
+    "clean-architecture",
+    "ddd",
+    "vertical-slice"
+  ]
+}

@@ -4,7 +4,7 @@
 
 ## Project Context
 
-This is a .NET 10 REST API using Vertical Slice Architecture. Features are organized in self-contained vertical slices — each feature contains its endpoint, handler, request/response types, and validation in a single file or folder.
+This is a .NET 10 REST API. Choose an architecture that fits your domain complexity (run the `architecture-advisor` skill for guidance). The architecture section below shows folder structures for VSA, Clean Architecture, and DDD — pick one and remove the others.
 
 ## Tech Stack
 
@@ -18,6 +18,10 @@ This is a .NET 10 REST API using Vertical Slice Architecture. Features are organ
 
 ## Architecture
 
+Choose one of the following structures and delete the others:
+
+### Option A: Vertical Slice Architecture (best for CRUD-heavy, small-medium teams)
+
 ```
 src/
   [ProjectName].Api/
@@ -29,27 +33,38 @@ src/
       Persistence/              # DbContext, configurations
       Extensions/               # Service registration helpers
     Program.cs
+```
+
+### Option B: Clean Architecture (best for medium complexity, long-lived systems)
+
+```
+src/
+  [ProjectName].Domain/         # Entities, interfaces, domain logic (no dependencies)
+  [ProjectName].Application/    # Use cases, DTOs, validation (references Domain)
+  [ProjectName].Infrastructure/ # EF Core, external services (references Application + Domain)
+  [ProjectName].Api/            # Endpoints, middleware (references all)
+```
+
+### Option C: DDD + Clean Architecture (best for complex domains)
+
+```
+src/
+  [ProjectName].Domain/         # Aggregates, value objects, domain events, domain services
+  [ProjectName].Application/    # Use cases orchestrating aggregates
+  [ProjectName].Infrastructure/ # Persistence, external service adapters
+  [ProjectName].Api/            # Thin endpoints
+```
+
+### Tests
+
+```
 tests/
-  [ProjectName].Api.Tests/
+  [ProjectName].Api.Tests/      # (or [ProjectName].Tests for CA/DDD)
     Features/
       [Feature]/
         [Operation]Tests.cs
     Fixtures/
       ApiFixture.cs             # WebApplicationFactory + Testcontainers
-```
-
-### Feature File Convention
-
-Each feature operation lives in a single file using a static class wrapper:
-
-```csharp
-public static class CreateOrder
-{
-    public record Command(...) : IRequest<Result<Response>>;
-    public record Response(...);
-    public class Validator : AbstractValidator<Command> { }
-    internal class Handler : IRequestHandler<Command, Result<Response>> { }
-}
 ```
 
 ## Coding Standards
@@ -66,7 +81,10 @@ public static class CreateOrder
 Load these dotnet-claude-kit skills for context:
 
 - `modern-csharp` — C# 14 language features and idioms
-- `vertical-slice` — Feature folder structure and handler patterns
+- `architecture-advisor` — Run for new projects to choose the best architecture
+- `vertical-slice` — Feature folder structure and handler patterns (if using VSA)
+- `clean-architecture` — Layered project structure with dependency inversion (if using CA)
+- `ddd` — Aggregates, value objects, domain events (if using DDD)
 - `minimal-api` — Endpoint routing, TypedResults, OpenAPI metadata
 - `ef-core` — DbContext patterns, query optimization, migrations
 - `testing` — xUnit v3, WebApplicationFactory, Testcontainers

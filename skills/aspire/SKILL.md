@@ -3,8 +3,11 @@ name: aspire
 description: >
   .NET Aspire for cloud-native orchestration. Covers AppHost configuration,
   service defaults, resource configuration, service discovery, and the Aspire
-  dashboard. Load this skill when setting up local development orchestration,
-  service discovery, or Aspire-managed infrastructure.
+  dashboard.
+  Load this skill when setting up local development orchestration, service
+  discovery, or Aspire-managed infrastructure, or when the user mentions
+  "Aspire", "AppHost", "service defaults", "service discovery", "orchestration",
+  "Aspire dashboard", "AddProject", "WithReference", or "cloud-native .NET".
 ---
 
 # .NET Aspire

@@ -3,8 +3,10 @@ name: api-versioning
 description: >
   API versioning strategies for ASP.NET Core. Covers Asp.Versioning library,
   URL segment, header, and query string strategies, version deprecation, and
-  OpenAPI integration. Load this skill when adding versioning to an API or
-  evolving an existing API with breaking changes.
+  OpenAPI integration.
+  Load this skill when adding versioning to an API, evolving an API with breaking
+  changes, or when the user mentions "API version", "versioning", "v1/v2",
+  "Asp.Versioning", "deprecation", "breaking change", or "backward compatibility".
 ---
 
 # API Versioning

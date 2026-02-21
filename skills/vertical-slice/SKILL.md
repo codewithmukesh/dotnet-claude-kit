@@ -1,10 +1,12 @@
 ---
 name: vertical-slice
 description: >
-  Vertical Slice Architecture as the default architecture for .NET applications.
-  Covers feature folders, endpoint grouping, and handler patterns for MediatR,
-  Wolverine, and raw handler classes. Load this skill when scaffolding new projects,
-  adding features, or discussing architecture decisions.
+  Vertical Slice Architecture (VSA) for .NET applications — one of several
+  supported architectures in dotnet-claude-kit. Covers feature folders, endpoint
+  grouping, and handler patterns for MediatR, Wolverine, and raw handler classes.
+  Load this skill when the architecture-advisor recommends VSA, when working in
+  an existing VSA codebase, when adding features to a feature-folder project,
+  or when discussing vertical slice patterns, feature folders, or handler patterns.
 ---
 
 # Vertical Slice Architecture (VSA)

@@ -8,9 +8,9 @@ dotnet-claude-kit is an opinionated Claude Code companion for .NET developers. I
 
 ## Philosophy
 
-- **Opinionated over encyclopedic** — We pick the best default and explain why, rather than listing every option equally
+- **Guided over prescriptive** — We ask the right questions, then recommend the best approach with clear rationale
 - **Modern .NET only** — Target .NET 10 and C# 14. No legacy patterns, no backwards compatibility with .NET Framework
-- **Vertical Slice Architecture** — VSA is the default architecture (see ADR-001)
+- **Architecture-aware** — We support VSA, Clean Architecture, DDD, and Modular Monolith with an advisor skill that recommends the best fit (see ADR-005)
 - **Token-conscious** — Every file respects context window limits. Skills max at 400 lines
 - **Practical over theoretical** — Every recommendation includes a code example and a "why"
 

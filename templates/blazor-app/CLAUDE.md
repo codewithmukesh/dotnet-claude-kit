@@ -123,6 +123,7 @@ internal class OrderService(AppDbContext db, TimeProvider time) : IOrderService
 Load these dotnet-claude-kit skills for context:
 
 - `modern-csharp` — C# 14 language features and idioms
+- `architecture-advisor` — Architecture guidance for structuring the backend
 - `authentication` — ASP.NET Core Identity, cookie auth, authorization policies
 - `error-handling` — Result pattern, error boundaries, ProblemDetails for API endpoints
 - `testing` — xUnit v3, bUnit component testing, WebApplicationFactory

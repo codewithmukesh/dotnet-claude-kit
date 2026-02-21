@@ -2,9 +2,11 @@
 name: ci-cd
 description: >
   CI/CD pipelines for .NET applications. Covers GitHub Actions and Azure DevOps
-  YAML pipelines with build, test, publish, and deploy stages. Load this skill
-  when setting up continuous integration, automated testing, or deployment
-  workflows.
+  YAML pipelines with build, test, publish, and deploy stages.
+  Load this skill when setting up continuous integration, automated testing,
+  deployment workflows, or when the user mentions "CI/CD", "pipeline",
+  "GitHub Actions", "Azure DevOps", "workflow", "deploy", "build pipeline",
+  "publish", "NuGet push", "release", or "continuous integration".
 ---
 
 # CI/CD

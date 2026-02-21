@@ -3,8 +3,11 @@ name: ef-core
 description: >
   Entity Framework Core patterns for .NET 10. Covers DbContext configuration,
   migrations workflow, interceptors, compiled queries, ExecuteUpdateAsync,
-  ExecuteDeleteAsync, value converters, and query optimization. Load this skill
-  when working with databases, writing queries, or managing schema changes.
+  ExecuteDeleteAsync, value converters, and query optimization.
+  Load this skill when working with databases, writing queries, managing schema
+  changes, or when the user mentions "EF Core", "Entity Framework", "DbContext",
+  "migration", "LINQ query", "database", "SQL", "N+1", "Include", "split query",
+  "value converter", "interceptor", or "compiled query".
 ---
 
 # EF Core (.NET 10)

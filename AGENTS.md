@@ -34,7 +34,8 @@ Match user intent to agent. When multiple agents could handle a query, the first
 | "Docker", "container", "CI/CD", "pipeline", "deploy" | devops-engineer | — |
 | "Aspire", "orchestration", "service discovery" | devops-engineer | — |
 | "review this code", "PR review", "code quality" | code-reviewer | — |
-| "add feature" (full vertical slice) | dotnet-architect | api-designer, ef-core-specialist |
+| "choose architecture", "which architecture", "architecture decision" | dotnet-architect | — |
+| "add feature" (architecture-appropriate) | dotnet-architect | api-designer, ef-core-specialist |
 | "refactor" | code-reviewer | dotnet-architect |
 
 ## Skill Loading Order
@@ -49,14 +50,14 @@ Agents load skills in dependency order. Core skills load first.
 
 | Agent | Skills |
 |-------|--------|
-| dotnet-architect | modern-csharp, vertical-slice, project-structure |
+| dotnet-architect | modern-csharp, architecture-advisor, project-structure + conditional: vertical-slice, clean-architecture, ddd |
 | api-designer | modern-csharp, minimal-api, api-versioning, authentication, error-handling |
 | ef-core-specialist | modern-csharp, ef-core, configuration |
 | test-engineer | modern-csharp, testing |
 | security-auditor | modern-csharp, authentication, configuration |
 | performance-analyst | modern-csharp, caching |
 | devops-engineer | modern-csharp, docker, ci-cd, aspire |
-| code-reviewer | modern-csharp + contextual (loads relevant skills based on files under review) |
+| code-reviewer | modern-csharp + contextual (loads relevant skills incl. clean-architecture, ddd based on files under review) |
 
 ## MCP Tool Preferences
 

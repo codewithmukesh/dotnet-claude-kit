@@ -3,15 +3,18 @@ name: minimal-api
 description: >
   .NET 10 minimal APIs — the default for building HTTP endpoints. Covers MapGroup,
   endpoint filters, TypedResults, OpenAPI metadata, parameter binding, and route
-  conventions. Load this skill when creating API endpoints, configuring routing,
-  or setting up OpenAPI documentation.
+  conventions.
+  Load this skill when creating API endpoints, configuring routing, setting up
+  OpenAPI documentation, or when the user mentions "endpoint", "MapGet", "MapPost",
+  "MapGroup", "TypedResults", "route", "minimal API", "OpenAPI", "swagger",
+  "rate limiting", or "output caching".
 ---
 
 # Minimal APIs (.NET 10)
 
 ## Core Principles
 
-1. **Minimal APIs are the default** — Use controllers only when migrating legacy code. Minimal APIs are lighter, faster, and compose better with VSA.
+1. **Minimal APIs are the default** — Use controllers only when migrating legacy code. Minimal APIs are lighter, faster, and compose well with any architecture style.
 2. **Group endpoints with `MapGroup`** — Never scatter individual `MapGet`/`MapPost` calls in `Program.cs`. Group related endpoints together.
 3. **Use `TypedResults` for OpenAPI** — `TypedResults.Ok(value)` gives you compile-time type safety AND correct OpenAPI documentation. `Results.Ok(value)` does not.
 4. **Metadata over comments** — Use `.WithName()`, `.WithTags()`, `.WithSummary()` to document endpoints. The metadata feeds into OpenAPI specs.

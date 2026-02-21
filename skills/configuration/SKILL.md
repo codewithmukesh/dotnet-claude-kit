@@ -3,8 +3,11 @@ name: configuration
 description: >
   Configuration patterns for .NET 10 applications. Covers the Options pattern,
   IOptionsSnapshot vs IOptions, secrets management, and environment-based
-  configuration. Load this skill when setting up application configuration,
-  managing secrets, or binding configuration sections.
+  configuration.
+  Load this skill when setting up application configuration, managing secrets,
+  binding configuration sections, or when the user mentions "configuration",
+  "appsettings", "Options pattern", "IOptions", "IOptionsSnapshot", "secrets",
+  "user secrets", "environment variables", "connection string", or "config binding".
 ---
 
 # Configuration

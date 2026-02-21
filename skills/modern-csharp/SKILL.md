@@ -3,8 +3,11 @@ name: modern-csharp
 description: >
   Modern C# language features for .NET 10 and C# 14. Covers primary constructors,
   collection expressions, the field keyword, extension members, records, pattern
-  matching, spans, and raw string literals. Load this skill when writing any new
-  C# code or reviewing existing code for modernization opportunities.
+  matching, spans, and raw string literals.
+  Load this skill when writing any new C# code, reviewing existing code for
+  modernization, using "modern C#", "C# 14", "primary constructor", "collection
+  expression", "records", "pattern matching", "span", "field keyword", or
+  "extension members". Always loaded as the baseline for all agents.
 ---
 
 # Modern C# (C# 14 / .NET 10)

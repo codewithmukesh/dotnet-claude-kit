@@ -3,8 +3,11 @@ name: docker
 description: >
   Docker containerization for .NET 10 applications. Covers multi-stage builds,
   .NET container images, non-root user configuration, health checks, and
-  .dockerignore. Load this skill when containerizing an application, optimizing
-  image size, or setting up Docker Compose for local development.
+  .dockerignore.
+  Load this skill when containerizing an application, optimizing image size,
+  setting up Docker Compose for local development, or when the user mentions
+  "Docker", "Dockerfile", "container", "docker-compose", "image", "multi-stage",
+  "non-root", ".dockerignore", "container health check", or "dotnet publish container".
 ---
 
 # Docker

@@ -3,8 +3,11 @@ name: project-structure
 description: >
   .NET solution and project structure conventions. Covers .slnx format,
   Directory.Build.props, Directory.Packages.props for central package management,
-  global usings, and naming conventions. Load this skill when setting up a new
-  solution, adding projects, or configuring build properties.
+  global usings, and naming conventions.
+  Load this skill when setting up a new solution, adding projects, configuring
+  build properties, or when the user mentions "solution structure", ".slnx",
+  "Directory.Build.props", "central package management", "Directory.Packages.props",
+  "global usings", ".editorconfig", "project layout", or "naming conventions".
 ---
 
 # Project Structure

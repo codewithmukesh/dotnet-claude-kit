@@ -21,7 +21,7 @@ Curated packages that dotnet-claude-kit recommends by default. Every entry inclu
 ### MediatR
 
 - **Package:** `MediatR` (13.x)
-- **Rationale:** The most widely adopted mediator in .NET. Excellent pipeline behavior support (validation, logging, transactions). Massive community, well-documented. Works perfectly with VSA feature handlers.
+- **Rationale:** The most widely adopted mediator in .NET. Excellent pipeline behavior support (validation, logging, transactions). Massive community, well-documented. Works well with any architecture — VSA feature handlers, Clean Architecture use cases, or DDD application services.
 - **When NOT to use:** If your application has fewer than 5 features and the indirection adds complexity without benefit. If you need message durability or distributed messaging, MediatR is in-process only -- use MassTransit or Wolverine instead. If raw performance is critical and you want to avoid the reflection/DI overhead, use plain handler classes injected directly.
 
 ### Wolverine

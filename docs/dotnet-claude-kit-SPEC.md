@@ -1,6 +1,6 @@
 # dotnet-claude-kit — Complete Repository Specification
 
-> The opinionated Claude Code companion for .NET developers.
+> The definitive Claude Code companion for .NET developers.
 > Project-ready templates, intelligent agents, workflow automation, and a Roslyn MCP server for token-efficient codebase navigation.
 
 ---
@@ -12,7 +12,7 @@
 | **Repo name** | `dotnet-claude-kit` |
 | **Target audience** | Open source for all .NET developers |
 | **Project types** | Framework-agnostic (Web API, Blazor, MAUI, modular monolith, libraries, workers) |
-| **Architecture default** | Vertical Slice Architecture (opinionated default) |
+| **Architecture default** | Advisor-driven — supports VSA, Clean Architecture, DDD, Modular Monolith (ADR-005) |
 | **VSA handler approach** | User's choice — provide patterns for MediatR, Wolverine, and raw handlers |
 | **Modular monolith** | Optional — show how to add modules, don't require it |
 | **Data access** | EF Core as the default ORM |
@@ -53,7 +53,7 @@ dotnet-claude-kit/
 │
 │
 │  ┌─────────────────────────────────────────────────────┐
-│  │  SKILLS — 18 opinionated skills                     │
+│  │  SKILLS — 20 architecture-aware skills                │
 │  └─────────────────────────────────────────────────────┘
 │
 ├── skills/
@@ -64,11 +64,23 @@ dotnet-claude-kit/
 │   │                                      # primary constructors, collection expressions
 │   │
 │   │  -- Architecture --
+│   ├── architecture-advisor/
+│   │   └── SKILL.md                       # Structured questionnaire → architecture
+│   │                                      # recommendation. Covers VSA, CA, DDD,
+│   │                                      # Modular Monolith. Always load first.
+│   │
 │   ├── vertical-slice/
-│   │   └── SKILL.md                       # VSA as default. Feature folders, endpoint
-│   │                                      # grouping. Patterns for MediatR, Wolverine,
-│   │                                      # and raw handler classes (user picks).
-│   │                                      # How to optionally introduce modules.
+│   │   └── SKILL.md                       # VSA. Feature folders, endpoint grouping.
+│   │                                      # Patterns for MediatR, Wolverine, and raw
+│   │                                      # handler classes (user picks).
+│   │
+│   ├── clean-architecture/
+│   │   └── SKILL.md                       # 4-project layout, dependency inversion,
+│   │                                      # use case handlers, domain entities.
+│   │
+│   ├── ddd/
+│   │   └── SKILL.md                       # Aggregates, value objects, domain events,
+│   │                                      # strongly-typed IDs, domain services.
 │   │
 │   │  -- Web / API --
 │   ├── minimal-api/
@@ -151,7 +163,7 @@ dotnet-claude-kit/
 │   │   └── README.md                      # When and how to use this template
 │   │
 │   ├── modular-monolith/
-│   │   ├── CLAUDE.md                      # Multi-module solution with VSA per module
+│   │   ├── CLAUDE.md                      # Multi-module solution with independent module architectures
 │   │   └── README.md
 │   │
 │   ├── blazor-app/
@@ -177,10 +189,11 @@ dotnet-claude-kit/
 │   ├── package-recommendations.md         # Vetted NuGet packages with rationale
 │   ├── breaking-changes.md                # .NET version migration gotchas
 │   └── decisions/                         # Architecture Decision Records
-│       ├── 001-vsa-default.md             # Why VSA is the default
+│       ├── 001-vsa-default.md             # VSA rationale (superseded by ADR-005)
 │       ├── 002-result-over-exceptions.md  # Why Result<T> over throwing
 │       ├── 003-ef-core-default-orm.md     # Why EF Core, when to escape to raw SQL
 │       ├── 004-hybrid-cache-default.md    # Why HybridCache over manual patterns
+│       ├── 005-multi-architecture.md     # Multi-architecture support (supersedes 001)
 │       └── template.md                    # ADR template for contributors
 │
 │
@@ -305,7 +318,7 @@ Each agent is a markdown file with:
 
 | Agent | Primary Skills | Roslyn MCP Usage |
 |---|---|---|
-| `dotnet-architect` | vertical-slice, project-structure, all knowledge/ | `GetProjectGraph` to understand solution shape |
+| `dotnet-architect` | architecture-advisor, project-structure, vertical-slice, clean-architecture, ddd, all knowledge/ | `GetProjectGraph` to understand solution shape |
 | `api-designer` | minimal-api, api-versioning, authentication, error-handling | `GetPublicApi` to review existing endpoints |
 | `ef-core-specialist` | ef-core, configuration | `FindReferences` to trace DbContext usage |
 | `test-engineer` | testing | `FindImplementations` to discover testable interfaces |
@@ -314,7 +327,7 @@ Each agent is a markdown file with:
 | `devops-engineer` | docker, ci-cd, aspire | `GetProjectGraph` for build dependency order |
 | `code-reviewer` | All skills contextually | All MCP tools — minimizes file reads during review |
 
-### 4. Skills (18 total)
+### 4. Skills (20 total)
 
 Each skill follows the Agent Skills open standard:
 
@@ -586,15 +599,15 @@ dotnet test mcp/CWM.RoslynNavigator/tests/
 
 | Concern | dotnet-artisan | dotnet-skills | **dotnet-claude-kit** |
 |---|---|---|---|
-| **Philosophy** | Encyclopedia (130 skills, cover everything) | Akka.NET focused (30 skills) | **Opinionated playbook (18 skills, VSA default)** |
+| **Philosophy** | Encyclopedia (130 skills, cover everything) | Akka.NET focused (30 skills) | **Guided playbook (20 skills, advisor-driven architecture)** |
 | **Project templates** | None | None | **5 ready-to-copy CLAUDE.md templates** |
 | **Token efficiency** | No MCP, relies on file scanning | No MCP | **Roslyn MCP for 5-10x reduction** |
-| **Architecture stance** | All patterns as equals | Akka.NET patterns | **VSA as opinionated default** |
+| **Architecture stance** | All patterns as equals | Akka.NET patterns | **Advisor-driven: VSA, CA, DDD, Modular Monolith** |
 | **Handler approach** | Prescriptive | N/A | **User chooses: MediatR / Wolverine / raw** |
 | **Living knowledge** | Static skills only | Static skills only | **knowledge/ directory updated per .NET release** |
 | **Hooks** | Has hooks | None | **Pre-commit format + post-scaffold restore** |
 | **Decision records** | None | None | **ADRs explaining every opinionated default** |
-| **Quality bar** | Breadth (130 skills, 2 contributors, 477 commits) | Depth in Akka.NET domain | **Depth across 18 core skills, max 400 lines each** |
+| **Quality bar** | Breadth (130 skills, 2 contributors, 477 commits) | Depth in Akka.NET domain | **Depth across 20 core skills, max 400 lines each** |
 
 ---
 
@@ -636,7 +649,7 @@ dotnet test mcp/CWM.RoslynNavigator/tests/
 
 ## Open Questions for Future Versions
 
-1. **Claude Code plugin marketplace** — When this stabilizes, should dotnet-claude-kit be published as a single installable plugin?
+1. **Claude Code plugin marketplace** — dotnet-claude-kit is now published as a plugin (see `.claude-plugin/`).
 2. **Slash commands** — Should v1.1 add `.claude/commands/` for `/scaffold-feature`, `/review-pr`, etc.?
 3. **GitHub Actions integration** — Should v1.1 add a workflow for Claude-powered PR reviews?
 4. **Additional MCP tools** — Should CWM.RoslynNavigator expand to include `RenameSymbol`, `ExtractInterface`, or stay read-only?

@@ -119,6 +119,7 @@ IReadOnlyList<Token> Tokenize(ReadOnlySpan<char> input);
 Load these dotnet-claude-kit skills for context:
 
 - `modern-csharp` -- C# 14 language features and idioms
+- `architecture-advisor` -- Architecture guidance for structuring the library
 - `project-structure` -- Solution layout, Directory.Build.props, central package management
 - `testing` -- xUnit v3, test patterns, snapshot testing
 - `ci-cd` -- GitHub Actions / Azure DevOps pipelines with pack + push stages

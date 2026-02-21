@@ -4,7 +4,7 @@
 
 ## Project Context
 
-This is a .NET 10 modular monolith using Vertical Slice Architecture within each module. The application is composed of independent modules that run in a single deployable unit (the Host) but maintain strict boundaries — each module owns its features, data, and domain logic. Modules communicate through integration events, never by direct cross-module method calls or shared database tables.
+This is a .NET 10 modular monolith with each module using its own internal architecture (VSA, Clean Architecture, or DDD — run the `architecture-advisor` skill per module if needed). The application is composed of independent modules that run in a single deployable unit (the Host) but maintain strict boundaries — each module owns its features, data, and domain logic. Modules communicate through integration events, never by direct cross-module method calls or shared database tables.
 
 ## Tech Stack
 
@@ -155,7 +155,10 @@ public class OrdersDbContext(DbContextOptions<OrdersDbContext> options) : DbCont
 Load these dotnet-claude-kit skills for context:
 
 - `modern-csharp` — C# 14 language features and idioms
-- `vertical-slice` — Feature folder structure and handler patterns
+- `architecture-advisor` — Choose the internal architecture for each module
+- `vertical-slice` — Feature folder structure and handler patterns (if using VSA)
+- `clean-architecture` — Layered project structure with dependency inversion (if using CA)
+- `ddd` — Aggregates, value objects, domain events (if using DDD)
 - `project-structure` — Solution layout, Directory.Build.props, central package management
 - `ef-core` — DbContext patterns, query optimization, migrations (one DbContext per module)
 - `messaging` — MassTransit, transactional outbox, integration events between modules

@@ -19,7 +19,7 @@ Load additional skills based on the files being reviewed:
 - Configuration / DI → `configuration`, `dependency-injection`
 - Caching code → `caching`
 - Messaging code → `messaging`
-- Project structure changes → `vertical-slice`, `project-structure`
+- Project structure changes → `vertical-slice`, `clean-architecture`, `ddd`, `project-structure`
 
 Also always reference:
 - `knowledge/common-antipatterns.md` — Known problem patterns
@@ -80,7 +80,7 @@ get_type_hierarchy(typeName) → verify inheritance changes are correct
 - Multi-dimensional code review
 - Identifying anti-patterns from `common-antipatterns.md`
 - Suggesting modern C# improvements
-- Verifying VSA structure adherence
+- Verifying architecture pattern adherence
 - Checking for missing tests
 - Cross-cutting quality concerns
 

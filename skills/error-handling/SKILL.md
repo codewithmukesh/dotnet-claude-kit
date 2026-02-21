@@ -3,8 +3,11 @@ name: error-handling
 description: >
   Error handling strategy for .NET 10 applications. Covers the Result pattern,
   ProblemDetails (RFC 9457), global exception handling, FluentValidation, and
-  structured error responses. Load this skill when implementing error handling,
-  validation, or designing API error contracts.
+  structured error responses.
+  Load this skill when implementing error handling, validation, or designing
+  API error contracts, or when the user mentions "error handling", "Result pattern",
+  "ProblemDetails", "exception", "validation", "FluentValidation", "error response",
+  "global exception handler", or "RFC 9457".
 ---
 
 # Error Handling
