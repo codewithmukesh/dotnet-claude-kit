@@ -13,10 +13,10 @@
   <a href="#installation">Installation</a> &bull;
   <a href="#quick-start">Quick Start</a> &bull;
   <a href="#what-makes-this-10x">10x Features</a> &bull;
-  <a href="#slash-commands-15">Commands</a> &bull;
+  <a href="#slash-commands-16">Commands</a> &bull;
   <a href="#skills-47">Skills</a> &bull;
   <a href="#agents-10">Agents</a> &bull;
-  <a href="#rules-9">Rules</a> &bull;
+  <a href="#rules-10">Rules</a> &bull;
   <a href="#templates-5">Templates</a> &bull;
   <a href="#roslyn-mcp-server">MCP Server</a> &bull;
   <a href="#contributing">Contributing</a>
@@ -36,7 +36,7 @@ A curated knowledge and action layer that sits between Claude Code and your .NET
 
 - Which architecture fits your project (VSA, Clean Architecture, DDD, Modular Monolith)
 - How to write modern C# 14 with primary constructors, collection expressions, and records
-- How to build minimal APIs with `TypedResults`, `MapGroup`, and proper OpenAPI metadata
+- How to build minimal APIs with `IEndpointGroup` auto-discovery, `TypedResults`, and proper OpenAPI metadata
 - How to use EF Core without repository wrappers, with compiled queries and interceptors
 - How to test with `WebApplicationFactory` + `Testcontainers` instead of in-memory fakes
 - How to navigate your codebase via Roslyn semantic analysis instead of expensive file reads
@@ -50,7 +50,7 @@ v0.4.0 adds an **action layer** on top of the knowledge layer — Claude doesn't
 
 | Capability | What It Does |
 |-----------|-------------|
-| **Scaffolding** | One command → complete feature with endpoint, handler, validator, DTO, EF config, and tests. All 4 architectures supported. |
+| **Scaffolding** | One command → complete feature with Result pattern, validation (FluentValidation + filter wiring), OpenAPI metadata, pagination, CancellationToken, and tests. 9-point checklist enforced. All 4 architectures. |
 | **Interactive Setup** | Guided project initialization: architecture questionnaire → tech stack selection → customized CLAUDE.md generation. |
 | **Health Check** | Automated codebase analysis using MCP tools: anti-pattern scan, diagnostics, dead code detection, test coverage → graded report card. |
 | **PR Review** | Multi-dimensional code review: anti-patterns, diagnostics, API surface changes, blast radius, architecture compliance, test coverage. |
@@ -196,7 +196,22 @@ public static class CreateOrder
 }
 ```
 
-**TimeProvider injection. DbContext directly. Result pattern. Response DTO. Sealed handler. CancellationToken propagation.** Every pattern Claude uses comes from the skills in this kit.
+```csharp
+// Each endpoint group auto-discovered — Program.cs never changes
+public sealed class OrderEndpoints : IEndpointGroup
+{
+    public void Map(IEndpointRouteBuilder app)
+    {
+        var group = app.MapGroup("/api/orders").WithTags("Orders");
+        group.MapPost("/", CreateOrderHandler)
+            .WithName("CreateOrder").Produces<CreateOrder.Response>(201)
+            .ProducesValidationProblem()
+            .AddEndpointFilter<ValidationFilter<CreateOrder.Command>>();
+    }
+}
+```
+
+**Result pattern. FluentValidation with endpoint filters. IEndpointGroup auto-discovery. TypedResults with OpenAPI metadata. CancellationToken everywhere. Sealed handlers. TimeProvider injection. DbContext directly.** Every pattern comes from the skills in this kit.
 
 ---
 
@@ -366,7 +381,7 @@ dotnet-claude-kit/
 ├── agents/                      # 10 specialist agents
 ├── skills/                      # 47 skills
 ├── commands/                    # 15 slash commands
-├── .claude/rules/               # 9 always-loaded rules
+├── .claude/rules/               # 10 always-loaded rules
 ├── templates/                   # 5 drop-in CLAUDE.md templates
 ├── knowledge/                   # Living reference documents + ADRs
 ├── mcp/CWM.RoslynNavigator/     # Roslyn MCP server (15 tools)
