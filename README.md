@@ -87,13 +87,17 @@ dotnet tool install -g CWM.RoslynNavigator
 
 ### Per-Project Setup
 
-Navigate to your .NET project root and run:
+Navigate to your project directory (existing or empty) and run:
 
 ```bash
-/init
+/dotnet-init
 ```
 
-This interactively detects your project type, asks about architecture and tech stack, and generates a fully customized `CLAUDE.md` — no manual copying needed.
+**Existing project?** It detects your solution, scans .csproj SDKs, reads your tech stack from config, asks architecture questions, and generates a customized `CLAUDE.md`.
+
+**Greenfield project?** It asks what you're building, scaffolds the full solution structure (`dotnet new sln`, projects, `Directory.Build.props`, `src/` and `tests/` folders), then generates `CLAUDE.md`. Follow up with `/scaffold` to add your first feature.
+
+No manual template copying needed.
 
 <details>
 <summary><strong>Manual Template Copy (Alternative)</strong></summary>
@@ -191,7 +195,7 @@ Shortcut workflows that orchestrate skills and agents. Type the command and Clau
 
 | Command | Purpose | Invokes |
 |---------|---------|---------|
-| `/init` | Interactive project setup — detects type, asks questions, generates CLAUDE.md | project-setup skill, dotnet-architect agent |
+| `/dotnet-init` | Project setup (existing or greenfield) — detects or scaffolds, then generates CLAUDE.md | project-setup skill, dotnet-architect agent |
 | `/plan` | Architecture-aware planning for non-trivial tasks | architecture-advisor skill, dotnet-architect agent |
 | `/verify` | 7-phase verification: build → analyzers → antipatterns → tests → security → format → diff | verification-loop skill |
 | `/tdd` | Red-green-refactor with xUnit + Testcontainers | testing skill, test-engineer agent |
