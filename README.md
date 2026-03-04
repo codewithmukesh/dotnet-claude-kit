@@ -3,7 +3,7 @@
   <p align="center">
     <strong>Make Claude Code an expert .NET developer.</strong>
     <br />
-    47 skills &bull; 10 specialist agents &bull; 15 slash commands &bull; 9 rules &bull; 5 project templates &bull; 15 MCP tools &bull; 7 hooks
+    47 skills &bull; 10 specialist agents &bull; 15 slash commands &bull; 10 rules &bull; 5 project templates &bull; 15 MCP tools &bull; 7 hooks
     <br />
     Built for .NET 10 / C# 14. Architecture-aware. Token-efficient.
   </p>
@@ -75,7 +75,7 @@ v0.4.0 adds an **action layer** on top of the knowledge layer — Claude doesn't
 
 ### Plugin Install (Recommended)
 
-Install as a Claude Code plugin — all 47 skills, 10 agents, 16 commands, 9 rules, hooks, and MCP config activate globally:
+Install as a Claude Code plugin — all 47 skills, 10 agents, 16 commands, 10 rules, hooks, and MCP config activate globally:
 
 ```bash
 # In your terminal — install the Roslyn MCP server
@@ -127,7 +127,7 @@ Replace `[ProjectName]`, update tech stack, choose your architecture.
 
 </details>
 
-Start Claude Code — 47 skills, 10 agents, 16 commands, 9 rules, and 15 MCP tools activate automatically.
+Start Claude Code — 47 skills, 10 agents, 16 commands, 10 rules, and 15 MCP tools activate automatically.
 
 That's it. Claude now writes .NET code the way a senior .NET engineer would.
 
@@ -223,7 +223,7 @@ Shortcut workflows that orchestrate skills and agents. Type the command and Clau
 | `/instinct-export` | Export instincts to shareable format | instinct-system skill |
 | `/instinct-import` | Import instincts from another project | instinct-system skill |
 
-## Rules (9)
+## Rules (10)
 
 Always-loaded conventions that apply to every interaction. Zero configuration — they're active as soon as the plugin is installed.
 
@@ -238,6 +238,7 @@ Always-loaded conventions that apply to every interaction. Zero configuration �
 | [git-workflow](.claude/rules/git-workflow.md) | Conventional commits, atomic commits, never force-push main |
 | [agents](.claude/rules/agents.md) | MCP-first, subagent routing, skill loading order |
 | [hooks](.claude/rules/hooks.md) | Auto-accept formatting, never skip pre-commit hooks |
+| [packages](.claude/rules/packages.md) | Always use latest stable NuGet versions, never rely on training data versions |
 
 ## Skills (47)
 

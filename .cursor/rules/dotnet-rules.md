@@ -214,3 +214,15 @@ public sealed class AuditService(TimeProvider clock)
 | Pre-commit failure | Fix the issue, commit again |
 | Post-test-analyze | Read and act on insights |
 | Post-scaffold-restore | Wait for completion before building |
+
+---
+
+## 10. Package Management
+
+- **Never hardcode NuGet package versions from memory.** Training data contains outdated 8.x/9.x versions.
+- **Run `dotnet add package <name>` without `--version`** to pull the latest stable release automatically.
+- **Microsoft.* packages for .NET 10 must use 10.x versions** (EF Core, Extensions, ASP.NET Core).
+- **Use `Directory.Packages.props`** for multi-project solutions to centralize version pins.
+- **Never downgrade** a package already in the project unless explicitly asked.
+- **Prefer release versions** over preview/RC unless the project targets preview features.
+- If unsure about the latest version, suggest `dotnet package search <name>` or checking NuGet.org.

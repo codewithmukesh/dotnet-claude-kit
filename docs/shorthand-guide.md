@@ -87,7 +87,7 @@ autonomous-loops, de-sloppify, health-check, instinct-system, security-scan, ses
 
 ---
 
-## Rules (9)
+## Rules (10)
 
 | Rule File | Scope | Key Enforcement |
 |-----------|-------|----------------|
@@ -100,6 +100,7 @@ autonomous-loops, de-sloppify, health-check, instinct-system, security-scan, ses
 | `git-workflow.md` | Git operations | Conventional commits, atomic commits, branch naming, never force-push main |
 | `agents.md` | Agent interactions | MCP-first, subagent routing, skill loading, model selection |
 | `hooks.md` | Hook responses | Auto-accept format, never skip pre-commit, review post-test analysis |
+| `packages.md` | NuGet packages | Always latest stable, never hardcode from training data, `dotnet add` without --version |
 
 All rules have `alwaysApply: true` -- they are enforced on every interaction.
 

@@ -1,8 +1,19 @@
 # Vetted NuGet Package Recommendations
 
-> Last updated: February 2026 -- .NET 10 / C# 14
+> Last updated: March 2026 -- .NET 10 / C# 14
 
 Curated packages that dotnet-claude-kit recommends by default. Every entry includes rationale and guidance on when NOT to use it.
+
+## CRITICAL: Always Use Latest Stable Versions
+
+**Never rely on version numbers from training data or memory.** They are likely outdated. When adding a package:
+
+1. **Preferred:** Run `dotnet add package <name>` without `--version` — NuGet resolves the latest stable automatically
+2. **If specifying version:** Verify against NuGet.org or `dotnet package search <name>` first
+3. **Microsoft packages for .NET 10:** Always use 10.x (e.g., `Microsoft.EntityFrameworkCore` 10.x, not 9.x)
+4. **Third-party packages:** Use the latest stable release that targets .NET 10 / netstandard2.0+
+
+The version ranges below (e.g., "13.x") indicate the **minimum recommended major version**, not the exact version to use. Always default to the latest stable release within that major.
 
 ---
 
