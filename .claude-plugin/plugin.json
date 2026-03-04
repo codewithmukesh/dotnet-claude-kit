@@ -1,7 +1,7 @@
 {
   "name": "dotnet-claude-kit",
   "version": "0.6.0",
-  "description": "The definitive Claude Code companion for .NET developers. 47 skills, 10 agents, 15 commands, 9 rules, 5 templates, 15 MCP tools, 7 hooks for modern .NET 10 / C# 14.",
+  "description": "The definitive Claude Code companion for .NET developers. 47 skills, 10 agents, 16 commands, 9 rules, 5 templates, 15 MCP tools, 7 hooks for modern .NET 10 / C# 14.",
   "author": {
     "name": "Mukesh Murugan",
     "url": "https://codewithmukesh.com"

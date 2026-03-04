@@ -127,6 +127,7 @@ Commands map to skills and agents. Use these as shortcuts for common workflows.
 
 | Command | Primary Skill | Primary Agent | Purpose |
 |---------|--------------|---------------|---------|
+| `/init` | project-setup | dotnet-architect | Interactive project initialization |
 | `/plan` | architecture-advisor | dotnet-architect | Architecture-aware planning |
 | `/verify` | verification-loop | — | 7-phase verification pipeline |
 | `/tdd` | testing | test-engineer | Red-green-refactor workflow |

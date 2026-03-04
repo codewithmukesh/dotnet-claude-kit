@@ -12,7 +12,7 @@
     {
       "name": "dotnet-claude-kit",
       "source": "./",
-      "description": "47 skills, 10 agents, 15 commands, 9 rules, 5 templates, Roslyn MCP server for .NET 10 / C# 14",
+      "description": "47 skills, 10 agents, 16 commands, 9 rules, 5 templates, Roslyn MCP server for .NET 10 / C# 14",
       "version": "0.6.0",
       "license": "MIT",
       "keywords": [

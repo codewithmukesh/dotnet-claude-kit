@@ -87,7 +87,18 @@ dotnet tool install -g CWM.RoslynNavigator
 
 ### Per-Project Setup
 
-Copy the template that matches your project type into your project root:
+Navigate to your .NET project root and run:
+
+```bash
+/init
+```
+
+This interactively detects your project type, asks about architecture and tech stack, and generates a fully customized `CLAUDE.md` — no manual copying needed.
+
+<details>
+<summary><strong>Manual Template Copy (Alternative)</strong></summary>
+
+If you prefer manual setup, copy the template matching your project type:
 
 ```bash
 cp templates/web-api/CLAUDE.md ./CLAUDE.md           # REST API
@@ -97,7 +108,11 @@ cp templates/worker-service/CLAUDE.md ./CLAUDE.md      # Background workers
 cp templates/class-library/CLAUDE.md ./CLAUDE.md       # NuGet packages
 ```
 
-Customize — replace `[ProjectName]`, update tech stack, choose your architecture. Start Claude Code — 47 skills, 10 agents, 15 commands, 9 rules, and 15 MCP tools activate automatically.
+Replace `[ProjectName]`, update tech stack, choose your architecture.
+
+</details>
+
+Start Claude Code — 47 skills, 10 agents, 16 commands, 9 rules, and 15 MCP tools activate automatically.
 
 That's it. Claude now writes .NET code the way a senior .NET engineer would.
 
@@ -170,12 +185,13 @@ public static class CreateOrder
 
 ---
 
-## Slash Commands (15)
+## Slash Commands (16)
 
 Shortcut workflows that orchestrate skills and agents. Type the command and Claude handles the rest.
 
 | Command | Purpose | Invokes |
 |---------|---------|---------|
+| `/init` | Interactive project setup — detects type, asks questions, generates CLAUDE.md | project-setup skill, dotnet-architect agent |
 | `/plan` | Architecture-aware planning for non-trivial tasks | architecture-advisor skill, dotnet-architect agent |
 | `/verify` | 7-phase verification: build → analyzers → antipatterns → tests → security → format → diff | verification-loop skill |
 | `/tdd` | Red-green-refactor with xUnit + Testcontainers | testing skill, test-engineer agent |
