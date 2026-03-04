@@ -229,15 +229,15 @@ Always-loaded conventions that apply to every interaction. Zero configuration �
 
 | Rule | Enforces |
 |------|----------|
-| [coding-style](rules/dotnet/coding-style.md) | C# 14 conventions, file-scoped namespaces, primary constructors, sealed, records |
-| [architecture](rules/dotnet/architecture.md) | Ask before recommending, no repo over EF, feature folders, dependency direction |
-| [security](rules/dotnet/security.md) | No hardcoded secrets, parameterized queries, explicit auth, HTTPS |
-| [testing](rules/dotnet/testing.md) | Integration-first, WebApplicationFactory + Testcontainers, AAA pattern |
-| [performance](rules/dotnet/performance.md) | CancellationToken propagation, TimeProvider, IHttpClientFactory, HybridCache |
-| [error-handling](rules/dotnet/error-handling.md) | Result pattern, ProblemDetails, no broad catch, boundary validation |
-| [git-workflow](rules/dotnet/git-workflow.md) | Conventional commits, atomic commits, never force-push main |
-| [agents](rules/dotnet/agents.md) | MCP-first, subagent routing, skill loading order |
-| [hooks](rules/dotnet/hooks.md) | Auto-accept formatting, never skip pre-commit hooks |
+| [coding-style](.claude/rules/coding-style.md) | C# 14 conventions, file-scoped namespaces, primary constructors, sealed, records |
+| [architecture](.claude/rules/architecture.md) | Ask before recommending, no repo over EF, feature folders, dependency direction |
+| [security](.claude/rules/security.md) | No hardcoded secrets, parameterized queries, explicit auth, HTTPS |
+| [testing](.claude/rules/testing.md) | Integration-first, WebApplicationFactory + Testcontainers, AAA pattern |
+| [performance](.claude/rules/performance.md) | CancellationToken propagation, TimeProvider, IHttpClientFactory, HybridCache |
+| [error-handling](.claude/rules/error-handling.md) | Result pattern, ProblemDetails, no broad catch, boundary validation |
+| [git-workflow](.claude/rules/git-workflow.md) | Conventional commits, atomic commits, never force-push main |
+| [agents](.claude/rules/agents.md) | MCP-first, subagent routing, skill loading order |
+| [hooks](.claude/rules/hooks.md) | Auto-accept formatting, never skip pre-commit hooks |
 
 ## Skills (47)
 
@@ -365,7 +365,7 @@ dotnet-claude-kit/
 ├── agents/                      # 10 specialist agents
 ├── skills/                      # 47 skills
 ├── commands/                    # 15 slash commands
-├── rules/dotnet/                # 9 always-loaded rules
+├── .claude/rules/               # 9 always-loaded rules
 ├── templates/                   # 5 drop-in CLAUDE.md templates
 ├── knowledge/                   # Living reference documents + ADRs
 ├── mcp/CWM.RoslynNavigator/     # Roslyn MCP server (15 tools)

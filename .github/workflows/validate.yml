@@ -116,11 +116,11 @@ jobs:
       - name: Check rule frontmatter and size
         run: |
           errors=0
-          if [ ! -d "rules" ]; then
+          if [ ! -d ".claude/rules" ] && [ ! -d "rules" ]; then
             echo "WARNING: No rules directory found"
             exit 0
           fi
-          for rule in $(find rules -name "*.md" -type f); do
+          for rule in $(find .claude/rules rules -name "*.md" -type f 2>/dev/null); do
             # Check YAML frontmatter exists
             if ! head -1 "$rule" | grep -q "^---$"; then
               echo "ERROR: $rule missing YAML frontmatter"
@@ -299,7 +299,7 @@ jobs:
       - name: Validate component paths exist
         run: |
           errors=0
-          for path in skills/ agents/ commands/ rules/ hooks/hooks.json .mcp.json; do
+          for path in skills/ agents/ commands/ .claude/rules/ hooks/hooks.json .mcp.json; do
             if [ ! -e "$path" ]; then
               echo "ERROR: plugin.json references '$path' but it does not exist"
               errors=$((errors + 1))

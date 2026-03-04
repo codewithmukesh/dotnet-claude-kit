@@ -19,13 +19,11 @@
     "vertical-slice",
     "scaffolding",
     "code-review",
-    "slash-commands",
-    "rules"
+    "slash-commands"
   ],
   "skills": "./skills/",
   "agents": "./agents/",
   "commands": "./commands/",
-  "rules": "./rules/",
   "hooks": "./hooks/hooks.json",
   "mcpServers": "./.mcp.json"
 }
