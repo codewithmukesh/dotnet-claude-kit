@@ -22,23 +22,24 @@ description: >
 
 Every scaffolded feature MUST include ALL of the following. Do not skip any item:
 
+- [ ] **Result pattern** — Handlers return `Result<T>`, not raw responses. Endpoints map Result to HTTP (success → TypedResults, failure → `ToProblemDetails()`)
 - [ ] **CancellationToken** on every async method and passed to every async call
 - [ ] **FluentValidation** validator class with meaningful rules (ranges, required fields, max lengths)
 - [ ] **ValidationFilter wiring** — `.AddEndpointFilter<ValidationFilter<T>>()` on mutating endpoints
 - [ ] **OpenAPI metadata** — `.WithName()`, `.WithSummary()`, `.Produces<T>()`, `.ProducesValidationProblem()`, `.ProducesProblem(404)`
 - [ ] **Pagination** on list endpoints — `page`, `pageSize` with bounded max (e.g., 50)
-- [ ] **Global error handler** — Verify `app.UseExceptionHandler()` + `IExceptionHandler` exists in Program.cs; scaffold it if missing
-- [ ] **appsettings.json** — Verify connection string exists; scaffold it with placeholder if missing
+- [ ] **Global error handler** — Verify `app.UseExceptionHandler()` exists in Program.cs; scaffold if missing
+- [ ] **appsettings.json** — Verify connection string exists; scaffold with placeholder if missing
 - [ ] **Integration test** with proper DI replacement using `services.RemoveAll<DbContextOptions<T>>()`
 
 ## Patterns
 
 ### Feature Scaffold — Vertical Slice Architecture (VSA)
 
-Single-file feature with command, handler, validator, and response:
+Single-file feature with Result pattern, validation, and response:
 
 ```csharp
-// Features/Orders/CreateOrder.cs
+// Features/Orders/CreateOrder.cs — handler returns Result<T>, not raw response
 namespace MyApp.Features.Orders;
 
 public static class CreateOrder
@@ -49,12 +50,12 @@ public static class CreateOrder
 
     internal sealed class Handler(AppDbContext db, TimeProvider clock)
     {
-        public async Task<Response> HandleAsync(Command command, CancellationToken ct)
+        public async Task<Result<Response>> HandleAsync(Command command, CancellationToken ct)
         {
             var order = Order.Create(command.CustomerId, command.Items, clock.GetUtcNow());
             db.Orders.Add(order);
             await db.SaveChangesAsync(ct);
-            return new Response(order.Id, order.Total, order.CreatedAt);
+            return Result.Success(new Response(order.Id, order.Total, order.CreatedAt));
         }
     }
 
@@ -74,7 +75,7 @@ public static class CreateOrder
 }
 ```
 
-Endpoint group with full OpenAPI metadata, validation filter, and pagination:
+Endpoint group — maps Result to HTTP, full OpenAPI metadata, validation, pagination:
 
 ```csharp
 // Features/Orders/OrderEndpoints.cs — auto-discovered via IEndpointGroup
@@ -85,28 +86,27 @@ public sealed class OrderEndpoints : IEndpointGroup
         var group = app.MapGroup("/api/orders").WithTags("Orders");
 
         group.MapPost("/", CreateOrderHandler)
-            .WithName("CreateOrder")
-            .WithSummary("Create a new order")
+            .WithName("CreateOrder").WithSummary("Create a new order")
             .Produces<CreateOrder.Response>(StatusCodes.Status201Created)
             .ProducesValidationProblem()
             .AddEndpointFilter<ValidationFilter<CreateOrder.Command>>();
 
         group.MapGet("/", ListOrdersHandler)
-            .WithName("ListOrders")
-            .WithSummary("List orders with pagination")
+            .WithName("ListOrders").WithSummary("List orders with pagination")
             .Produces<PagedList<OrderSummary>>();
 
         group.MapGet("/{id:guid}", GetOrderHandler)
             .WithName("GetOrder")
-            .Produces<OrderDetail>()
-            .ProducesProblem(StatusCodes.Status404NotFound);
+            .Produces<OrderDetail>().ProducesProblem(StatusCodes.Status404NotFound);
     }
 
-    private static async Task<Created<CreateOrder.Response>> CreateOrderHandler(
+    private static async Task<IResult> CreateOrderHandler(
         CreateOrder.Command cmd, CreateOrder.Handler handler, CancellationToken ct)
     {
-        var response = await handler.HandleAsync(cmd, ct);
-        return TypedResults.Created($"/api/orders/{response.Id}", response);
+        var result = await handler.HandleAsync(cmd, ct);
+        return result.IsSuccess
+            ? TypedResults.Created($"/api/orders/{result.Value.Id}", result.Value)
+            : result.ToProblemDetails();
     }
 
     private static async Task<Ok<PagedList<OrderSummary>>> ListOrdersHandler(
@@ -134,9 +134,7 @@ public record PaginationQuery(int Page = 1, int PageSize = 20)
     public int Page { get; init; } = Math.Max(1, Page);
     public int PageSize { get; init; } = Math.Clamp(PageSize, 1, 50);
 }
-
 public record PagedList<T>(List<T> Items, int TotalCount, int Page, int PageSize);
-```
 ```
 
 ### Feature Scaffold — Clean Architecture (CA)

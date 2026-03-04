@@ -95,13 +95,16 @@ public sealed class OrderEndpoints : IEndpointGroup
     {
         var group = app.MapGroup("/api/orders").WithTags("Orders");
 
-        group.MapPost("/", async (CreateOrder.Command command, ISender sender) =>
+        group.MapPost("/", async (CreateOrder.Command command, ISender sender, CancellationToken ct) =>
         {
-            var result = await sender.Send(command);
+            var result = await sender.Send(command, ct);
             return result.IsSuccess
-                ? Results.Created($"/api/orders/{result.Value.Id}", result.Value)
+                ? TypedResults.Created($"/api/orders/{result.Value.Id}", result.Value)
                 : result.ToProblemDetails();
-        });
+        })
+        .WithName("CreateOrder").Produces<CreateOrder.OrderResponse>(201)
+        .ProducesValidationProblem()
+        .AddEndpointFilter<ValidationFilter<CreateOrder.Command>>();
     }
 }
 ```
@@ -122,7 +125,7 @@ public static class CreateOrder
     public record OrderResponse(Guid Id, decimal Total, DateTime CreatedAt);
 
     // Wolverine discovers this by convention (static Handle method)
-    public static async Task<OrderResponse> Handle(
+    public static async Task<Result<OrderResponse>> Handle(
         Command command,
         AppDbContext db,
         TimeProvider clock,
@@ -131,8 +134,7 @@ public static class CreateOrder
         var order = Order.Create(command.CustomerId, command.Items, clock.GetUtcNow());
         db.Orders.Add(order);
         await db.SaveChangesAsync(ct);
-
-        return new OrderResponse(order.Id, order.Total, order.CreatedAt);
+        return Result.Success(new OrderResponse(order.Id, order.Total, order.CreatedAt));
     }
 }
 ```
@@ -165,12 +167,12 @@ public static class CreateOrder
     }
 }
 
-// Endpoint wiring
+// Endpoint wiring — Result maps to HTTP response
 group.MapPost("/", async (CreateOrder.Command command, CreateOrder.Handler handler, CancellationToken ct) =>
 {
     var result = await handler.ExecuteAsync(command, ct);
     return result.IsSuccess
-        ? Results.Created($"/orders/{result.Value.Id}", result.Value)
+        ? TypedResults.Created($"/api/orders/{result.Value.Id}", result.Value)
         : result.ToProblemDetails();
 });
 ```
