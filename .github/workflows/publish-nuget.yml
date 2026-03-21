@@ -17,6 +17,7 @@ env:
   DOTNET_VERSION: '10.0.x'
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
   PROJECT_PATH: mcp/CWM.RoslynNavigator/src/CWM.RoslynNavigator.csproj
   TEST_PATH: mcp/CWM.RoslynNavigator/tests/CWM.RoslynNavigator.Tests.csproj
 
