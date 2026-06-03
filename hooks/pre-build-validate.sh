@@ -48,11 +48,25 @@ if [[ "$TEST_PROJECTS" -eq 0 && "$CSPROJ_COUNT" -gt 1 ]]; then
     WARNINGS=$((WARNINGS + 1))
 fi
 
-# Check for mixed target frameworks
+# Check for mixed target frameworks. Parse both <TargetFramework> and
+# <TargetFrameworks> (the old check only matched the singular tag), split
+# multi-targeting on ';', drop $(...) MSBuild expansions and platform suffixes
+# (e.g. -android, -ios, -windows...), and compare only the base netX.Y so legitimate
+# multi-targeting isn't mis-reported as "mixed". The previous '| wc -l || echo 0' also
+# corrupted the count under 'set -euo pipefail' when grep matched nothing.
 if [[ "$CSPROJ_COUNT" -gt 0 ]]; then
-    FRAMEWORKS=$(grep -h '<TargetFramework>' "$SOLUTION_DIR"/*/*.csproj "$SOLUTION_DIR"/src/*/*.csproj 2>/dev/null | sort -u | wc -l || echo "0")
-    if [[ "$FRAMEWORKS" -gt 1 ]]; then
-        echo "⚠️  Mixed target frameworks detected — consider aligning all projects"
+    BASE_TFMS=$(
+        grep -hoE '<TargetFrameworks?>[^<]+</TargetFrameworks?>' \
+            "$SOLUTION_DIR"/*/*.csproj "$SOLUTION_DIR"/src/*/*.csproj 2>/dev/null \
+            | sed -E 's/<[^>]+>//g' \
+            | tr ';' '\n' \
+            | sed -E 's/\$\([^)]*\)//g; s/-[A-Za-z0-9.]+$//; s/[[:space:]]//g' \
+            | grep -E '^net[0-9]' \
+            | sort -u || true
+    )
+    TFM_COUNT=$(printf '%s\n' "$BASE_TFMS" | grep -c . || true)
+    if [[ "${TFM_COUNT:-0}" -gt 1 ]]; then
+        echo "⚠️  Mixed target frameworks detected ($(printf '%s' "$BASE_TFMS" | paste -sd, -)) — consider aligning all projects"
         WARNINGS=$((WARNINGS + 1))
     fi
 fi

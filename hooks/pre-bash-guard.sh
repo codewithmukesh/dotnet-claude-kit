@@ -1,9 +1,22 @@
 #!/usr/bin/env bash
 # Pre-Bash Guard — Block destructive operations
-# Inspects the Bash tool command before execution via CLAUDE_TOOL_INPUT.
+# Inspects the Bash tool command before execution. Reads CLAUDE_TOOL_INPUT when set,
+# otherwise the PreToolUse payload on stdin — current Claude Code passes hook data on
+# stdin as JSON, not via CLAUDE_TOOL_INPUT, so without the stdin path the guard would
+# see an empty command and never block. The command field is parsed with jq so escaped
+# quotes inside the command don't truncate it; falls back to the raw payload when jq is
+# unavailable, which over-blocks rather than under-blocks — the safe direction here.
 # Exit 2 = block the command, exit 0 = allow.
 
-COMMAND="${CLAUDE_TOOL_INPUT}"
+COMMAND="${CLAUDE_TOOL_INPUT:-}"
+
+if [[ -z "$COMMAND" ]] && [[ ! -t 0 ]]; then
+  STDIN=$(cat)
+  if command -v jq >/dev/null 2>&1; then
+    COMMAND=$(printf '%s' "$STDIN" | jq -r '.tool_input.command // empty' 2>/dev/null)
+  fi
+  [[ -z "$COMMAND" ]] && COMMAND="$STDIN"
+fi
 
 # ── Destructive git operations ──────────────────────────────────────
 
