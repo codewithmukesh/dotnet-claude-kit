@@ -56,8 +56,9 @@ fi
 # corrupted the count under 'set -euo pipefail' when grep matched nothing.
 if [[ "$CSPROJ_COUNT" -gt 0 ]]; then
     BASE_TFMS=$(
-        grep -hoE '<TargetFrameworks?>[^<]+</TargetFrameworks?>' \
-            "$SOLUTION_DIR"/*/*.csproj "$SOLUTION_DIR"/src/*/*.csproj 2>/dev/null \
+        find "$SOLUTION_DIR" -type d \( -name bin -o -name obj \) -prune -o \
+            -name '*.csproj' -type f \
+            -exec grep -hoE '<TargetFrameworks?>[^<]+</TargetFrameworks?>' {} + 2>/dev/null \
             | sed -E 's/<[^>]+>//g' \
             | tr ';' '\n' \
             | sed -E 's/\$\([^)]*\)//g; s/-[A-Za-z0-9.]+$//; s/[[:space:]]//g' \
