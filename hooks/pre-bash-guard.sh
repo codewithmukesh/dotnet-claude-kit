@@ -44,7 +44,7 @@ fi
 
 if echo "$COMMAND" | grep -qE 'rm\s+-[a-zA-Z]*r[a-zA-Z]*f|rm\s+-[a-zA-Z]*f[a-zA-Z]*r'; then
   # Allow rm -rf on safe targets (node_modules, bin, obj, TestResults, .vs)
-  if echo "$COMMAND" | grep -qE 'rm\s+-rf\s+(node_modules|bin|obj|TestResults|\.vs|/tmp)'; then
+  if echo "$COMMAND" | grep -qE 'rm\s+-rf\s+(node_modules|bin|obj|TestResults|\.vs|/tmp)(/|\s|$)'; then
     : # safe, fall through to exit 0
   else
     echo "WARNING: rm -rf detected in a project directory. Verify the target path is intentional."
