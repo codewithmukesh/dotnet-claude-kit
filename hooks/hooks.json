@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/pre-bash-guard.sh"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/pre-bash-guard.sh\""
           }
         ]
       }
@@ -17,11 +17,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/post-edit-format.sh"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-edit-format.sh\""
           },
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PLUGIN_ROOT}/hooks/post-scaffold-restore.sh"
+            "command": "bash \"${CLAUDE_PLUGIN_ROOT}/hooks/post-scaffold-restore.sh\""
           }
         ]
       }

@@ -23,10 +23,21 @@ else
     fi
 fi
 
-# Count results
-PASSED=$(echo "$TEST_OUTPUT" | grep -c 'Passed!' 2>/dev/null || echo "0")
-FAILED=$(echo "$TEST_OUTPUT" | grep -c 'Failed!' 2>/dev/null || echo "0")
-SKIPPED=$(echo "$TEST_OUTPUT" | grep -c 'Skipped!' 2>/dev/null || echo "0")
+# Count results by summing the numeric Passed/Failed/Skipped values from each test
+# project's summary line, e.g.:
+#   Passed!  - Failed:     0, Passed:    86, Skipped:     0, Total:    86, Duration: ...
+# The previous approach counted occurrences of the words "Passed!"/"Failed!", which only
+# counts summary lines (≈ test projects), not tests — and "grep -c ... || echo 0"
+# double-appended a value under this script's 'set -euo pipefail'.
+sum_metric() {
+    printf '%s\n' "$TEST_OUTPUT" \
+        | { grep -oE "$1:[[:space:]]*[0-9]+" || true; } \
+        | { grep -oE '[0-9]+' || true; } \
+        | awk '{ s += $1 } END { print s + 0 }'
+}
+PASSED=$(sum_metric Passed)
+FAILED=$(sum_metric Failed)
+SKIPPED=$(sum_metric Skipped)
 
 # Extract failure details
 FAILURES=$(echo "$TEST_OUTPUT" | grep -A 5 'Failed ' 2>/dev/null || true)

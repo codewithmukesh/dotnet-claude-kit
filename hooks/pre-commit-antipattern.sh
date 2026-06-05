@@ -9,10 +9,15 @@
 
 set -euo pipefail
 
-# Get staged .cs files
-STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.cs$' || true)
+# Get staged .cs files into an array, reading one path per line so paths containing
+# spaces stay intact (a plain "for FILE in $STAGED_FILES" word-splits them). Uses a
+# while-read loop rather than mapfile for bash 3.2 (macOS) compatibility.
+STAGED_FILES=()
+while IFS= read -r FILE; do
+    [[ -n "$FILE" ]] && STAGED_FILES+=("$FILE")
+done < <(git diff --cached --name-only --diff-filter=ACM | grep '\.cs$' || true)
 
-if [[ -z "$STAGED_FILES" ]]; then
+if [[ ${#STAGED_FILES[@]} -eq 0 ]]; then
     exit 0
 fi
 
@@ -20,7 +25,7 @@ echo "Checking staged C# files for common issues..."
 
 ERRORS=0
 
-for FILE in $STAGED_FILES; do
+for FILE in "${STAGED_FILES[@]}"; do
     if [[ ! -f "$FILE" ]]; then
         continue
     fi
