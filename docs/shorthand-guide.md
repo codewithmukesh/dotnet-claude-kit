@@ -10,7 +10,8 @@ Workflow skills at `skills/<name>/SKILL.md` — each registers its `/name` autom
 
 | Command | Description | Related Skill / Agent |
 |---------|-------------|----------------------|
-| `/plan` | Enter plan mode with architecture awareness | architecture-advisor / dotnet-architect |
+| `/spec` | Relentless questioning until human + AI agree on a persisted spec | -- / -- |
+| `/plan` | Enter plan mode with architecture awareness (consumes specs) | architecture-advisor / dotnet-architect |
 | `/scaffold` | Architecture-aware feature scaffolding (templates inline) | -- / dotnet-architect |
 | `/build-fix` | Bounded build-fix and test-fix loops | -- / build-error-resolver |
 | `/verify` | 7-phase verification pipeline | -- / code-reviewer |
@@ -27,9 +28,9 @@ Instinct operations (status, export, import) are modes of the `instinct-system` 
 
 ---
 
-## Skills (44 total)
+## Skills (45 total)
 
-13 are the workflow skills listed under Slash Commands above; the remaining 31 are knowledge skills:
+14 are the workflow skills listed under Slash Commands above; the remaining 31 are knowledge skills:
 
 ### .NET Domain (28)
 
@@ -133,6 +134,7 @@ Only the first three are Claude Code hooks (auto-run via `hooks/hooks.json`); th
 
 | Command | Primary Skill(s) | Primary Agent | Support Agent(s) |
 |---------|-----------------|---------------|-------------------|
+| `/spec` | -- | -- | -- |
 | `/plan` | architecture-advisor | dotnet-architect | -- |
 | `/scaffold` | project-setup | dotnet-architect | api-designer, ef-core-specialist |
 | `/build-fix` | -- | build-error-resolver | -- |

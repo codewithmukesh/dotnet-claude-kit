@@ -123,7 +123,8 @@ Each workflow skill registers its own slash command and carries its methodology 
 | Command | Supporting Skills | Primary Agent | Purpose |
 |---------|------------------|---------------|---------|
 | `/dotnet-init` | project-setup | dotnet-architect | Interactive project initialization |
-| `/plan` | architecture-advisor | dotnet-architect | Architecture-aware planning |
+| `/spec` | — | — | Relentless questioning → agreed spec in `docs/specs/` |
+| `/plan` | architecture-advisor | dotnet-architect | Architecture-aware planning (consumes approved specs) |
 | `/verify` | — | — | 7-phase verification pipeline |
 | `/tdd` | testing | test-engineer | Red-green-refactor workflow |
 | `/scaffold` | — | dotnet-architect | Architecture-aware feature scaffolding |

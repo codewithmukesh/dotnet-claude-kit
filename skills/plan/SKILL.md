@@ -38,7 +38,11 @@ stop and re-plan rather than pushing through a broken approach.
 
 ### Step 1: Understand the Task
 
-Clarify what the user wants to build. Ask focused questions if the request is ambiguous.
+Check `docs/specs/` for an approved spec covering this task — if one exists, it is
+the source of truth: map its acceptance criteria to plan steps and skip ahead to
+Step 2. If the feature is spec-worthy (too big to describe in one sentence) and no
+spec exists, recommend `/spec` first instead of planning on assumptions.
+Otherwise, clarify what the user wants to build with focused questions.
 Do not assume requirements that were not stated.
 
 ### Step 2: Detect Architecture
@@ -113,5 +117,6 @@ Does this plan look right, or should I adjust anything?
 
 ## Related
 
+- `/spec` -- Write the spec first for features too big to describe in one sentence
 - `/scaffold` -- Generate the files once the plan is approved
 - `/verify` -- Run verification after implementing the plan

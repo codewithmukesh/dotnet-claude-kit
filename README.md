@@ -3,7 +3,7 @@
   <p align="center">
     <strong>Make Claude Code an expert .NET developer.</strong>
     <br />
-    44 skills &bull; 10 specialist agents &bull; 13 slash commands &bull; 10 rules &bull; 5 project templates &bull; 15 MCP tools &bull; automation hooks
+    45 skills &bull; 10 specialist agents &bull; 14 slash commands &bull; 10 rules &bull; 5 project templates &bull; 15 MCP tools &bull; automation hooks
     <br />
     Built for .NET 10 / C# 14. Architecture-aware. Token-efficient.
   </p>
@@ -13,7 +13,7 @@
   <a href="#installation">Installation</a> &bull;
   <a href="#quick-start">Quick Start</a> &bull;
   <a href="#what-makes-this-10x">10x Features</a> &bull;
-  <a href="#slash-commands-13">Commands</a> &bull;
+  <a href="#slash-commands-14">Commands</a> &bull;
   <a href="#knowledge-skills-31">Skills</a> &bull;
   <a href="#agents-10">Agents</a> &bull;
   <a href="#rules-10">Rules</a> &bull;
@@ -75,7 +75,7 @@ v0.4.0 adds an **action layer** on top of the knowledge layer — Claude doesn't
 
 ### Plugin Install (Recommended)
 
-Install as a Claude Code plugin — all 44 skills (including 13 slash-command workflows), 10 agents, 10 rules, hooks, and MCP config activate globally:
+Install as a Claude Code plugin — all 45 skills (including 14 slash-command workflows), 10 agents, 10 rules, hooks, and MCP config activate globally:
 
 ```bash
 # In your terminal — install the Roslyn MCP server
@@ -129,7 +129,7 @@ Replace `[ProjectName]`, update tech stack, choose your architecture.
 
 </details>
 
-Start Claude Code — 44 skills, 10 agents, 10 rules, and 15 MCP tools activate automatically.
+Start Claude Code — 45 skills, 10 agents, 10 rules, and 15 MCP tools activate automatically.
 
 That's it. Claude now writes .NET code the way a senior .NET engineer would.
 
@@ -217,14 +217,15 @@ public sealed class OrderEndpoints : IEndpointGroup
 
 ---
 
-## Slash Commands (13)
+## Slash Commands (14)
 
 Shortcut workflows that orchestrate skills and agents. Type the command and Claude handles the rest. These are workflow skills — each lives at `skills/<name>/SKILL.md`, registers its `/name` automatically, and carries its methodology inline (no separate knowledge twin to load).
 
 | Command | Purpose | Works With |
 |---------|---------|------------|
 | `/dotnet-init` | Project setup (existing or greenfield) — detects or scaffolds, then generates CLAUDE.md | project-setup skill, dotnet-architect agent |
-| `/plan` | Architecture-aware planning for non-trivial tasks | architecture-advisor skill, dotnet-architect agent |
+| `/spec` | Relentless questioning until human + AI agree on a persisted spec (`docs/specs/`) | feeds /plan and /tdd |
+| `/plan` | Architecture-aware planning — consumes approved specs | architecture-advisor skill, dotnet-architect agent |
 | `/verify` | 7-phase verification: build → analyzers → antipatterns → tests → security → format → diff | — |
 | `/tdd` | Red-green-refactor with xUnit + Testcontainers | testing skill, test-engineer agent |
 | `/scaffold` | Architecture-aware feature scaffolding (all 4 architectures, per-architecture templates included) | dotnet-architect agent |
@@ -258,7 +259,7 @@ Always-loaded conventions that apply to every interaction. Zero configuration �
 
 ## Knowledge Skills (31)
 
-Code-heavy reference files that teach Claude .NET best practices. Each skill is under 400 lines with concrete code examples, anti-patterns (BAD/GOOD comparisons), and decision guides. (The other 13 of the 44 skills are the workflow orchestrators documented under [Slash Commands](#slash-commands-13).)
+Code-heavy reference files that teach Claude .NET best practices. Each skill is under 400 lines with concrete code examples, anti-patterns (BAD/GOOD comparisons), and decision guides. (The other 14 of the 45 skills are the workflow orchestrators documented under [Slash Commands](#slash-commands-14).)
 
 | Category | Skills | What Claude Learns |
 |----------|--------|--------------------|
@@ -377,7 +378,7 @@ dotnet-claude-kit/
 ├── CLAUDE.md                    # Instructions for developing THIS repo
 ├── AGENTS.md                    # Agent routing & orchestration
 ├── agents/                      # 10 specialist agents
-├── skills/                      # 44 skills (incl. 13 slash-command workflows)
+├── skills/                      # 45 skills (incl. 14 slash-command workflows)
 ├── .claude/rules/               # 10 always-loaded rules
 ├── templates/                   # 5 drop-in CLAUDE.md templates
 ├── knowledge/                   # Living reference documents + ADRs

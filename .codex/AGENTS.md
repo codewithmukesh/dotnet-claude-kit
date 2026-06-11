@@ -25,7 +25,7 @@ Skills live in `skills/<skill-name>/SKILL.md` and follow the Agent Skills open s
 api-versioning, architecture-advisor, aspire, authentication, caching, ci-cd, clean-architecture, configuration, ddd, dependency-injection, docker, ef-core, error-handling, httpclient-factory, logging, messaging, minimal-api, modern-csharp, openapi, opentelemetry, project-setup, project-structure, resilience, scalar, serilog, testing, vertical-slice, container-publish
 
 ### Workflow Skills (each registers a slash command and carries its methodology inline)
-build-fix, checkpoint, code-review, de-sloppify, dotnet-init, health-check, migrate, plan, scaffold, security-scan, tdd, verify, wrap-up
+build-fix, checkpoint, code-review, de-sloppify, dotnet-init, health-check, migrate, plan, scaffold, security-scan, spec, tdd, verify, wrap-up
 
 ### Workflow & Learning Skills
 convention-learner, workflow-mastery, instinct-system

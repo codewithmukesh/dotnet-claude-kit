@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.10.0] — 2026-06-12
+
+### Added
+- **`/spec` — relentless specification workflow** — Turns a vague feature idea into an agreed, persisted spec before any planning or code. Structured questioning in 3–5-question rounds across nine dimensions (problem/users, scope, domain/data, API contract, authorization, edge cases, non-functionals, integrations, acceptance criteria) with a hard never-assume rule: every gap becomes a question, "I don't know" becomes an explicit deferred decision, and contradictions are challenged on the spot. Specs live at `docs/specs/<NNN>-<slug>.md` with a Draft → In Review → Approved lifecycle — approval is an explicit act, requires zero open questions, and implementation never starts from a Draft. Acceptance criteria feed `/plan` (steps), `/tdd` (first failing tests), and commit messages
+- **`/plan` consumes specs** — Step 1 now checks `docs/specs/` for an approved spec as the source of truth, and recommends `/spec` before planning any feature too big to describe in one sentence
+
+### Changed
+- Plugin version bumped to 0.10.0 (45 skills, 14 slash commands)
+
 ## [0.9.0] — 2026-06-12
 
 ### Changed
