@@ -1,11 +1,14 @@
 ---
 name: verify
 description: >
-  Run a comprehensive 7-phase verification pipeline for .NET projects. Covers
-  build, analyzers, antipattern detection, tests, security, formatting, and diff
-  review. Each phase produces PASS/FAIL with actionable output. Short-circuits
-  on critical failures. Use when: "verify", "check everything", "is this ready",
-  "pre-PR check", "run all checks", or after completing a feature or refactor.
+  Run a comprehensive 7-phase verification pipeline for .NET projects: build,
+  analyzers, antipattern detection, tests, security, formatting, and diff
+  review. Each phase produces PASS/FAIL with actionable output and the pipeline
+  short-circuits on critical failures. Also the authority on verification
+  strategy: which phases to run for a given change, quality gates, and
+  fix-and-retry loops. Use when: "verify", "check everything", "is this ready",
+  "pre-PR check", "run all checks", "quality gate", "verification strategy",
+  "which checks should run", or after completing a feature or refactor.
 ---
 
 # /verify -- 7-Phase Verification Pipeline
@@ -14,97 +17,104 @@ description: >
 
 Runs a sequential, 7-phase verification pipeline that catches issues at every level --
 from compiler errors to subtle antipatterns to formatting drift. Each phase produces
-a clear PASS or FAIL result. Critical failures (phases 1-2) short-circuit the pipeline
-because later phases cannot produce meaningful results on broken code.
+an explicit PASS, WARN, or FAIL with details. "It looks fine" is not a verification
+result; a table of statuses is. Critical failures (Phase 1 build, Phase 4 tests)
+short-circuit the pipeline because later phases cannot produce meaningful results
+on broken code.
 
-The pipeline is designed to answer one question: **"Is this code ready for review?"**
+The pipeline answers one question: **"Is this code ready for review?"**
 
-### The 7 Phases
-
-| Phase | Tool | What It Catches |
-|-------|------|-----------------|
-| 1. Build | `dotnet build` | Compilation errors, missing references, type mismatches |
-| 2. Diagnostics | `get_diagnostics` (MCP) | Analyzer warnings, nullable reference issues, code quality |
-| 3. Antipatterns | `detect_antipatterns` (MCP) | async void, sync-over-async, `new HttpClient()`, `DateTime.Now`, broad catch, missing CancellationToken |
-| 4. Tests | `dotnet test` | Failing unit and integration tests, regressions |
-| 5. Security | Security scan | Hardcoded secrets, SQL injection patterns, missing auth attributes |
-| 6. Format | `dotnet format --verify-no-changes` | Code style drift, formatting inconsistencies |
-| 7. Diff Review | `git diff` analysis | Accidental changes, debug leftovers, TODO/HACK markers |
+| Phase | Tool | What It Catches | Critical |
+|-------|------|-----------------|----------|
+| 1. Build | `dotnet build` | Compilation errors, missing references | Yes |
+| 2. Diagnostics | `get_diagnostics` (MCP) | New analyzer warnings, nullability issues | FAIL on new errors |
+| 3. Antipatterns | `detect_antipatterns` (MCP) | async void, sync-over-async, `DateTime.Now`, more | No |
+| 4. Tests | `dotnet test` | Failing tests, regressions | Yes |
+| 5. Security | `dotnet list package --vulnerable` + scan | Secrets, SQL injection, missing auth, vulnerable packages | FAIL on critical/high |
+| 6. Format | `dotnet format --verify-no-changes` | Style drift, formatting inconsistencies | No |
+| 7. Diff Review | `git diff` analysis | Accidental changes, debug leftovers, TODOs | No |
 
 ## When
 
-- After completing a feature or bug fix
-- Before creating a pull request
-- After a major refactor
-- After merging upstream changes
-- When the user says "verify", "check this", "is this ready", "run checks"
+- After completing a feature, bug fix, or major refactor
+- Before creating a pull request -- non-negotiable, full pipeline
+- After merging upstream changes or updating dependencies
+- When the user says "verify", "check everything", "is this ready", "run all checks"
 - As the final step before marking a task complete
 
-**Quick check alternative:** For small changes where the full pipeline is overkill,
-run just phases 1 and 4 (build + test).
+### Which Phases to Run
+
+Full pipeline is the default. For scoped changes, run a subset:
+
+| Scenario | Phases | Notes |
+|----------|--------|-------|
+| Feature complete / Pre-PR / new endpoint | All 7 | No shortcuts |
+| Bug fix | 1, 2, 4 | Add a test first if none covers it |
+| After refactor | 1, 2, 3, 4 | Correctness focus; add 5-7 if security-sensitive |
+| Dependency update | 1, 4, 5 | Build, tests, vulnerability scan |
+| Config or test-only change | 1, 4 | Build and test |
+| Formatting only | 6 | Format check is sufficient |
+
+When in doubt, run all 7. Extra phases cost minutes; a missed security issue costs
+days of incident response. Never cherry-pick phases because a change "looks safe".
 
 ## How
 
-### Phase 1: Build (Critical -- short-circuits on failure)
+### Phase 1: Build (CRITICAL -- short-circuits)
 
 ```bash
 dotnet build --no-restore --verbosity quiet
 ```
 
-- If the build fails, STOP. Report errors and fix them before continuing.
-- No point running analyzers or tests on code that does not compile.
+- If the build fails, STOP. Report errors and fix before continuing -- nothing
+  downstream is meaningful on code that does not compile.
+- Capture the warning count even on PASS; new warnings are tracked in Phase 2.
 - Output: PASS (0 errors) or FAIL (with error list)
 
-### Phase 2: Diagnostics (Critical -- short-circuits on failure)
+### Phase 2: Diagnostics
 
-Use the Roslyn MCP `get_diagnostics` tool:
-- Scope to the modified project(s) when possible, full solution for cross-cutting changes
-- Filter for warnings and errors
-- Flag any new warnings introduced by the current changes
+Use the Roslyn MCP `get_diagnostics` tool, scoped to changed files/projects
+(full solution for cross-cutting changes). Compare against baseline -- flag only
+NEW warnings introduced by the current changes. Common findings: CS8600/CS8602
+(nullability), CS0219 (unused variable).
 
-Output: PASS (0 new warnings/errors) or FAIL (with diagnostic list, grouped by severity)
+Output: PASS (0 new) / WARN (new warnings) / FAIL (new errors). Treat new
+warnings as work -- today's CS8600 is next month's production NullReferenceException.
 
 ### Phase 3: Antipattern Detection
 
-Use the Roslyn MCP `detect_antipatterns` tool:
-- Scan modified files or the full project depending on change scope
-- Flag all detected antipatterns with severity and file location
+Use the Roslyn MCP `detect_antipatterns` tool on changed files (full project for
+broad changes). Catches: `async void`, sync-over-async (`.Result`,
+`.GetAwaiter().GetResult()`), `new HttpClient()`, `DateTime.Now`/`UtcNow` instead
+of `TimeProvider`, broad `catch (Exception)`, string interpolation in logging,
+missing `CancellationToken`, EF read queries without `AsNoTracking`.
 
-Common antipatterns caught:
-- `async void` methods (except event handlers)
-- Sync-over-async (`Task.Result`, `.GetAwaiter().GetResult()`)
-- `new HttpClient()` instead of `IHttpClientFactory`
-- `DateTime.Now`/`DateTime.UtcNow` instead of `TimeProvider`
-- Broad `catch (Exception)` without specific handling
-- String interpolation in logging (`logger.LogInformation($"...")`)
-- Missing `CancellationToken` propagation
-- EF Core queries without `AsNoTracking` for read-only scenarios
+Output: PASS (0 findings) / WARN (findings) / FAIL (critical antipatterns)
 
-Output: PASS (0 antipatterns) or WARN (with findings) or FAIL (critical antipatterns)
-
-### Phase 4: Tests
+### Phase 4: Tests (CRITICAL -- short-circuits)
 
 ```bash
 dotnet test --no-build --verbosity quiet
 ```
 
-- Run the full test suite, or scoped to affected test projects for large solutions
-- Report test count, pass count, fail count, and skip count
-- Any failing test is a FAIL -- no exceptions
+- Full suite, or scoped to affected test projects for large solutions.
+- Any failing test is a FAIL -- no exceptions. Stop and fix before later phases.
+- If no test project exists: SKIP with a recommendation to add tests.
 
-Output: PASS (all tests green) or FAIL (with failing test names and error messages)
+Output: PASS (all green) or FAIL (failing test names + error messages)
 
 ### Phase 5: Security Scan
 
-Review the changes for common security issues:
-- Hardcoded connection strings, API keys, or secrets
-- SQL injection vulnerabilities (raw SQL without parameterization)
-- Missing `[Authorize]` attributes on endpoints that should be protected
-- CORS misconfiguration (overly permissive origins)
-- Missing input validation on public endpoints
-- Disabled HTTPS or certificate validation
+```bash
+dotnet list package --vulnerable --include-transitive
+```
 
-Output: PASS (no findings) or WARN/FAIL (with findings by severity)
+Then review changed files for: hardcoded secrets/connection strings/API keys,
+SQL injection (raw SQL without parameterization), missing `[Authorize]` on
+endpoints that need it, permissive CORS, missing input validation, disabled
+HTTPS or certificate validation.
+
+Output: PASS / WARN (medium/low findings) / FAIL (critical/high vulnerabilities)
 
 ### Phase 6: Format Check
 
@@ -112,26 +122,31 @@ Output: PASS (no findings) or WARN/FAIL (with findings by severity)
 dotnet format --verify-no-changes --verbosity quiet
 ```
 
-- Verifies code matches the project's formatting rules
-- Does NOT auto-fix -- reports what needs fixing
-- If no `.editorconfig` exists, note it as a recommendation
+Reports drift without auto-fixing. To resolve, run `dotnet format` and include
+the changes in the commit. If no `.editorconfig` exists, note it as a recommendation.
 
-Output: PASS (no formatting issues) or WARN (with file list)
+Output: PASS / WARN (with file list)
 
 ### Phase 7: Diff Review
 
-Analyze `git diff` (staged and unstaged) for:
-- Accidental file changes (unrelated modifications)
-- Debug leftovers (`Console.WriteLine`, `debugger` statements, `#if DEBUG` blocks in production code)
-- TODO/HACK/FIXME markers that should be resolved before merge
-- Large files that might need review (> 500 lines changed)
-- Sensitive files modified (`.env`, `appsettings.json` secrets section)
+Analyze `git diff --stat` and `git diff` (staged + unstaged) for:
+- Accidental or unrelated file changes (`.vs/`, `bin/`, `obj/`, `.env`, secrets)
+- Debug leftovers (`Console.WriteLine`, `#if DEBUG` in production paths)
+- Unresolved TODO/HACK/FIXME markers
+- Scope mismatch -- changes must match the task/PR description
 
-Output: PASS (clean diff) or WARN (with findings)
+Output: PASS (clean, matches intent) / WARN (with findings)
+
+### Fix-and-Retry Loop
+
+A single pass rarely produces all-green. The loop is the point:
+
+1. **IDENTIFY** -- which phase failed, and the specific error
+2. **FIX** -- make the minimal change that resolves it
+3. **RE-RUN** -- from Phase 1 if the fix changed code; otherwise from the failed phase
+4. **REPEAT** -- until all phases pass, or an issue needs user input
 
 ### Final Summary
-
-After all phases complete, output a summary table:
 
 ```
 ## Verification Results
@@ -149,9 +164,9 @@ After all phases complete, output a summary table:
 **Verdict: READY FOR REVIEW** (with 2 non-blocking warnings)
 ```
 
-Verdicts:
-- **READY FOR REVIEW** -- All phases PASS or only non-blocking WARNs
-- **NEEDS FIXES** -- Any phase FAIL, with specific remediation steps
+Verdicts: **READY FOR REVIEW** (all PASS, or only non-blocking WARNs) or
+**NEEDS FIXES** (any FAIL, with specific remediation steps). For pre-PR runs,
+include the verification report in the PR description.
 
 ## Example
 
@@ -171,12 +186,12 @@ Phase 7: Diff Review ...... PASS
 
 Verdict: READY FOR REVIEW (1 non-blocking warning)
 
-Recommendation: Replace DateTime.Now with TimeProvider on line 42
-before merging. Not blocking, but it will fail the antipattern check in CI.
+Recommendation: Replace DateTime.Now with TimeProvider on line 42 before
+merging. Not blocking, but it will fail the antipattern check in CI.
 ```
 
 ## Related
 
 - `/build-fix` -- Auto-fix build errors when Phase 1 fails
-- `/de-sloppify` -- Deep cleanup when Phases 3/6 have many findings
-- `/security-scan` -- Focused deep security review (beyond Phase 5 basics)
+- `/code-review` -- Multi-dimensional review once verification passes
+- `/health-check` -- Whole-project graded assessment (beyond this change set)

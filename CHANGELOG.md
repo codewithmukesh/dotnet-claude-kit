@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.0] — 2026-06-12
+
+### Changed
+- **Skill catalog consolidated: 60 → 44 skills** — Sixteen redundant skills merged or retired to cut the always-loaded description overhead (~25%) and eliminate routing collisions between overlapping skills. Surviving descriptions absorb the absorbed skills' trigger phrases, so all existing invocation phrases still route correctly:
+  - **Workflow/knowledge twins merged** — each workflow now carries its methodology inline: `code-review` ← code-review-workflow + 80-20-review (blast-radius prioritization built in), `verify` ← verification-loop, `scaffold` ← scaffolding (per-architecture templates moved to `skills/scaffold/references/architecture-patterns.md`, loaded on demand), `migrate` ← migration-workflow (now also covers .NET version upgrades and NuGet updates), `build-fix` ← autonomous-loops (loop discipline: bounded iterations, progress detection, fail-safes; test-fix loop is a first-class variant), `wrap-up` ← wrap-up-ritual + session-management (owns the full handoff lifecycle including session start), `checkpoint` ← session-management's mid-session save
+  - **Learning skills unified** — `instinct-system` absorbs instinct-status/export/import (now modes: "show instincts", "export instincts", "import instincts"), self-correction-loop (corrections = confirmed instincts at full confidence → MEMORY.md), and learning-log (discoveries → .claude/learning-log.md)
+  - **`workflow-mastery` absorbs context-discipline** — token budget management and MCP-first navigation are now its Context Discipline section
+  - **Retired** — `model-selection` (the always-loaded `.claude/rules/agents.md` already carries model guidance) and `split-memory` (native Claude Code memory supersedes it)
+- **Slash commands: 16 → 13** — `/instinct-status`, `/instinct-export`, `/instinct-import` replaced by instinct-system modes; all other commands unchanged
+- **New structural rule: one skill per concern** — CLAUDE.md and CONTRIBUTING.md now prohibit workflow/knowledge twin pairs and document the `references/` progressive-disclosure pattern for deep content
+- **Cross-references updated everywhere** — AGENTS.md routing tables, README catalog and counts, docs/shorthand-guide.md, docs/longform-guide.md, .codex/AGENTS.md, all 5 templates, and 4 agent skill maps point at the surviving skills
+- Plugin version bumped to 0.9.0
+
 ## [0.8.0] — 2026-06-11
 
 ### Added

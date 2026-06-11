@@ -3,183 +3,168 @@ name: code-review
 description: >
   MCP-powered multi-dimensional code review for .NET projects. Uses Roslyn
   analysis tools for antipatterns, diagnostics, references, and dependency
-  graphs combined with structured manual review. Produces categorized findings
-  with severity levels and actionable fix suggestions.
-  Use when: "review", "code review", "PR review", "review this", "review my
-  code", "check code quality", "review changes".
+  graphs combined with structured manual review. Prioritizes effort with
+  blast-radius scoring — data access, security, concurrency, and integration
+  boundaries before style — and produces severity-categorized findings with
+  actionable fixes. Use when: "review", "code review", "PR review", "review
+  this", "review my code", "check code quality", "review changes", "what
+  should I review", "review priorities", "blast radius", "critical path".
 ---
 
-# /code-review -- MCP-Powered Code Review
+# /code-review — MCP-Powered Code Review
 
 ## What
 
-Performs a comprehensive, multi-dimensional code review that combines Roslyn MCP
-tool analysis with structured manual review. Every review follows a consistent
-7-step process and produces findings categorized by severity (Critical, Warning,
-Suggestion) with actionable remediation guidance.
+Performs a multi-dimensional code review combining Roslyn MCP analysis with
+structured manual review. Effort follows the 80/20 rule: the 20% of code that
+causes 80% of incidents (data access, security, concurrency, integration
+boundaries) gets thorough review; style and formatting are left to tooling.
 
-Review dimensions:
-- **Correctness** -- Logic errors, edge cases, null handling, async pitfalls
-- **Security** -- Auth gaps, injection risks, secret exposure, CORS issues
-- **Performance** -- N+1 queries, missing indexes, unnecessary allocations, missing cancellation
-- **Architecture** -- Layer violations, coupling issues, boundary breaches
-- **Maintainability** -- Naming, complexity, duplication, test coverage
-- **API Design** -- HTTP semantics, error responses, versioning, OpenAPI metadata
+Review dimensions: **Correctness** (logic, edge cases, null handling, async
+pitfalls), **Security** (auth gaps, injection, secrets, CORS), **Performance**
+(N+1, allocations, missing cancellation), **Architecture compliance** (layer
+violations, boundary breaches), **Test coverage** (behavior tests for changed
+types).
 
 ## When
 
-- "Review this code", "PR review", "code review"
-- Before merging a pull request
+- "Review this", "code review", "PR review", before merging a pull request
 - After a major refactor to verify no regressions or design drift
-- When onboarding to unfamiliar code and wanting a quality assessment
-- Periodic health checks on critical modules
+- "What should I review?" — deciding where review effort goes on a large change
+- Onboarding to unfamiliar code and wanting a quality assessment
 
 ## How
 
-### Step 1: Scope the Review
+### Step 1: Scope and Score Blast Radius
 
-Determine what is being reviewed:
-- **PR review**: Use `git diff main...HEAD` to identify all changed files
-- **File review**: Focus on specified files
-- **Module review**: Identify all files in the module/feature
+Identify changed files (`git diff main...HEAD`, specified files, or module).
+Score each change to set review depth — blast radius determines depth, not
+line count. A one-line middleware change outranks a 300-line rename.
 
-Categorize changed files by layer (domain, application, infrastructure, API, tests).
+| Blast Radius | Examples | Depth |
+|---|---|---|
+| Critical | Middleware, auth, DB migrations, shared kernel, CI/CD | Thorough — every code path |
+| High | Public API changes, message consumers, EF configuration, new module | Focused — consumers + behavior |
+| Medium | New feature following existing patterns, bug fix, new endpoint | Standard — checklist pass |
+| Low | Docs, formatting, renames, logging statements | Glance — build + tests pass |
 
-### Step 2: MCP Diagnostics Scan
-
-Run Roslyn MCP tools on the review scope:
-
-```
-get_diagnostics(scope: "project", path: "affected-project")
-```
-
-- Flag new warnings and errors
-- Group by severity and category
-- Identify nullable reference warnings -- these often indicate missing null checks
-
-### Step 3: Antipattern Detection
+### Step 2: MCP Analysis (before reading any file)
 
 ```
-detect_antipatterns(projectFilter: "affected-project")
+detect_antipatterns(projectFilter: "affected-project")   → async void, DateTime.Now, new HttpClient(), broad catch
+get_diagnostics(scope: "project", path: "affected-project") → new warnings, nullability issues
 ```
 
-- Review each finding against the change context
-- Distinguish pre-existing antipatterns from newly introduced ones
-- Focus review effort on new antipatterns
+Distinguish newly introduced findings from pre-existing ones — focus on new.
 
-### Step 4: Blast Radius Analysis
+### Step 3: Blast Radius Verification
 
-For each significant change, measure its impact:
+For each modified public API:
 
 ```
-find_references(symbolName: "ModifiedType")
-find_callers(methodName: "ModifiedMethod")
-get_dependency_graph(symbolName: "ModifiedMethod", depth: 2)
+find_references(symbolName: "ModifiedType")              → count consumers; high count = high risk
+get_dependency_graph(symbolName: "ModifiedMethod", depth: 2) → ripple effects
 ```
 
-- Identify all consumers of modified APIs
-- Check if callers handle new error cases or changed return types
-- Flag changes with high blast radius for extra scrutiny
+Check whether callers handle changed return types and new error cases.
 
-### Step 5: Architecture Compliance
+### Step 4: Architecture Compliance
 
-Verify changes respect architectural boundaries:
+Verify dependency direction (Domain → nothing; Infrastructure → Application →
+Domain) via `get_project_graph` and `detect_circular_dependencies`. Per
+architecture: VSA features don't cross-reference; Clean Architecture domain has
+zero project references; Modular Monolith modules communicate only via
+integration events — `find_references` on a module's DbContext should resolve
+only inside that module.
 
-```
-get_type_hierarchy(typeName: "NewOrModifiedType")
-find_implementations(interfaceName: "AffectedInterface")
-```
+### Step 5: Manual Review — Priority Order
 
-- Domain types must not reference infrastructure
-- Application layer must not bypass domain logic
-- New dependencies should follow existing dependency direction
-- Cross-module communication must go through defined contracts
+Review what tools can't catch, highest-risk areas first:
 
-### Step 6: Manual Review
+| Priority | Area | Check |
+|---|---|---|
+| 1 | Data access | N+1 (missing `Include`/projection), raw SQL with user input, missing `CancellationToken` |
+| 2 | Security | Every endpoint has explicit `[Authorize]`/`[AllowAnonymous]`, input validated, no secrets in code, no PII in logs |
+| 3 | Concurrency | Token propagated end-to-end, no `.Result`/`.Wait()`, thread-safe shared state |
+| 4 | Integration | Retry/timeout on external calls, consumer idempotency, no swallowed exceptions |
+| 5 | Correctness | Business logic, edge cases (empty/null/concurrent), entities mapped to DTOs at the boundary |
+| 6 | Tests | Behavior tested (not implementation); happy path + main error case covered |
+| — | Style/naming | Mention only after the above; formatters and analyzers own this |
 
-Review aspects that tools cannot catch:
-- **Business logic correctness** -- Does the code do what it is supposed to?
-- **Edge cases** -- What happens with empty collections, null inputs, concurrent access?
-- **Error messages** -- Are they actionable for the end user?
-- **Naming clarity** -- Do names communicate intent?
-- **Test quality** -- Do tests verify behavior or just exercise code paths?
+### Step 6: Produce the Review
 
-### Step 7: Produce the Review
-
-Output a structured review with this format:
+Every finding states what's wrong, why it matters, and how to fix it. Never
+bury a security bug under naming nits.
 
 ```markdown
-## Code Review: [Scope Description]
+## Code Review: [Scope]
 
 ### Summary
-[1-3 sentence overview of the change and overall assessment]
+[1-3 sentences: scope, risk level, recommendation]
 
 ### Critical (must fix before merge)
-- **[Finding title]** -- [file:line]
-  [What is wrong, why it matters, how to fix]
+- **[Title]** — [file:line] [What's wrong. Why it matters. How to fix.]
 
 ### Warnings (should fix, creates tech debt)
-- **[Finding title]** -- [file:line]
-  [What is wrong, why it matters, how to fix]
+- **[Title]** — [file:line] [...]
 
 ### Suggestions (nice to have)
-- **[Finding title]** -- [file:line]
-  [Recommendation and rationale]
+- **[Title]** — [file:line] [...]
 
 ### Architecture Compliance
-[PASS/WARN with notes on boundary violations]
+[PASS/WARN with boundary-violation notes]
 
 ### Test Coverage
-[Assessment of test coverage for the changes]
+[Which changed types have tests; specific scenarios to add]
 
 ### What's Good
-- [Positive observations -- always include this section]
+- [Always include — reinforce good patterns]
 ```
+
+**Quick review** (1-2 files, low blast radius): run `detect_antipatterns` +
+`get_diagnostics`, read for correctness, output Summary + Issues + What's Good.
 
 ## Example
 
 ```
 User: /code-review the changes in this PR
 
-Claude: Scoping review to 7 changed files across 3 projects...
+Claude: 7 changed files across 3 projects. CreateOrder touches data access
+and a public endpoint — High blast radius. Running MCP analysis...
 
 ## Code Review: Order Processing Feature
 
 ### Summary
-Adds CreateOrder and GetOrder endpoints with EF Core persistence.
-Well-structured VSA feature with good test coverage. Two issues
-need attention before merge.
+Adds CreateOrder/GetOrder endpoints with EF Core persistence. Well-structured
+VSA feature. Two issues need attention before merge.
 
-### Critical
-- **Missing CancellationToken propagation** -- CreateOrder.cs:38
-  The handler calls DbContext.SaveChangesAsync() without passing
-  the CancellationToken. If the client disconnects, the server
-  continues processing. Pass `ct` from the handler parameter.
+### Critical (must fix before merge)
+- **Missing CancellationToken propagation** — CreateOrder.cs:38
+  SaveChangesAsync() called without the token. Client disconnects keep
+  burning server resources. Pass `ct` from the handler parameter.
 
-### Warnings
-- **N+1 query in GetOrder** -- GetOrder.cs:25
-  Loading Order without .Include(o => o.Items) causes a lazy-load
-  per item during serialization. Add eager loading or use a projection.
+### Warnings (should fix, creates tech debt)
+- **N+1 query in GetOrder** — GetOrder.cs:25
+  Order loaded without `.Include(o => o.Items)`; one lazy load per item
+  during serialization. Eager-load or use a projection.
 
-### Suggestions
-- **Consider sealed class** -- CreateOrderHandler.cs:10
-  Handler classes are not inherited. Mark as sealed for minor
-  performance benefit and clearer intent.
+### Suggestions (nice to have)
+- **Seal the handler** — CreateOrderHandler.cs:10
+  Not designed for inheritance; `sealed` enables devirtualization.
 
 ### Architecture Compliance
-PASS -- All changes within Features/Orders/, no layer violations.
+PASS — all changes within Features/Orders/, no layer violations.
 
 ### Test Coverage
-Two integration tests cover the happy path. Consider adding tests
-for validation failures and not-found scenarios.
+Happy path covered. Add tests for validation failure and not-found.
 
 ### What's Good
-- Clean separation of command and query features
-- FluentValidation rules cover all edge cases
-- Response DTOs use records with good property names
+- Clean command/query separation; FluentValidation covers edge cases
+- Response DTOs are records, no entity leaks
 ```
 
 ## Related
 
-- `/verify` -- Run automated verification pipeline (complements manual review)
-- `/health-check` -- Broader project health assessment beyond a single PR
+- `/de-sloppify` — Cleanup pass for the style/formatting issues review skips
+- `/verify` — Automated verification pipeline (complements manual review)
+- `/health-check` — Broader project health assessment beyond a single PR

@@ -17,7 +17,7 @@ You are the Code Reviewer — the quality gatekeeper. You perform multi-dimensio
 
 ### Always Loaded
 1. `modern-csharp` — Baseline C# 14 patterns
-2. `code-review-workflow` — Structured review process using MCP tools
+2. `code-review` — Structured review process using MCP tools
 3. `convention-learner` — Detect and enforce project-specific conventions
 
 ### Contextually Loaded

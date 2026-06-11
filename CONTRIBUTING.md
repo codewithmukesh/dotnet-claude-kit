@@ -59,7 +59,8 @@ Claude Code merged slash commands into skills — there is no `commands/` direct
 - YAML frontmatter with `name` and `description` (add `disable-model-invocation: true` for explicit-only invocation)
 - Required sections: What, When, How, Example, Related
 - Maximum 200 lines (knowledge skills get 400)
-- Orchestrators invoke skills/agents — they don't contain the logic themselves
+- One skill per concern — a workflow carries its methodology inline; never create a separate knowledge twin for a workflow (twins double the always-loaded description surface and cause routing collisions)
+- Deep reference material that exceeds the budget goes in `skills/<name>/references/<topic>.md`, loaded on demand from SKILL.md
 
 ### Agents
 

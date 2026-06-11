@@ -20,7 +20,7 @@ Load these skills in order:
 1. `modern-csharp` — Baseline C# 14 patterns
 2. `architecture-advisor` — Always load first for architecture decisions; run the questionnaire for new projects
 3. `project-structure` — Solution layout, Directory.Build.props, central package management
-4. `scaffolding` — Code generation patterns for features, entities, and tests across all architectures
+4. `scaffold` — Code generation patterns for features, entities, and tests across all architectures
 5. `project-setup` — Interactive project initialization, health checks, and migration guidance
 
 ### Conditionally Loaded (Based on Project Architecture)

@@ -42,7 +42,7 @@ Start Claude Code in your project directory. The plugin loads automatically. Try
 
 ```
 /health-check          # Assess project health
-/instinct-status       # See what patterns have been learned
+"show instincts"       # See what patterns have been learned
 /plan add user export  # Plan a new feature before building
 ```
 
@@ -76,7 +76,7 @@ Skills are loaded on-demand, not all at once. Each agent has a defined skill map
 - **Medium queries** (feature implementation): 3-4 skills loaded
 - **Large queries** (architecture review): All relevant skills for the domain
 
-The `context-discipline` skill provides advanced strategies for managing token budget during long sessions.
+The `workflow-mastery` skill (Context Discipline section) provides advanced strategies for managing token budget during long sessions.
 
 ### Subagent Delegation
 
@@ -182,16 +182,16 @@ The instinct system learns project-specific patterns and conventions over time.
 ### How It Works
 
 1. **Observation**: As you work, the system observes patterns in your codebase (naming conventions, architecture choices, testing patterns).
-2. **Correction capture**: When you correct Claude, the `self-correction-loop` skill captures the pattern and writes it to `MEMORY.md`.
+2. **Correction capture**: When you correct Claude, the `instinct-system` skill captures the pattern and writes it to `MEMORY.md`.
 3. **Confidence scoring**: Each instinct has a confidence score (0-100) that increases with repeated observations and decreases when contradicted.
 4. **Application**: High-confidence instincts are applied automatically. Low-confidence instincts are suggested but not enforced.
 
 ### Managing Instincts
 
 ```
-/instinct-status       # View all instincts with confidence scores
-/instinct-export       # Export for sharing across projects
-/instinct-import       # Import from another project
+"show instincts"       # View all instincts with confidence scores
+"export instincts"     # Export for sharing across projects
+"import instincts"     # Import from another project
 ```
 
 Instincts are stored in `.claude/instincts.json` and are project-specific. Exporting creates a portable format that another project can import and adapt.
@@ -266,7 +266,7 @@ Use `/wrap-up` when done for the day:
 1. Use MCP tools instead of reading files (see Token Optimization above)
 2. Load fewer skills -- only what the current task needs
 3. Use subagents for research tasks to keep main context clean
-4. Use the `context-discipline` skill for advanced strategies
+4. Use the `workflow-mastery` skill (Context Discipline section) for advanced strategies
 5. Consider splitting large tasks into smaller, focused sessions
 
 ### Tests Failing with Testcontainers
@@ -285,9 +285,9 @@ Use `/wrap-up` when done for the day:
 **Symptom:** Previously learned patterns are not being followed.
 
 **Fixes:**
-1. Check instinct confidence with `/instinct-status` -- low-confidence instincts are suggestions, not enforced
+1. Check instinct confidence by asking "show instincts" -- low-confidence instincts are suggestions, not enforced
 2. Verify `.claude/instincts.json` exists and is not corrupted
-3. Instincts are project-specific -- they do not transfer automatically between projects (use `/instinct-export` and `/instinct-import`)
+3. Instincts are project-specific -- they do not transfer automatically between projects (use the instinct-system export and import modes)
 
 ---
 

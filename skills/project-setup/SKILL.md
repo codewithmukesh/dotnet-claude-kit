@@ -145,7 +145,7 @@ Grading scale:
 
 ### Migration Workflow
 
-> For complete migration workflows (EF Core, NuGet, .NET version upgrades), see the **migration-workflow** skill.
+> For complete migration workflows (EF Core, NuGet, .NET version upgrades), see the **migrate** skill.
 
 ## Anti-patterns
 

@@ -22,13 +22,13 @@ This project uses [dotnet-claude-kit](https://github.com/codewithmukesh/dotnet-c
 Skills live in `skills/<skill-name>/SKILL.md` and follow the Agent Skills open standard.
 
 ### .NET Domain Skills
-api-versioning, architecture-advisor, aspire, authentication, caching, ci-cd, clean-architecture, configuration, ddd, dependency-injection, docker, ef-core, error-handling, httpclient-factory, logging, messaging, minimal-api, modern-csharp, openapi, opentelemetry, project-setup, project-structure, resilience, scaffolding, scalar, serilog, testing, vertical-slice, container-publish
+api-versioning, architecture-advisor, aspire, authentication, caching, ci-cd, clean-architecture, configuration, ddd, dependency-injection, docker, ef-core, error-handling, httpclient-factory, logging, messaging, minimal-api, modern-csharp, openapi, opentelemetry, project-setup, project-structure, resilience, scalar, serilog, testing, vertical-slice, container-publish
 
-### Workflow Skills
-code-review-workflow, convention-learner, migration-workflow, verification-loop, workflow-mastery
+### Workflow Skills (each registers a slash command and carries its methodology inline)
+build-fix, checkpoint, code-review, de-sloppify, dotnet-init, health-check, migrate, plan, scaffold, security-scan, tdd, verify, wrap-up
 
-### Meta & Productivity Skills
-80-20-review, context-discipline, learning-log, model-selection, self-correction-loop, split-memory, wrap-up-ritual
+### Workflow & Learning Skills
+convention-learner, workflow-mastery, instinct-system
 
 ## MCP Tools
 

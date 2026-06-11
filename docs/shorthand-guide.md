@@ -10,27 +10,28 @@ Workflow skills at `skills/<name>/SKILL.md` — each registers its `/name` autom
 
 | Command | Description | Related Skill / Agent |
 |---------|-------------|----------------------|
-| `/plan` | Enter plan mode with architecture awareness | workflow-mastery / dotnet-architect |
-| `/scaffold` | Architecture-aware feature scaffolding | scaffolding / dotnet-architect |
-| `/build-fix` | Autonomous build-fix loop | verification-loop / build-error-resolver |
-| `/verify` | 7-phase verification pipeline | verification-loop / code-reviewer |
+| `/plan` | Enter plan mode with architecture awareness | architecture-advisor / dotnet-architect |
+| `/scaffold` | Architecture-aware feature scaffolding (templates inline) | -- / dotnet-architect |
+| `/build-fix` | Bounded build-fix and test-fix loops | -- / build-error-resolver |
+| `/verify` | 7-phase verification pipeline | -- / code-reviewer |
 | `/tdd` | Guided test-driven development workflow | testing / test-engineer |
-| `/code-review` | MCP-powered multi-dimensional code review | code-review-workflow / code-reviewer |
-| `/health-check` | Project health assessment with letter grades | health-check / code-reviewer |
-| `/security-scan` | Deep security audit (OWASP Top 10, secrets, packages) | security-scan / security-auditor |
-| `/migrate` | Guided EF Core migration workflow | migration-workflow / ef-core-specialist |
-| `/de-sloppify` | Systematic code cleanup pass | de-sloppify / refactor-cleaner |
-| `/checkpoint` | Save progress with commit and handoff note | wrap-up-ritual / -- |
-| `/wrap-up` | End-of-session wrap-up ritual | wrap-up-ritual / -- |
-| `/instinct-status` | Display learned instincts with confidence scores | instinct-system / -- |
-| `/instinct-export` | Export instincts to shareable format | instinct-system / -- |
-| `/instinct-import` | Import instincts from another project | instinct-system / -- |
+| `/code-review` | MCP-powered, blast-radius-prioritized code review | -- / code-reviewer |
+| `/health-check` | Project health assessment with letter grades | -- / code-reviewer |
+| `/security-scan` | Deep security audit (OWASP Top 10, secrets, packages) | -- / security-auditor |
+| `/migrate` | EF Core schema, .NET version, and NuGet migrations | ef-core / ef-core-specialist |
+| `/de-sloppify` | Systematic code cleanup pass | -- / refactor-cleaner |
+| `/checkpoint` | Mid-session save: commit + brief handoff note | -- / -- |
+| `/wrap-up` | Session handoff lifecycle (end-of-session + session start) | instinct-system / -- |
+
+Instinct operations (status, export, import) are modes of the `instinct-system` skill — say "show instincts", "export instincts", or "import instincts".
 
 ---
 
-## Skills (47 total)
+## Skills (44 total)
 
-### .NET Domain (29)
+13 are the workflow skills listed under Slash Commands above; the remaining 31 are knowledge skills:
+
+### .NET Domain (28)
 
 | Category | Skills |
 |----------|--------|
@@ -42,33 +43,15 @@ Workflow skills at `skills/<name>/SKILL.md` — each registers its `/name` autom
 | Resilience & Performance | caching, resilience, httpclient-factory |
 | Messaging | messaging |
 | Language | modern-csharp |
-| Project | project-setup, scaffolding, testing |
+| Project | project-setup, testing |
 
-### Workflow (5)
+### Workflow & Learning (3)
 
 | Skill | Purpose |
 |-------|---------|
-| code-review-workflow | Structured multi-dimensional review process |
 | convention-learner | Detect and codify project conventions |
-| migration-workflow | Safe EF Core migration with review and rollback |
-| verification-loop | Build-test-verify feedback loop |
-| workflow-mastery | Advanced Claude Code workflow patterns |
-
-### Meta & Productivity (7)
-
-| Skill | Purpose |
-|-------|---------|
-| 80-20-review | Focus review effort on highest-risk code |
-| context-discipline | Manage context window and token budget |
-| learning-log | Document non-obvious discoveries |
-| model-selection | Choose the right model (Opus/Sonnet/Haiku) per task |
-| self-correction-loop | Capture corrections and prevent recurrence |
-| split-memory | Split large CLAUDE.md across organized files |
-| wrap-up-ritual | Session handoff with progress and pending tasks |
-
-### Autonomous (6 -- no SKILL.md, used internally)
-
-autonomous-loops, de-sloppify, health-check, instinct-system, security-scan, session-management
+| workflow-mastery | Advanced Claude Code workflow patterns + context discipline |
+| instinct-system | Confidence-scored instincts, correction capture, discovery logging (with status/export/import modes) |
 
 ---
 
@@ -76,15 +59,15 @@ autonomous-loops, de-sloppify, health-check, instinct-system, security-scan, ses
 
 | Agent | Triggers | Primary Skills |
 |-------|----------|---------------|
-| dotnet-architect | "architecture", "project structure", "set up project", "add module" | architecture-advisor, project-structure, scaffolding, project-setup |
+| dotnet-architect | "architecture", "project structure", "set up project", "add module" | architecture-advisor, project-structure, scaffold, project-setup |
 | api-designer | "create endpoint", "API route", "OpenAPI", "versioning" | minimal-api, api-versioning, authentication, error-handling |
-| ef-core-specialist | "database", "migration", "query", "DbContext", "EF" | ef-core, configuration, migration-workflow |
+| ef-core-specialist | "database", "migration", "query", "DbContext", "EF" | ef-core, configuration, migrate |
 | test-engineer | "write tests", "test strategy", "WebApplicationFactory", "Testcontainers" | testing |
 | security-auditor | "security", "authentication", "JWT", "OIDC", "authorize" | authentication, configuration |
 | performance-analyst | "performance", "benchmark", "caching", "HybridCache" | caching |
 | devops-engineer | "Docker", "CI/CD", "pipeline", "Aspire", "deploy" | docker, ci-cd, aspire |
-| code-reviewer | "review this code", "PR review", "code quality", "conventions" | code-review-workflow, convention-learner |
-| build-error-resolver | Build failures, compilation errors | modern-csharp, autonomous-loops |
+| code-reviewer | "review this code", "PR review", "code quality", "conventions" | code-review, convention-learner |
+| build-error-resolver | Build failures, compilation errors | modern-csharp, build-fix |
 | refactor-cleaner | "clean up", "dead code", "refactor", "remove unused" | modern-csharp |
 
 ---
@@ -150,18 +133,15 @@ Only the first three are Claude Code hooks (auto-run via `hooks/hooks.json`); th
 
 | Command | Primary Skill(s) | Primary Agent | Support Agent(s) |
 |---------|-----------------|---------------|-------------------|
-| `/plan` | workflow-mastery | dotnet-architect | -- |
-| `/scaffold` | scaffolding, project-setup | dotnet-architect | api-designer, ef-core-specialist |
-| `/build-fix` | verification-loop | build-error-resolver | -- |
-| `/verify` | verification-loop | code-reviewer | dotnet-architect |
+| `/plan` | architecture-advisor | dotnet-architect | -- |
+| `/scaffold` | project-setup | dotnet-architect | api-designer, ef-core-specialist |
+| `/build-fix` | -- | build-error-resolver | -- |
+| `/verify` | -- | code-reviewer | dotnet-architect |
 | `/tdd` | testing | test-engineer | -- |
-| `/code-review` | code-review-workflow, 80-20-review | code-reviewer | -- |
-| `/health-check` | health-check | code-reviewer | dotnet-architect |
-| `/security-scan` | security-scan, authentication | security-auditor | -- |
-| `/migrate` | migration-workflow, ef-core | ef-core-specialist | -- |
-| `/de-sloppify` | de-sloppify | refactor-cleaner | code-reviewer |
-| `/checkpoint` | wrap-up-ritual | -- | -- |
-| `/wrap-up` | wrap-up-ritual | -- | -- |
-| `/instinct-status` | instinct-system | -- | -- |
-| `/instinct-export` | instinct-system | -- | -- |
-| `/instinct-import` | instinct-system | -- | -- |
+| `/code-review` | convention-learner | code-reviewer | -- |
+| `/health-check` | -- | code-reviewer | dotnet-architect |
+| `/security-scan` | authentication | security-auditor | -- |
+| `/migrate` | ef-core | ef-core-specialist | -- |
+| `/de-sloppify` | -- | refactor-cleaner | code-reviewer |
+| `/checkpoint` | -- | -- | -- |
+| `/wrap-up` | instinct-system | -- | -- |

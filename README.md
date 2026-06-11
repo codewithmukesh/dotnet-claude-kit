@@ -3,7 +3,7 @@
   <p align="center">
     <strong>Make Claude Code an expert .NET developer.</strong>
     <br />
-    60 skills &bull; 10 specialist agents &bull; 16 slash commands &bull; 10 rules &bull; 5 project templates &bull; 15 MCP tools &bull; automation hooks
+    44 skills &bull; 10 specialist agents &bull; 13 slash commands &bull; 10 rules &bull; 5 project templates &bull; 15 MCP tools &bull; automation hooks
     <br />
     Built for .NET 10 / C# 14. Architecture-aware. Token-efficient.
   </p>
@@ -13,8 +13,8 @@
   <a href="#installation">Installation</a> &bull;
   <a href="#quick-start">Quick Start</a> &bull;
   <a href="#what-makes-this-10x">10x Features</a> &bull;
-  <a href="#slash-commands-16">Commands</a> &bull;
-  <a href="#knowledge-skills-47">Skills</a> &bull;
+  <a href="#slash-commands-13">Commands</a> &bull;
+  <a href="#knowledge-skills-31">Skills</a> &bull;
   <a href="#agents-10">Agents</a> &bull;
   <a href="#rules-10">Rules</a> &bull;
   <a href="#templates-5">Templates</a> &bull;
@@ -75,7 +75,7 @@ v0.4.0 adds an **action layer** on top of the knowledge layer — Claude doesn't
 
 ### Plugin Install (Recommended)
 
-Install as a Claude Code plugin — all 60 skills (including 16 slash-command workflows), 10 agents, 10 rules, hooks, and MCP config activate globally:
+Install as a Claude Code plugin — all 44 skills (including 13 slash-command workflows), 10 agents, 10 rules, hooks, and MCP config activate globally:
 
 ```bash
 # In your terminal — install the Roslyn MCP server
@@ -129,7 +129,7 @@ Replace `[ProjectName]`, update tech stack, choose your architecture.
 
 </details>
 
-Start Claude Code — 60 skills, 10 agents, 10 rules, and 15 MCP tools activate automatically.
+Start Claude Code — 44 skills, 10 agents, 10 rules, and 15 MCP tools activate automatically.
 
 That's it. Claude now writes .NET code the way a senior .NET engineer would.
 
@@ -217,28 +217,27 @@ public sealed class OrderEndpoints : IEndpointGroup
 
 ---
 
-## Slash Commands (16)
+## Slash Commands (13)
 
-Shortcut workflows that orchestrate skills and agents. Type the command and Claude handles the rest. These are workflow skills (Claude Code merged slash commands into skills) — each lives at `skills/<name>/SKILL.md` and registers its `/name` automatically.
+Shortcut workflows that orchestrate skills and agents. Type the command and Claude handles the rest. These are workflow skills — each lives at `skills/<name>/SKILL.md`, registers its `/name` automatically, and carries its methodology inline (no separate knowledge twin to load).
 
-| Command | Purpose | Invokes |
-|---------|---------|---------|
+| Command | Purpose | Works With |
+|---------|---------|------------|
 | `/dotnet-init` | Project setup (existing or greenfield) — detects or scaffolds, then generates CLAUDE.md | project-setup skill, dotnet-architect agent |
 | `/plan` | Architecture-aware planning for non-trivial tasks | architecture-advisor skill, dotnet-architect agent |
-| `/verify` | 7-phase verification: build → analyzers → antipatterns → tests → security → format → diff | verification-loop skill |
+| `/verify` | 7-phase verification: build → analyzers → antipatterns → tests → security → format → diff | — |
 | `/tdd` | Red-green-refactor with xUnit + Testcontainers | testing skill, test-engineer agent |
-| `/scaffold` | Architecture-aware feature scaffolding (all 4 architectures) | scaffolding skill, dotnet-architect agent |
-| `/code-review` | MCP-powered multi-dimensional code review | code-review-workflow skill, code-reviewer agent |
-| `/build-fix` | Autonomous build error fixing (iterative loop) | autonomous-loops skill, build-error-resolver agent |
-| `/checkpoint` | Save progress: commit + handoff note | wrap-up-ritual skill |
-| `/security-scan` | OWASP + secrets + vulnerable dependency audit | security-scan skill, security-auditor agent |
-| `/migrate` | Safe EF Core migration workflow | migration-workflow skill, ef-core-specialist agent |
-| `/health-check` | Project health assessment with letter grades (A-F) | health-check skill, code-reviewer agent |
-| `/de-sloppify` | Systematic cleanup: format → dead code → analyzers → sealed | de-sloppify skill, refactor-cleaner agent |
-| `/wrap-up` | Session ending ritual with handoff note | wrap-up-ritual skill |
-| `/instinct-status` | Show learned instincts with confidence scores | instinct-system skill |
-| `/instinct-export` | Export instincts to shareable format | instinct-system skill |
-| `/instinct-import` | Import instincts from another project | instinct-system skill |
+| `/scaffold` | Architecture-aware feature scaffolding (all 4 architectures, per-architecture templates included) | dotnet-architect agent |
+| `/code-review` | MCP-powered, blast-radius-prioritized code review | code-reviewer agent |
+| `/build-fix` | Bounded build-fix and test-fix loops with progress detection | build-error-resolver agent |
+| `/checkpoint` | Mid-session save: commit + brief handoff note | — |
+| `/security-scan` | OWASP + secrets + vulnerable dependency audit | security-auditor agent |
+| `/migrate` | EF Core schema, .NET version, and NuGet migrations with rollback | ef-core-specialist agent |
+| `/health-check` | Project health assessment with letter grades (A-F) | code-reviewer agent |
+| `/de-sloppify` | Systematic cleanup: format → dead code → analyzers → sealed | refactor-cleaner agent |
+| `/wrap-up` | Session handoff lifecycle: end-of-session ritual + session-start loading | instinct-system skill |
+
+Instinct operations (status, export, import) are modes of the [instinct-system](skills/instinct-system/SKILL.md) skill — say "show instincts", "export instincts", or "import instincts".
 
 ## Rules (10)
 
@@ -257,26 +256,23 @@ Always-loaded conventions that apply to every interaction. Zero configuration �
 | [hooks](.claude/rules/hooks.md) | Auto-accept formatting, never skip pre-commit hooks |
 | [packages](.claude/rules/packages.md) | Always use latest stable NuGet versions, never rely on training data versions |
 
-## Knowledge Skills (47)
+## Knowledge Skills (31)
 
-Code-heavy reference files that teach Claude .NET best practices. Each skill is under 400 lines with concrete code examples, anti-patterns (BAD/GOOD comparisons), and decision guides. (The other 13 of the 60 skills are the workflow orchestrators documented under [Slash Commands](#slash-commands-16).)
+Code-heavy reference files that teach Claude .NET best practices. Each skill is under 400 lines with concrete code examples, anti-patterns (BAD/GOOD comparisons), and decision guides. (The other 13 of the 44 skills are the workflow orchestrators documented under [Slash Commands](#slash-commands-13).)
 
 | Category | Skills | What Claude Learns |
 |----------|--------|--------------------|
 | **Architecture** | [architecture-advisor](skills/architecture-advisor/SKILL.md), [vertical-slice](skills/vertical-slice/SKILL.md), [clean-architecture](skills/clean-architecture/SKILL.md), [ddd](skills/ddd/SKILL.md), [project-structure](skills/project-structure/SKILL.md) | Ask before recommending. VSA for CRUD, CA for medium complexity, DDD for rich domains, Modular Monolith for bounded contexts. |
 | **Core Language** | [modern-csharp](skills/modern-csharp/SKILL.md) | Primary constructors, collection expressions, `field` keyword, records, pattern matching, spans |
-| **Web / API** | [minimal-api](skills/minimal-api/SKILL.md), [api-versioning](skills/api-versioning/SKILL.md), [authentication](skills/authentication/SKILL.md) | `MapGroup`, `TypedResults`, endpoint filters, JWT/OIDC, Asp.Versioning |
+| **Web / API** | [minimal-api](skills/minimal-api/SKILL.md), [api-versioning](skills/api-versioning/SKILL.md), [authentication](skills/authentication/SKILL.md), [openapi](skills/openapi/SKILL.md), [scalar](skills/scalar/SKILL.md), [httpclient-factory](skills/httpclient-factory/SKILL.md) | `MapGroup`, `TypedResults`, endpoint filters, JWT/OIDC, Asp.Versioning, built-in OpenAPI, typed HTTP clients |
 | **Data** | [ef-core](skills/ef-core/SKILL.md) | No repository wrappers. Compiled queries, interceptors, `ExecuteUpdateAsync`, value converters |
 | **Resilience** | [error-handling](skills/error-handling/SKILL.md), [resilience](skills/resilience/SKILL.md), [caching](skills/caching/SKILL.md), [messaging](skills/messaging/SKILL.md) | Result pattern, Polly v8 pipelines, `HybridCache`, Wolverine/MassTransit, outbox, sagas |
-| **Observability** | [logging](skills/logging/SKILL.md) | Serilog structured logging, OpenTelemetry, correlation IDs |
+| **Observability** | [logging](skills/logging/SKILL.md), [serilog](skills/serilog/SKILL.md), [opentelemetry](skills/opentelemetry/SKILL.md) | Health checks and correlation IDs, Serilog structured logging, OpenTelemetry traces and metrics |
 | **Testing** | [testing](skills/testing/SKILL.md) | xUnit v3, `WebApplicationFactory`, `Testcontainers`, Verify snapshots |
-| **DevOps** | [docker](skills/docker/SKILL.md), [ci-cd](skills/ci-cd/SKILL.md), [aspire](skills/aspire/SKILL.md) | Multi-stage builds, GitHub Actions, .NET Aspire orchestration |
+| **DevOps** | [docker](skills/docker/SKILL.md), [container-publish](skills/container-publish/SKILL.md), [ci-cd](skills/ci-cd/SKILL.md), [aspire](skills/aspire/SKILL.md) | Multi-stage builds, Dockerfile-less SDK publishing, GitHub Actions, .NET Aspire orchestration |
 | **Cross-cutting** | [dependency-injection](skills/dependency-injection/SKILL.md), [configuration](skills/configuration/SKILL.md) | Keyed services, Options pattern, secrets management |
-| **Workflow** | [workflow-mastery](skills/workflow-mastery/SKILL.md) | Parallel worktrees, plan mode strategy, verification loops, auto-format hooks, permission setup, subagent patterns |
-| **Workflows & Automation** | [scaffolding](skills/scaffolding/SKILL.md), [project-setup](skills/project-setup/SKILL.md), [code-review-workflow](skills/code-review-workflow/SKILL.md), [migration-workflow](skills/migration-workflow/SKILL.md), [convention-learner](skills/convention-learner/SKILL.md) | Feature scaffolding for all architectures, interactive project init, MCP-driven PR reviews, safe migration workflows, convention detection and enforcement |
-| **Verification & Quality** | [verification-loop](skills/verification-loop/SKILL.md), [de-sloppify](skills/de-sloppify/SKILL.md), [health-check](skills/health-check/SKILL.md), [security-scan](skills/security-scan/SKILL.md) | 7-phase verification pipeline, systematic cleanup, graded health assessment, deep security scanning |
-| **Intelligence & Learning** | [instinct-system](skills/instinct-system/SKILL.md), [session-management](skills/session-management/SKILL.md), [autonomous-loops](skills/autonomous-loops/SKILL.md) | Confidence-scored pattern learning, session continuity, bounded iterative fix loops |
-| **Meta & Productivity** | [self-correction-loop](skills/self-correction-loop/SKILL.md), [wrap-up-ritual](skills/wrap-up-ritual/SKILL.md), [context-discipline](skills/context-discipline/SKILL.md), [model-selection](skills/model-selection/SKILL.md), [80-20-review](skills/80-20-review/SKILL.md), [split-memory](skills/split-memory/SKILL.md), [learning-log](skills/learning-log/SKILL.md) | Self-improving correction capture, structured session handoffs, token budget management, strategic model selection, focused code review, modular CLAUDE.md, insight documentation |
+| **Project Setup** | [project-setup](skills/project-setup/SKILL.md), [convention-learner](skills/convention-learner/SKILL.md) | Solution scaffolding, convention detection and enforcement |
+| **Workflow & Learning** | [workflow-mastery](skills/workflow-mastery/SKILL.md), [instinct-system](skills/instinct-system/SKILL.md) | Parallel worktrees, plan mode strategy, subagent patterns, context discipline; confidence-scored instincts, correction capture, discovery logging |
 
 ## Agents (10)
 
@@ -381,7 +377,7 @@ dotnet-claude-kit/
 ├── CLAUDE.md                    # Instructions for developing THIS repo
 ├── AGENTS.md                    # Agent routing & orchestration
 ├── agents/                      # 10 specialist agents
-├── skills/                      # 60 skills (incl. 16 slash-command workflows)
+├── skills/                      # 44 skills (incl. 13 slash-command workflows)
 ├── .claude/rules/               # 10 always-loaded rules
 ├── templates/                   # 5 drop-in CLAUDE.md templates
 ├── knowledge/                   # Living reference documents + ADRs

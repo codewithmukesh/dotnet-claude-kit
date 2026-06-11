@@ -60,15 +60,15 @@ Agents load skills in dependency order. Core skills load first.
 
 | Agent | Skills |
 |-------|--------|
-| dotnet-architect | modern-csharp, architecture-advisor, project-structure, scaffolding, project-setup + conditional: vertical-slice, clean-architecture, ddd |
+| dotnet-architect | modern-csharp, architecture-advisor, project-structure, scaffold, project-setup + conditional: vertical-slice, clean-architecture, ddd |
 | api-designer | modern-csharp, minimal-api, api-versioning, authentication, error-handling |
-| ef-core-specialist | modern-csharp, ef-core, configuration, migration-workflow |
+| ef-core-specialist | modern-csharp, ef-core, configuration, migrate |
 | test-engineer | modern-csharp, testing |
 | security-auditor | modern-csharp, authentication, configuration |
 | performance-analyst | modern-csharp, caching |
 | devops-engineer | modern-csharp, docker, ci-cd, aspire |
-| code-reviewer | modern-csharp, code-review-workflow, convention-learner + contextual (loads relevant skills incl. clean-architecture, ddd based on files under review) |
-| build-error-resolver | modern-csharp, autonomous-loops + contextual: ef-core, dependency-injection |
+| code-reviewer | modern-csharp, code-review, convention-learner + contextual (loads relevant skills incl. clean-architecture, ddd based on files under review) |
+| build-error-resolver | modern-csharp, build-fix + contextual: ef-core, dependency-injection |
 | refactor-cleaner | modern-csharp, de-sloppify + contextual: testing, ef-core |
 
 ## MCP Tool Preferences
@@ -91,58 +91,52 @@ Agents should **prefer Roslyn MCP tools over file scanning** to reduce token con
 
 ## Cross-Agent Meta Skills
 
-These 10 meta and productivity skills are not tied to a specific agent — any agent can load them when the context calls for it:
+These meta and productivity skills are not tied to a specific agent — any agent can load them when the context calls for it:
 
 | Skill | When to Load |
 |-------|-------------|
-| `self-correction-loop` | After ANY user correction — capture the rule in MEMORY.md |
-| `wrap-up-ritual` | User signals end of session — write handoff to `.claude/handoff.md` |
-| `context-discipline` | Context running low, large codebase navigation, planning exploration strategy |
-| `model-selection` | Choosing between Opus/Sonnet/Haiku, assigning subagent models |
-| `80-20-review` | Code review, PR review, deciding what to review in depth |
-| `split-memory` | CLAUDE.md exceeds 300 lines, need to split instructions across files |
-| `learning-log` | Non-obvious discovery during development — log the insight |
-| `instinct-system` | Pattern detection across sessions — observe-hypothesize-confirm cycle for project conventions |
-| `session-management` | Session start/end — load handoff, detect solution, write session summary |
-| `autonomous-loops` | Iterative fix loops — build-fix, test-fix, refactor with bounded iterations |
+| `instinct-system` | After ANY user correction, pattern detection across sessions, logging non-obvious discoveries; includes status/export/import modes |
+| `wrap-up` | Session start (load handoff) and session end (write handoff to `.claude/handoff.md`, capture learnings) |
+| `checkpoint` | Mid-session save before risky changes or task switches — commit + brief handoff |
+| `workflow-mastery` | Context running low, large codebase navigation, parallel workflows, subagent strategy |
+| `convention-learner` | Detect and enforce project-specific conventions in new code |
+
+Model selection guidance lives in the always-loaded `.claude/rules/agents.md` — no skill load needed.
 
 ### Meta Skill Routing
 
 | User Intent Pattern | Skill |
 |---|---|
-| "learn from mistakes", "remember this", "don't do that again" | self-correction-loop |
-| "wrap up", "done for today", "save progress", "handoff" | wrap-up-ritual |
-| "context", "running out of tokens", "too many files" | context-discipline |
-| "which model", "use Opus", "use Sonnet", "switch model" | model-selection |
-| "review this", "what should I review", "blast radius" | 80-20-review |
-| "split CLAUDE.md", "too long", "organize instructions" | split-memory |
-| "log this", "document this finding", "gotcha" | learning-log |
-| "show instincts", "what have you learned", "confidence scores" | instinct-system |
-| "start session", "load handoff", "session start" | session-management |
-| "fix build loop", "keep fixing", "auto-fix" | autonomous-loops |
+| "learn from mistakes", "remember this", "log this", "gotcha", "show instincts", "what have you learned" | instinct-system |
+| "wrap up", "done for today", "handoff", "start session", "load handoff" | wrap-up |
+| "save progress", "checkpoint", "pause here" | checkpoint |
+| "context", "running out of tokens", "too many files" | workflow-mastery |
+| "review this", "what should I review", "blast radius" | code-review |
+| "fix build loop", "keep fixing", "auto-fix" | build-fix |
 
 ## Slash Commands
 
 Commands map to skills and agents. Use these as shortcuts for common workflows.
 
-| Command | Primary Skill | Primary Agent | Purpose |
-|---------|--------------|---------------|---------|
+Each workflow skill registers its own slash command and carries its methodology inline (the kit no longer splits workflows from their knowledge twins).
+
+| Command | Supporting Skills | Primary Agent | Purpose |
+|---------|------------------|---------------|---------|
 | `/dotnet-init` | project-setup | dotnet-architect | Interactive project initialization |
 | `/plan` | architecture-advisor | dotnet-architect | Architecture-aware planning |
-| `/verify` | verification-loop | — | 7-phase verification pipeline |
+| `/verify` | — | — | 7-phase verification pipeline |
 | `/tdd` | testing | test-engineer | Red-green-refactor workflow |
-| `/scaffold` | scaffolding | dotnet-architect | Architecture-aware feature scaffolding |
-| `/code-review` | code-review-workflow | code-reviewer | MCP-powered code review |
-| `/build-fix` | autonomous-loops | build-error-resolver | Iterative build error fixing |
-| `/checkpoint` | wrap-up-ritual | — | Save progress (commit + handoff) |
-| `/security-scan` | security-scan | security-auditor | OWASP + secrets + dependency audit |
-| `/migrate` | migration-workflow | ef-core-specialist | Safe EF Core migration workflow |
-| `/health-check` | health-check | code-reviewer | Graded project health report |
-| `/de-sloppify` | de-sloppify | refactor-cleaner | Systematic code cleanup |
-| `/wrap-up` | wrap-up-ritual | — | Session ending ritual |
-| `/instinct-status` | instinct-system | — | Show learned instincts |
-| `/instinct-export` | instinct-system | — | Export instincts to shareable format |
-| `/instinct-import` | instinct-system | — | Import instincts from another project |
+| `/scaffold` | — | dotnet-architect | Architecture-aware feature scaffolding |
+| `/code-review` | convention-learner | code-reviewer | MCP-powered, blast-radius-prioritized code review |
+| `/build-fix` | — | build-error-resolver | Bounded build-fix and test-fix loops |
+| `/checkpoint` | — | — | Mid-session save (commit + handoff) |
+| `/security-scan` | — | security-auditor | OWASP + secrets + dependency audit |
+| `/migrate` | ef-core | ef-core-specialist | EF Core schema, .NET version, and NuGet migrations |
+| `/health-check` | — | code-reviewer | Graded project health report |
+| `/de-sloppify` | — | refactor-cleaner | Systematic code cleanup |
+| `/wrap-up` | instinct-system | — | Session handoff lifecycle (end + start) |
+
+Instinct operations (status, export, import) are modes of the `instinct-system` skill — say "show instincts", "export instincts", or "import instincts".
 
 ## Conflict Resolution
 
@@ -155,7 +149,7 @@ When two agents could handle a query:
 
 ## Token Budget Guidance
 
-For detailed context management strategies, see the **`context-discipline`** skill.
+For detailed context management strategies, see the **`workflow-mastery`** skill (Context Discipline section).
 
 - **Small queries** (single pattern/fix): Load 1-2 skills, use MCP tools for context
 - **Medium queries** (feature implementation): Load 3-4 skills, use MCP tools to understand existing code

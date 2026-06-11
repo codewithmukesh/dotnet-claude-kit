@@ -93,10 +93,9 @@ Load these dotnet-claude-kit skills for context:
 - `logging` — Serilog, OpenTelemetry
 - `configuration` — Options pattern, secrets management
 - `dependency-injection` — Service registration patterns
-- `workflow-mastery` — Parallel worktrees, verification loops, subagent patterns
-- `self-correction-loop` — Capture corrections as permanent rules in MEMORY.md
-- `wrap-up-ritual` — Structured session handoff to `.claude/handoff.md`
-- `context-discipline` — Token budget management, MCP-first navigation
+- `workflow-mastery` — Parallel worktrees, verification loops, subagent patterns, context discipline
+- `instinct-system` — Capture corrections, instincts, and discoveries as persistent learning
+- `wrap-up` — Structured session handoff to `.claude/handoff.md`
 
 ## MCP Tools
 

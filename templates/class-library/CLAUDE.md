@@ -123,10 +123,9 @@ Load these dotnet-claude-kit skills for context:
 - `project-structure` -- Solution layout, Directory.Build.props, central package management
 - `testing` -- xUnit v3, test patterns, snapshot testing
 - `ci-cd` -- GitHub Actions / Azure DevOps pipelines with pack + push stages
-- `workflow-mastery` -- Parallel worktrees, verification loops, subagent patterns
-- `self-correction-loop` -- Capture corrections as permanent rules in MEMORY.md
-- `wrap-up-ritual` -- Structured session handoff to `.claude/handoff.md`
-- `context-discipline` -- Token budget management, MCP-first navigation
+- `workflow-mastery` -- Parallel worktrees, verification loops, subagent patterns, context discipline
+- `instinct-system` -- Capture corrections, instincts, and discoveries as persistent learning
+- `wrap-up` -- Structured session handoff to `.claude/handoff.md`
 
 ## MCP Tools
 

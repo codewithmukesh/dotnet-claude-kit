@@ -28,7 +28,7 @@ description: >
 
 ### 8-Dimension Health Assessment
 
-Run all dimensions. Each uses specific MCP tools and produces a letter grade. For deep code-quality dimensions, delegate to the `code-reviewer` agent with the `code-review-workflow` skill.
+Run all dimensions. Each uses specific MCP tools and produces a letter grade. For deep code-quality dimensions, delegate to the `code-reviewer` agent with the `code-review` skill.
 
 **Dimension 1: Build Health**
 ```

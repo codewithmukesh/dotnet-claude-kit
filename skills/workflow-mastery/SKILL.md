@@ -3,12 +3,17 @@ name: workflow-mastery
 description: >
   Claude Code workflow mastery for .NET developers. Covers parallel execution
   with git worktrees, plan mode strategy, verification loops, auto-formatting
-  hooks, permission setup for dotnet CLI, prompting techniques, and subagent
-  patterns — all adapted for the .NET ecosystem.
+  hooks, permission setup for dotnet CLI, prompting techniques, subagent
+  patterns, and context discipline — token budget management, MCP-first
+  navigation, lazy loading, and subagent isolation — all adapted for the
+  .NET ecosystem.
   Load this skill when setting up Claude Code for a .NET project, optimizing
-  workflows, running parallel sessions, or when the user mentions "productivity",
-  "workflow", "parallel", "worktree", "plan mode", "permissions", "hooks",
-  "10x", "setup Claude Code", or "speed up development".
+  workflows, running parallel sessions, when context is running low or sessions
+  feel sluggish, when exploring a large codebase efficiently, or when the user
+  mentions "productivity", "workflow", "parallel", "worktree", "plan mode",
+  "permissions", "hooks", "10x", "setup Claude Code", "speed up development",
+  "context", "tokens", "budget", "running out of context", "too many files",
+  or "large codebase".
   Inspired by tips from Boris Cherny (creator of Claude Code) and the Anthropic team.
 ---
 
@@ -19,8 +24,9 @@ description: >
 1. **Parallel over sequential** — Run 3-5 Claude sessions simultaneously using git worktrees. Build a feature in one, fix a bug in another, run tests in a third. The single biggest productivity unlock.
 2. **Plan then execute** — For any non-trivial task, start in plan mode, iterate until the plan is bulletproof, then switch to auto-accept. A good plan means Claude 1-shots the implementation.
 3. **Verification closes the loop** — Give Claude a way to prove its work: `dotnet build`, `dotnet test`, `get_diagnostics` via MCP. This single practice 2-3x the quality of the output.
-4. **Automate the repetitive** — If you do it more than once a day, make it a hook, a slash command, or a subagent. Pre-allow safe permissions. Eliminate friction.
-5. **Compound your knowledge** — Every correction becomes a rule in `MEMORY.md` (see `self-correction-loop` skill). Every PR review adds a learning. Over time, Claude's mistake rate drops because your project's knowledge base grows.
+4. **Context is a budget, not a dumping ground** — A 200k window fills fast: a typical .cs file is 500-2000 tokens, and 50 file reads can burn half the budget. Spend tokens like sprint capacity — deliberately.
+5. **Automate the repetitive** — If you do it more than once a day, make it a hook, a slash command, or a subagent. Pre-allow safe permissions. Eliminate friction.
+6. **Compound your knowledge** — Every correction becomes a rule in `MEMORY.md` (see `instinct-system` skill). Every PR review adds a learning. Over time, Claude's mistake rate drops because your project's knowledge base grows.
 
 ## Patterns
 
@@ -125,13 +131,13 @@ What could go wrong? What's missing? What would you do differently?"
 
 ### Verification Loop for .NET
 
-> For the full 7-phase verification pipeline (build, diagnostics, anti-patterns, tests, security, format, diff review) with structured PASS/FAIL reporting, see the **verification-loop** skill.
+> For the full 7-phase verification pipeline (build, diagnostics, anti-patterns, tests, security, format, diff review) with structured PASS/FAIL reporting, see the **verify** skill.
 
-Boris's #1 tip: "Give Claude a way to verify its work." The short version: always tell Claude to run `dotnet build`, `dotnet test`, `get_diagnostics`, and `dotnet format --verify-no-changes` before declaring done. The verification-loop skill has the complete pipeline with short-circuit rules and report templates.
+Boris's #1 tip: "Give Claude a way to verify its work." The short version: always tell Claude to run `dotnet build`, `dotnet test`, `get_diagnostics`, and `dotnet format --verify-no-changes` before declaring done. The verify skill has the complete pipeline with short-circuit rules and report templates.
 
 ### Compounding Knowledge via Corrections
 
-For the full correction capture system — detection, generalization, categorized storage, and periodic audits — see the **`self-correction-loop`** skill. The short version: after every correction, capture a generalized rule in `MEMORY.md` so the same mistake never recurs.
+For the full correction capture system — detection, generalization, categorized storage, and periodic audits — see the **`instinct-system`** skill. The short version: after every correction, capture a generalized rule in `MEMORY.md` so the same mistake never recurs.
 
 ### Prompting Techniques for .NET
 
@@ -161,8 +167,6 @@ I want to verify the migration before applying it."
 ```
 
 ### Subagent Patterns for .NET
-
-> **Context-aware delegation:** For guidance on when to use subagents to manage token budgets effectively, see the **`context-discipline`** skill.
 
 Create reusable subagents in `.claude/agents/`:
 
@@ -194,6 +198,65 @@ Do not change behavior. Only simplify.
 "Run the verify-api agent on my changes before I create the PR."
 "Run code-simplifier on the files I just modified."
 ```
+
+**When to offload vs. stay in main context:** see Context Discipline below — subagents are also your context isolation chambers, not just task runners.
+
+## Context Discipline
+
+The rules in `.claude/rules/agents.md` already mandate MCP-first navigation (`find_symbol` before file reads, `get_diagnostics` over builds). This section is the strategy layer on top: how to budget, when to offload, and how to recover.
+
+### Token Economics
+
+A Roslyn MCP query costs 30-150 tokens; a file read costs 500-2000+. To understand `OrderService`, four MCP calls (`find_symbol` → `get_public_api` → `find_references` → `get_type_hierarchy`) cost ~310 tokens; reading the four related files costs ~2900. Then read only the method you'll modify. Reserve full file reads for files you are about to edit.
+
+### Subagent Offloading Decision Matrix
+
+```
+OFFLOAD TO A SUBAGENT WHEN:
+- Exploring unfamiliar code (> 3 files to read)
+- Research requiring docs or multiple files
+- Verbose output (test runs, diagnostics, comparisons)
+- Any task where the journey is verbose but the answer is concise
+
+STAY IN MAIN CONTEXT WHEN:
+- Modifying a file you've already read
+- Quick lookups (1-2 MCP queries)
+- Work that builds on the ongoing conversation with the user
+```
+
+Ask subagents for compressed answers: "Trace the auth flow from login to token validation. Return numbered steps with file:line references." You get ~300 tokens of findings instead of 15k tokens of raw files.
+
+### File Reading Prioritization
+
+```
+PRIORITY 1 — Files you will modify: read fully (exact content needed for edits)
+PRIORITY 2 — Contracts you must satisfy: read the interface, skip implementations
+PRIORITY 3 — Reference patterns: get_public_api first, read only if insufficient
+PRIORITY 4 — General context: subagent summarizes; never read in main context
+
+NEVER READ: entire directories (get_project_graph), test files for context
+(get_test_coverage_map), generated files/migrations, configs unless needed
+```
+
+### Budget Planning and Recovery
+
+Before a complex task, sketch the spend: understand ~5k (MCP + subagent), plan ~2k, implement ~15k (read targets + write + iterate), verify ~3k — leaving the bulk of the window for conversation.
+
+```
+WARNING SIGNS: 10+ files read, 50+ exchanges, forgetting earlier details,
+re-reading files you already saw
+
+RECOVERY: summarize what you know in 5-10 lines → subagents for remaining
+exploration → MCP-only lookups → suggest a fresh session if still degraded
+
+LARGE CODEBASES (50+ projects): get_project_graph → narrow to 2-3 relevant
+projects → find_symbol for key types → get_public_api for interfaces →
+read ONLY files you'll modify → subagents for cross-cutting concerns
+```
+
+### Lazy Skill Loading
+
+Don't front-load skills "just in case" — 15 skills at ~300 tokens each is ~4500 tokens spent before any work starts. Load `modern-csharp` at session start if relevant; pull `ef-core`, `testing`, etc. the moment the topic actually arises.
 
 ## Anti-patterns
 
@@ -241,6 +304,21 @@ You: "Would a staff .NET engineer approve this?
       Is there a more elegant way using C# 14 features?"
 ```
 
+### Don't Load Everything Because the Window Is Large
+
+```
+// BAD — "200k tokens is huge, let's load everything"
+Read all 30 files in the Orders module, all 15 test files,
+docker-compose.yml, every migration
+*80k tokens consumed before writing a single line of code*
+
+// GOOD — minimum viable context
+MCP: get_project_graph (solution shape) + find_symbol (locate targets)
+Read: the 2-3 files you'll actually modify
+Subagent: summarize anything else
+*~3k tokens consumed, the rest free for actual work*
+```
+
 ## Decision Guide
 
 | Scenario | Recommendation |
@@ -255,3 +333,10 @@ You: "Would a staff .NET engineer approve this?
 | Want to verify architecture | Spin up a second session as staff reviewer |
 | Repetitive PR workflow | Create a subagent (verify-api, code-simplifier) |
 | Learning a new codebase | Use "Explanatory" output style via `/config` |
+| Need a type's API or location | `get_public_api` / `find_symbol` — don't read the file |
+| Need to modify a file | Read it fully — exact content required |
+| Exploring unfamiliar code | Spawn a subagent — keep main context clean |
+| 10+ files read in a session | Pause — switch to MCP + subagents |
+| Context feels heavy or sluggish | Summarize what you know, subagents going forward |
+| Large codebase (50+ projects) | MCP-first, subagent-heavy, read only files you modify |
+| New topic mid-session | Load the relevant skill on demand, not in advance |

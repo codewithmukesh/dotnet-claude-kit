@@ -1,97 +1,85 @@
 ---
 name: checkpoint
 description: >
-  Mid-session save point: create a descriptive git commit and a minimal handoff
-  note, then keep working. Use before a risky change, when switching tasks, or
-  to bank progress without ending the session. Invoke when the user says
-  "checkpoint", "save progress", "save state", "commit what we have", or
-  "pause here". For a full end-of-session ritual with learning extraction,
-  use /wrap-up instead.
+  Mid-session save point: create a descriptive git commit and a brief handoff
+  note, then keep working. Use before a risky change or refactor, when
+  switching tasks, or to bank progress without ending the session. Triggers
+  on: /checkpoint, "checkpoint", "save progress", "commit and handoff",
+  "save state", "pause here", "before a risky change". For the full
+  end-of-session ritual with learning extraction, use /wrap-up instead.
 ---
 
 # /checkpoint
 
 ## What
 
-Creates a progress checkpoint by performing two actions in sequence:
+A quick mid-session save that banks the known-good state in two moves:
 
-1. **Git commit** -- Stages all relevant changes and creates a descriptive commit
-   message summarizing the current work.
-2. **Handoff note** -- Writes `.claude/handoff.md` capturing what was done, what
-   is pending, and what was learned so the next session can resume immediately.
+1. **Descriptive git commit** — stage relevant changes and commit with a
+   message that summarizes the work.
+2. **Brief handoff note** — write `.claude/handoff.md` so a resumed session
+   (or you, after a botched refactor) knows exactly where things stand.
 
-This is a quick, safe operation -- it preserves your current state without pushing
-to remote or modifying branches.
+Checkpoint is the mid-session save; `/wrap-up` is the end-of-session ritual.
+Checkpoint commits and jots a note, then keeps working. Wrap-up does the full
+handoff plus learning extraction into `MEMORY.md`.
 
 ## When
 
-- User says "save progress", "checkpoint", "commit what we have"
-- Before switching to a different task or feature
-- Before attempting a risky refactor (checkpoint the known-good state)
-- Before ending a session (lighter alternative to full `/wrap-up`)
-- After completing a logical unit of work mid-session
+- Before a risky refactor or destructive change — checkpoint the known-good state
+- When switching to a different task or feature mid-session
+- After completing a logical unit of work — bank it
+- User says "checkpoint", "save progress", "save state", "pause here"
+- If the session is actually ending, use `/wrap-up` for the full ritual
 
 ## How
 
-1. **Assess state** -- Run `git status` and `git diff` to understand staged and
-   unstaged changes.
-2. **Stage changes** -- Stage relevant files. Exclude generated files, build
-   artifacts, and secrets (`.env`, credentials). Prefer staging specific files
-   over `git add -A`.
-3. **Create commit** -- Write a descriptive commit message that summarizes the
-   work completed. Follow the repository's existing commit message style.
-4. **Write handoff** -- Create or overwrite `.claude/handoff.md` with:
-   - **Completed** -- What was accomplished (with file paths and line references)
-   - **Pending** -- What remains to be done (with specific next steps)
-   - **Learned** -- Any discoveries, corrections, or non-obvious findings
-   - **Context** -- Current branch, last commit hash, uncommitted state
-5. **Confirm** -- Report the commit hash and summarize the handoff contents.
+1. **Assess state** — `git status` and `git diff` to see staged and unstaged
+   changes.
+2. **Stage changes** — Stage specific files; never `git add -A`. Exclude
+   generated files, build artifacts, and secrets (`.env`, credentials).
+3. **Commit** — Descriptive message following the repo's commit style
+   (conventional prefixes: `feat:`, `fix:`, `refactor:`). New commit, never
+   amend. If there is nothing to commit, skip to the handoff.
+4. **Write handoff note** — `.claude/handoff.md`, same format as `/wrap-up`
+   but abbreviated: Completed, Pending (with specific next steps), Learned
+   (only if something non-obvious surfaced), and Context (branch + commit
+   hash). One file, always overwritten.
+5. **Confirm** — Report the commit hash and the handoff summary, then resume
+   work.
 
 ### Safety Rules
 
-- Never force-push or modify remote branches
-- Never commit files that contain secrets
-- Never amend a previous commit -- always create a new one
-- If there are no changes to commit, skip the commit and only update the handoff
-
-## Invokes
-
-| Type  | Name              | Purpose                                          |
-|-------|-------------------|--------------------------------------------------|
-| Skill | `wrap-up-ritual`  | Handoff note structure and learning extraction    |
-| Skill | `self-correction-loop` | Capture any learnings into MEMORY.md        |
+- Never push, force-push, or touch remote branches
+- Never commit secrets
+- Never amend — a checkpoint is a new commit you can return to
+- No changes to commit? Update the handoff only
 
 ## Example
 
 ```
-User: /checkpoint
+User: /checkpoint — about to try the EF Core split-query refactor
 
-Claude: Assessing current state...
-  3 files modified, 1 new file.
+Claude: 3 files modified, 1 new.
 
-  Committing: "Add CreateOrder validation with FluentValidation"
+  Commit a1b2c3d: "feat: add CreateOrder validation with FluentValidation"
   - src/Orders/Features/CreateOrder.cs
   - src/Orders/Features/CreateOrderValidator.cs (new)
   - tests/Orders.Tests/Features/CreateOrderTests.cs
 
-  Commit: a1b2c3d
-
-  Writing handoff to .claude/handoff.md:
+  Handoff updated (.claude/handoff.md):
   ## Completed
-  - [x] Added FluentValidation to CreateOrder (src/Orders/Features/CreateOrder.cs)
-  - [x] Integration test covering 3 validation scenarios
-
+  - [x] CreateOrder validation + 3 test scenarios
   ## Pending
-  - [ ] Add same validation pattern to UpdateOrder
-  - [ ] Add validation to DeleteOrder (check authorization first)
+  - [ ] Split-query refactor in GetOrderDetails (about to attempt)
+  ## Context
+  - Branch: feature/order-validation | Checkpoint: a1b2c3d
 
-  ## Learned
-  - FluentValidation validators must be registered in module DI setup
-
-  Checkpoint saved. Safe to switch tasks or end session.
+  Checkpoint saved — safe to proceed with the risky refactor.
 ```
 
 ## Related
 
-- `/wrap-up` -- Full session wrap-up ritual with deeper learning extraction
-- `/build-fix` -- Fix build errors before checkpointing
+- `/wrap-up` — End-of-session ritual: full handoff format definition plus
+  learning extraction into MEMORY.md
+- `/build-fix` — Get the build green before checkpointing

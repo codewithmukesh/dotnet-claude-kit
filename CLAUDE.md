@@ -121,8 +121,9 @@ description: >
 ### Quality Standards
 
 - **Maximum 200 lines** — Orchestrators are not encyclopedias (knowledge skills get 400)
-- **Invoke, don't implement** — Orchestrators reference skills and agents for the actual logic
-- **Clear trigger phrases** — Users should know when to reach for this workflow
+- **One skill per concern** — A workflow skill carries its methodology inline; never create a separate knowledge twin for a workflow (no `verify` + `verification-loop` pairs). Twin skills double the always-loaded description surface and cause routing collisions.
+- **Deep reference material goes in `references/`** — If methodology genuinely exceeds the budget (e.g. per-architecture code templates), put it in `skills/<name>/references/<topic>.md` and point to it from SKILL.md. References load only on demand — this is the token-friendly progressive-disclosure pattern.
+- **Clear trigger phrases** — Users should know when to reach for this workflow. When merging skills, the surviving description must absorb the absorbed skill's trigger phrases.
 
 ## Rule Structure
 
