@@ -11,6 +11,8 @@ CWM.RoslynNavigator is a Model Context Protocol (MCP) server that provides Claud
 - .NET 10 SDK
 - A .NET solution file (`.sln` or `.slnx`)
 
+> **macOS/Linux note**: If `dotnet` on your `PATH` is a wrapper script (common with Homebrew), set `DOTNET_ROOT` to your .NET installation root — the directory containing `sdk/` and `host/` (e.g. `/usr/local/share/dotnet` for the official installer, `/opt/homebrew/Cellar/dotnet/<version>/libexec` for Homebrew). The server falls back to resolving the SDK via `dotnet --list-sdks` when `DOTNET_ROOT` is missing, but setting it explicitly is the most reliable option. See [Troubleshooting](#troubleshooting).
+
 ## Tools
 
 | Tool | Description |
@@ -131,6 +133,30 @@ Responses/              → Token-optimized JSON response DTOs
 | Large (15-50 projects) | Lazy-load compilations on first query per project with LRU cache (30 max) |
 | Enterprise (50+) | Lazy loading + LRU eviction + warn if query touches unloaded project |
 
+## Troubleshooting
+
+### "No .NET SDKs were found" on startup (macOS/Linux)
+
+`MSBuildLocator` resolves the SDK via `hostfxr_resolve_sdk2`, which locates `dotnet` on `PATH` and expects the SDK layout relative to that binary. When `dotnet` is a wrapper script (Homebrew) or `DOTNET_ROOT` is unset — typical for MCP servers launched outside an interactive shell — resolution fails with:
+
+```
+No .NET SDKs were found.
+Unhandled exception. System.InvalidOperationException: Failed to find all versions of .NET Core MSBuild.
+```
+
+The server automatically falls back to `dotnet --list-sdks` to locate the SDK. If that also fails, set `DOTNET_ROOT` explicitly in the MCP registration:
+
+```bash
+claude mcp add-json --scope user cwm-roslyn-navigator \
+  '{"type":"stdio","command":"cwm-roslyn-navigator","env":{"DOTNET_ROOT":"/usr/local/share/dotnet"}}'
+```
+
+Or export it in your shell profile (`~/.zshrc` / `~/.bashrc`):
+
+```sh
+export DOTNET_ROOT=/usr/local/share/dotnet
+```
+
 ## Development
 
 ```bash
@@ -148,6 +174,11 @@ dotnet run --project mcp/CWM.RoslynNavigator/src/CWM.RoslynNavigator.csproj -- -
 ```
 
 ## Changelog
+
+### 0.7.1
+
+- **Fixed: logs corrupted the MCP stdio stream** ([#10](https://github.com/codewithmukesh/dotnet-claude-kit/issues/10)) — All console logging now goes to stderr. The MCP stdio transport reserves stdout for JSON-RPC; log lines on stdout caused clients to drop the connection with "JSON Parse error".
+- **Fixed: "No .NET SDKs were found" on macOS/Linux** ([#9](https://github.com/codewithmukesh/dotnet-claude-kit/issues/9)) — When `MSBuildLocator.RegisterDefaults()` fails (wrapper-script `dotnet` on PATH with `DOTNET_ROOT` unset), the server falls back to resolving the SDK via `dotnet --list-sdks` and registers it with `RegisterMSBuildPath`.
 
 ### 0.7.0
 
