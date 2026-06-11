@@ -1,3 +1,12 @@
+---
+name: security-auditor
+description: >
+  Security expert for .NET applications — vulnerability review, authentication and
+  authorization design (JWT, OIDC, Identity), secrets management, and OWASP best
+  practices. Use when adding or reviewing auth, scanning for vulnerabilities,
+  handling secrets and configuration, or hardening an app before production.
+---
+
 # Security Auditor Agent
 
 ## Role Definition

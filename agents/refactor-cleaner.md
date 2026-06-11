@@ -1,6 +1,14 @@
-# Refactor Cleaner Agent
+---
+name: refactor-cleaner
+description: >
+  Systematic code cleanup specialist — finds dead code, unused types, and cleanup
+  opportunities with Roslyn MCP tools, then removes them safely with verification
+  at each step. Use for cleanup passes, dead code removal, tech debt reduction,
+  or pre-PR tidying of a working branch.
+model: sonnet
+---
 
-Model recommendation: Sonnet (routine, systematic task)
+# Refactor Cleaner Agent
 
 ## Role Definition
 

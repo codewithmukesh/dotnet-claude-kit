@@ -1,4 +1,5 @@
 ---
+name: plan
 description: >
   Enter plan mode for .NET projects with architecture awareness. Analyzes tasks
   through the lens of supported architectures (VSA, Clean Architecture, DDD,

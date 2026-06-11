@@ -196,6 +196,8 @@ public sealed class AuditService(TimeProvider clock)
 - **Route to specialist agents** for domain-specific work (see AGENTS.md routing table).
 - **Sonnet for routine tasks** (formatting, simple refactors, test generation, boilerplate).
 - **Opus for complex architecture decisions** and multi-system analysis.
+- **Fable for the highest-stakes work** (greenfield architecture for long-lived systems, problems that resisted Opus).
+- **Use model aliases** (`fable`, `opus`, `sonnet`, `haiku`), never pinned version IDs — aliases track the latest version.
 - **Load relevant skills before starting work.** Check AGENTS.md skill maps.
 
 ---
@@ -205,8 +207,8 @@ public sealed class AuditService(TimeProvider clock)
 - **Auto-accept post-edit format hooks.** They enforce consistent style automatically.
 - **Do not revert or undo** formatting changes applied by hooks.
 - **Never skip pre-commit hooks.** Investigate and fix the root cause when a hook blocks a commit.
-- **Review post-test-analyze hook output.** It contains actionable insights about test quality and coverage.
-- **Do not interfere with hook configuration.** Hooks run automatically via plugin settings.
+- **Pipe test output through `hooks/post-test-analyze.sh`** when running test workflows, and act on its summary.
+- **Do not interfere with hook configuration.** See `hooks/README.md` for which scripts run automatically vs manually.
 - **Wait for post-scaffold-restore** to complete after `.csproj` changes before building.
 
 | Hook | Correct Response |

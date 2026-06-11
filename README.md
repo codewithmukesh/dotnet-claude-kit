@@ -3,7 +3,7 @@
   <p align="center">
     <strong>Make Claude Code an expert .NET developer.</strong>
     <br />
-    47 skills &bull; 10 specialist agents &bull; 15 slash commands &bull; 10 rules &bull; 5 project templates &bull; 15 MCP tools &bull; 7 hooks
+    60 skills &bull; 10 specialist agents &bull; 16 slash commands &bull; 10 rules &bull; 5 project templates &bull; 15 MCP tools &bull; automation hooks
     <br />
     Built for .NET 10 / C# 14. Architecture-aware. Token-efficient.
   </p>
@@ -75,7 +75,7 @@ v0.4.0 adds an **action layer** on top of the knowledge layer — Claude doesn't
 
 ### Plugin Install (Recommended)
 
-Install as a Claude Code plugin — all 47 skills, 10 agents, 16 commands, 10 rules, hooks, and MCP config activate globally:
+Install as a Claude Code plugin — all 60 skills (including 16 slash-command workflows), 10 agents, 10 rules, hooks, and MCP config activate globally:
 
 ```bash
 # In your terminal — install the Roslyn MCP server
@@ -127,7 +127,7 @@ Replace `[ProjectName]`, update tech stack, choose your architecture.
 
 </details>
 
-Start Claude Code — 47 skills, 10 agents, 16 commands, 10 rules, and 15 MCP tools activate automatically.
+Start Claude Code — 60 skills, 10 agents, 10 rules, and 15 MCP tools activate automatically.
 
 That's it. Claude now writes .NET code the way a senior .NET engineer would.
 
@@ -217,7 +217,7 @@ public sealed class OrderEndpoints : IEndpointGroup
 
 ## Slash Commands (16)
 
-Shortcut workflows that orchestrate skills and agents. Type the command and Claude handles the rest.
+Shortcut workflows that orchestrate skills and agents. Type the command and Claude handles the rest. These are workflow skills (Claude Code merged slash commands into skills) — each lives at `skills/<name>/SKILL.md` and registers its `/name` automatically.
 
 | Command | Purpose | Invokes |
 |---------|---------|---------|
@@ -343,19 +343,19 @@ Living reference documents updated per .NET release:
 | [breaking-changes](knowledge/breaking-changes.md) | .NET migration gotchas |
 | [decisions/](knowledge/decisions/) | Architecture Decision Records explaining every default |
 
-## Hooks (7)
+## Hooks & Automation Scripts (7)
 
-Automated workflow integration:
+Three Claude Code hooks run automatically (declared in `hooks/hooks.json`); the rest are git pre-commit hooks and workflow utilities — see [hooks/README.md](hooks/README.md) for setup:
 
-| Hook | Event | What It Does |
+| Script | Kind | What It Does |
 |------|-------|-------------|
-| `pre-bash-guard.sh` | PreToolUse (Bash) | Blocks destructive git ops (force push, reset --hard), warns on risky commands |
-| `pre-commit-format.sh` | Pre-commit | `dotnet format --verify-no-changes` ensures consistent formatting |
-| `pre-commit-antipattern.sh` | Pre-commit | Detects DateTime.Now, async void, new HttpClient() in staged files |
-| `post-scaffold-restore.sh` | Post-file-edit (*.csproj) | `dotnet restore` after project file changes |
-| `post-edit-format.sh` | Post-file-edit (*.cs) | Auto-formats C# files after edits |
-| `post-test-analyze.sh` | Post-test | Parses test results and outputs actionable summary |
-| `pre-build-validate.sh` | Pre-build | Validates project structure (solution file, Directory.Build.props, test projects) |
+| `pre-bash-guard.sh` | Claude Code hook — PreToolUse (Bash) | Blocks destructive git ops (force push, reset --hard), warns on risky commands |
+| `post-edit-format.sh` | Claude Code hook — PostToolUse (*.cs) | Auto-formats C# files after edits |
+| `post-scaffold-restore.sh` | Claude Code hook — PostToolUse (*.csproj) | `dotnet restore` after project file changes |
+| `pre-commit-format.sh` | Git pre-commit (manual install) | `dotnet format --verify-no-changes` ensures consistent formatting |
+| `pre-commit-antipattern.sh` | Git pre-commit (manual install) | Detects DateTime.Now, async void, new HttpClient() in staged files |
+| `post-test-analyze.sh` | Utility (pipe test output) | Parses test results and outputs actionable summary |
+| `pre-build-validate.sh` | Utility (run before builds) | Validates project structure (solution file, Directory.Build.props, test projects) |
 
 ## Defaults & Decisions
 
@@ -379,14 +379,13 @@ dotnet-claude-kit/
 ├── CLAUDE.md                    # Instructions for developing THIS repo
 ├── AGENTS.md                    # Agent routing & orchestration
 ├── agents/                      # 10 specialist agents
-├── skills/                      # 47 skills
-├── commands/                    # 15 slash commands
+├── skills/                      # 60 skills (incl. 16 slash-command workflows)
 ├── .claude/rules/               # 10 always-loaded rules
 ├── templates/                   # 5 drop-in CLAUDE.md templates
 ├── knowledge/                   # Living reference documents + ADRs
 ├── mcp/CWM.RoslynNavigator/     # Roslyn MCP server (15 tools)
 ├── mcp-configs/                 # MCP server config templates
-├── hooks/                       # 7 Claude Code hooks
+├── hooks/                       # Claude Code hooks + git hooks + utilities
 ├── docs/                        # Shorthand + longform guides
 ├── .mcp.json                    # MCP server registration
 ├── .claude-plugin/              # Plugin marketplace manifests

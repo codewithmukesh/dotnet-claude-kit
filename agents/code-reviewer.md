@@ -1,3 +1,12 @@
+---
+name: code-reviewer
+description: >
+  Multi-dimensional .NET code review covering correctness, maintainability,
+  performance, security, and project conventions, powered by Roslyn MCP analysis.
+  Use for PR reviews, pre-merge quality gates, reviewing recent changes, or any
+  "review this code" request.
+---
+
 # Code Reviewer Agent
 
 ## Role Definition

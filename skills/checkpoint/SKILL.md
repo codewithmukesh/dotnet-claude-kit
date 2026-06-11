@@ -1,4 +1,5 @@
 ---
+name: checkpoint
 description: >
   Save progress by creating a descriptive git commit and writing a handoff note.
   Use when the user wants to checkpoint work, save progress before a risky change,

@@ -1,4 +1,5 @@
 ---
+name: scaffold
 description: >
   Architecture-aware feature scaffolding for .NET 10 projects. Detects the
   project's architecture (VSA, Clean Architecture, DDD, Modular Monolith) and

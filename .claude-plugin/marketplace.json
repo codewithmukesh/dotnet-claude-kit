@@ -5,15 +5,14 @@
     "url": "https://codewithmukesh.com"
   },
   "metadata": {
-    "description": "The definitive Claude Code companion for .NET developers",
-    "repository": "https://github.com/codewithmukesh/dotnet-claude-kit"
+    "description": "The definitive Claude Code companion for .NET developers"
   },
   "plugins": [
     {
       "name": "dotnet-claude-kit",
       "source": "./",
-      "description": "47 skills, 10 agents, 16 commands, 10 rules, 5 templates, Roslyn MCP server for .NET 10 / C# 14",
-      "version": "0.7.0",
+      "description": "60 skills (incl. 16 slash-command workflows), 10 agents, 10 rules, 5 templates, Roslyn MCP server for .NET 10 / C# 14",
+      "version": "0.8.0",
       "license": "MIT",
       "keywords": [
         "dotnet",

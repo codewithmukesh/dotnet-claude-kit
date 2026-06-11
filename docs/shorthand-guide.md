@@ -1,10 +1,12 @@
 # dotnet-claude-kit Quick Reference
 
-A compact reference for all components: commands, skills, agents, rules, hooks, and MCP tools.
+A compact reference for all components: slash commands, skills, agents, rules, hooks, and MCP tools.
 
 ---
 
-## Commands
+## Slash Commands
+
+Workflow skills at `skills/<name>/SKILL.md` — each registers its `/name` automatically (Claude Code merged slash commands into skills).
 
 | Command | Description | Related Skill / Agent |
 |---------|-------------|----------------------|
@@ -106,17 +108,19 @@ All rules have `alwaysApply: true` -- they are enforced on every interaction.
 
 ---
 
-## Hooks (7)
+## Hooks & Automation Scripts (7)
 
-| Hook Script | Event | Behavior |
+Only the first three are Claude Code hooks (auto-run via `hooks/hooks.json`); the rest are git pre-commit hooks and workflow utilities (see `hooks/README.md`):
+
+| Script | Kind | Behavior |
 |-------------|-------|----------|
-| `pre-bash-guard.sh` | PreToolUse (Bash) | Guards against dangerous bash commands |
-| `post-edit-format.sh` | PostToolUse (Edit/Write) | Runs `dotnet format` on modified files |
-| `post-scaffold-restore.sh` | PostToolUse (Edit/Write) | Runs `dotnet restore` after .csproj changes |
-| `pre-commit-format.sh` | Pre-commit | Verifies formatting before commit |
-| `pre-commit-antipattern.sh` | Pre-commit | Scans for antipatterns before commit |
-| `pre-build-validate.sh` | Pre-build | Validates project structure before build |
-| `post-test-analyze.sh` | Post-test | Analyzes test results for insights |
+| `pre-bash-guard.sh` | Claude Code hook — PreToolUse (Bash) | Guards against dangerous bash commands |
+| `post-edit-format.sh` | Claude Code hook — PostToolUse (Edit/Write) | Runs `dotnet format` on modified files |
+| `post-scaffold-restore.sh` | Claude Code hook — PostToolUse (Edit/Write) | Runs `dotnet restore` after .csproj changes |
+| `pre-commit-format.sh` | Git pre-commit (manual install) | Verifies formatting before commit |
+| `pre-commit-antipattern.sh` | Git pre-commit (manual install) | Scans for antipatterns before commit |
+| `pre-build-validate.sh` | Utility script | Validates project structure before build |
+| `post-test-analyze.sh` | Utility script (pipe test output) | Analyzes test results for insights |
 
 ---
 

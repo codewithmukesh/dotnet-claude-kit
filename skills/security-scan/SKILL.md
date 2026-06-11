@@ -28,7 +28,7 @@ description: >
 
 ### 6-Layer Security Scan Pipeline
 
-Execute all 6 layers. Each produces findings rated Critical, High, Medium, or Low.
+Execute all 6 layers. Each produces findings rated Critical, High, Medium, or Low. Delegate deep auth and secrets review to the `security-auditor` agent, pairing the `authentication` and `configuration` skills.
 
 **Layer 1: Package Vulnerabilities**
 ```bash

@@ -1,4 +1,5 @@
 ---
+name: migrate
 description: >
   Guided, safe EF Core migration workflow. Reviews pending model changes, generates
   a migration with a descriptive name, reviews the generated SQL for safety, and

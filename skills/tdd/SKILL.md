@@ -1,4 +1,5 @@
 ---
+name: tdd
 description: >
   Guided test-driven development workflow for .NET 10 using xUnit v3,
   WebApplicationFactory, Testcontainers, and Verify snapshots. Follows the

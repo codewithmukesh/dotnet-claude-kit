@@ -28,7 +28,7 @@ description: >
 
 ### 7-Step Cleanup Pipeline
 
-Execute in order. Verify (build + test) after each step. Commit each step separately.
+Execute in order. Verify (build + test) after each step. Commit each step separately. For structural steps (dead code removal, sealing, CancellationToken propagation), delegate to the `refactor-cleaner` agent.
 
 **Step 1: Format All Code**
 ```bash

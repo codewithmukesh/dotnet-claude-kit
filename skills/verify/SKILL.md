@@ -1,4 +1,5 @@
 ---
+name: verify
 description: >
   Run a comprehensive 7-phase verification pipeline for .NET projects. Covers
   build, analyzers, antipattern detection, tests, security, formatting, and diff

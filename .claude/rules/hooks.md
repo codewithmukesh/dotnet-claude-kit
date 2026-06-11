@@ -25,12 +25,12 @@ description: >
 
 ## Post-Test Analysis
 
-- **DO** review post-test-analyze hook output. It contains actionable insights about test quality and coverage.
-  Rationale: Ignoring analysis output means missing regressions and quality signals.
+- **DO** pipe test output through `hooks/post-test-analyze.sh` when running test workflows (`dotnet test 2>&1 | bash hooks/post-test-analyze.sh`), and act on its summary.
+  Rationale: The structured summary surfaces failures and next steps that raw test output buries.
 
 ## Hook Infrastructure
 
-- **DON'T** interfere with hook configuration. Hooks run automatically via plugin settings.
+- **DON'T** interfere with hook configuration. Claude Code hooks (pre-bash-guard, post-edit-format, post-scaffold-restore) run automatically via `hooks/hooks.json`; pre-commit scripts run via git. See `hooks/README.md` for the full map.
   Rationale: Hooks are configured intentionally. Ad-hoc changes break the automated workflow.
 
 - **DO** wait for post-scaffold-restore to complete after `.csproj` changes before building.
@@ -42,5 +42,5 @@ description: >
 |---|---|
 | Post-edit format | Accept the changes |
 | Pre-commit failure | Fix the issue, commit again |
-| Post-test-analyze | Read and act on insights |
+| Post-test-analyze (manual pipe) | Read and act on insights |
 | Post-scaffold-restore | Wait for completion before building |

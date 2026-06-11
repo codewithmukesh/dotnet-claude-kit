@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] — 2026-06-11
+
+### Added
+- **YAML frontmatter on all 10 agents** — `name` + trigger-rich `description` per the current Claude Code subagent standard, so Claude can route delegation intelligently (previously agents surfaced with a generic fallback description). `build-error-resolver` and `refactor-cleaner` declare `model: sonnet` via frontmatter
+- **`hooks/README.md`** — Documents which scripts are Claude Code hooks (auto-run via `hooks.json`), which are git pre-commit hooks (manual install), and which are workflow utilities
+- **Fable 5 guidance** — `model-selection` skill and rules now cover the Fable tier (above Opus) for highest-stakes architecture, debugging escalation, and critical reviews
+
+### Changed
+- **Commands migrated to skills (`commands/` removed)** — Claude Code merged slash commands into skills, so all 16 commands now live at `skills/<name>/SKILL.md` (60 skills total). 13 moved as-is with `name` frontmatter added; 3 that duplicated existing skill names (`de-sloppify`, `health-check`, `security-scan`) were merged into those skills — this also fixes their double `/name` registration. All 16 slash invocations are unchanged. CI workflow, CLAUDE.md, CONTRIBUTING.md, README, and docs updated accordingly
+- **CI now enforces agent frontmatter** — validate.yml checks `name`/`description` on every agent; the obsolete validate-commands job was removed
+- **`model-selection` skill modernized** — Opus 4.6 references updated to the current lineup (Fable 5, Opus 4.8, Sonnet 4.6, Haiku 4.5); prose now uses tier aliases (`fable`/`opus`/`sonnet`/`haiku`) so guidance doesn't rot; added "Hardcoding Model Versions" anti-pattern
+- **CLAUDE.md / CONTRIBUTING.md** — Orchestrators are authored as skills (Claude Code merged slash commands into skills); agent frontmatter schema and workflow-skill structure documented
+- **README and docs** — Hooks tables now correctly distinguish Claude Code hooks from git hooks and utility scripts
+- **`.claude/rules/hooks.md`** — Post-test analysis guidance now reflects how `post-test-analyze.sh` is actually invoked (piped, not automatic)
+- **`plugin.json`** — Added `displayName`; description no longer claims 7 automatic hooks
+
+### Fixed
+- **`pre-bash-guard.sh` destructive-command guard was inert** — It read the command from the legacy `CLAUDE_TOOL_INPUT` env var only; it now parses the PreToolUse JSON payload from stdin (jq with grep fallback), with the env var kept as fallback
+
 ## [0.7.0] — 2026-03-22
 
 ### Added

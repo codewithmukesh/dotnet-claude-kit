@@ -1,6 +1,14 @@
-# Build Error Resolver Agent
+---
+name: build-error-resolver
+description: >
+  Autonomous .NET build fixer — parses dotnet build errors, categorizes them,
+  applies known fix patterns, and rebuilds iteratively until green. Use when the
+  build is broken, after a large refactor or dependency update, or whenever
+  compiler errors need systematic resolution without hand-holding.
+model: sonnet
+---
 
-Model recommendation: Sonnet (routine, iterative task)
+# Build Error Resolver Agent
 
 ## Role Definition
 

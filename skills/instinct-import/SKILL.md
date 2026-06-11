@@ -1,4 +1,5 @@
 ---
+name: instinct-import
 description: >
   Import instincts from another project. Triggers on: /instinct-import,
   "import instincts", "load instincts from", "bring in instincts".

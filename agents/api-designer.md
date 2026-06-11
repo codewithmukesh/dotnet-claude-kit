@@ -1,3 +1,13 @@
+---
+name: api-designer
+description: >
+  Expert in designing HTTP APIs with ASP.NET Core Minimal APIs — REST conventions,
+  endpoint and contract design, API versioning strategies, OpenAPI specifications,
+  and authorization policies. Use when designing new endpoints or request/response
+  shapes, adding or evolving API versions, reviewing API surface quality, or
+  producing OpenAPI documentation.
+---
+
 # API Designer Agent
 
 ## Role Definition

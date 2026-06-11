@@ -1,4 +1,5 @@
 ---
+name: build-fix
 description: >
   Iteratively fix dotnet build errors. Runs an autonomous build-fix loop that
   parses compiler errors, categorizes them, applies fixes, and rebuilds until

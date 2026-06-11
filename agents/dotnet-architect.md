@@ -1,3 +1,13 @@
+---
+name: dotnet-architect
+description: >
+  Primary decision-maker for .NET project structure, architecture selection, and
+  module boundaries — guides the architecture-advisor questionnaire and recommends
+  VSA, Clean Architecture, DDD, or Modular Monolith. Use when starting a new
+  project, choosing or changing architecture, restructuring a solution, or
+  resolving module boundary and dependency questions.
+---
+
 # .NET Architect Agent
 
 ## Role Definition

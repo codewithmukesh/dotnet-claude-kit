@@ -1,4 +1,5 @@
 ---
+name: instinct-export
 description: >
   Export instincts to a shareable format. Triggers on: /instinct-export,
   "export instincts", "share instincts", "save instincts for another project".

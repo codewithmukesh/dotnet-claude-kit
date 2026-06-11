@@ -1,4 +1,5 @@
 ---
+name: code-review
 description: >
   MCP-powered multi-dimensional code review for .NET projects. Uses Roslyn
   analysis tools for antipatterns, diagnostics, references, and dependency

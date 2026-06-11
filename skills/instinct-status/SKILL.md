@@ -1,4 +1,5 @@
 ---
+name: instinct-status
 description: >
   Display all learned instincts with confidence scores. Triggers on:
   /instinct-status, "show instincts", "what have you learned",

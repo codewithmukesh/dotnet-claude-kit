@@ -51,15 +51,25 @@ Each template needs:
 - `CLAUDE.md` — The drop-in file with project context, skills references, commands
 - `README.md` — When and how to use the template
 
-### Commands
+### Workflow Skills (Orchestrators)
 
-Commands in `commands/` are lightweight orchestrators that invoke skills and agents.
+Claude Code merged slash commands into skills — there is no `commands/` directory. Workflow orchestrators (e.g., `/verify`, `/scaffold`) are skills at `skills/<name>/SKILL.md`; the skill name registers the slash invocation automatically.
 
-**Command requirements:**
-- YAML frontmatter with `description`
+**Workflow skill requirements:**
+- YAML frontmatter with `name` and `description` (add `disable-model-invocation: true` for explicit-only invocation)
 - Required sections: What, When, How, Example, Related
-- Maximum 200 lines
-- Commands invoke skills/agents — they don't contain the logic themselves
+- Maximum 200 lines (knowledge skills get 400)
+- Orchestrators invoke skills/agents — they don't contain the logic themselves
+
+### Agents
+
+Agents in `agents/` are specialist subagents.
+
+**Agent requirements:**
+- YAML frontmatter with `name` (matches file name) and `description` (include concrete trigger scenarios — Claude routes delegation on this)
+- Optional `model:` uses tier aliases only (`fable`, `opus`, `sonnet`, `haiku`) — never pinned version IDs
+- No `permissionMode`, `hooks`, or `mcpServers` in frontmatter (unsupported for plugin agents)
+- Required sections: Role definition, Skill dependencies, MCP tool usage, Response patterns, Boundaries
 
 ### Rules
 

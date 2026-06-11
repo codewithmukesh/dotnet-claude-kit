@@ -1,4 +1,5 @@
 ---
+name: wrap-up
 description: >
   End-of-session wrap-up ritual. Triggers on: /wrap-up, "done for today",
   "wrap up", "that's all", "end session", "signing off".

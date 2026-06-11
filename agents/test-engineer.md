@@ -1,3 +1,12 @@
+---
+name: test-engineer
+description: >
+  Testing expert for .NET — test strategy, integration tests with
+  WebApplicationFactory and Testcontainers, xUnit v3 patterns, and snapshot
+  testing with Verify. Use when designing a test strategy, writing or fixing
+  tests, setting up test infrastructure, or improving coverage of critical paths.
+---
+
 # Test Engineer Agent
 
 ## Role Definition

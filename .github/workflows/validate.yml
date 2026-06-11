@@ -45,12 +45,25 @@ jobs:
               errors=$((errors + 1))
             fi
 
-            # Check required sections
-            for section in "Core Principles" "Patterns" "Anti-patterns" "Decision Guide"; do
-              if ! grep -q "## $section" "$skill"; then
-                echo "WARNING: $skill missing '## $section' section"
+            # Workflow/orchestrator skills (What/When/How structure) have a tighter budget
+            if grep -qx "## What" "$skill"; then
+              if [ "$lines" -gt 200 ]; then
+                echo "ERROR: $skill is a workflow skill with $lines lines (max 200)"
+                errors=$((errors + 1))
               fi
-            done
+              for section in "What" "When" "How"; do
+                if ! grep -q "## $section" "$skill"; then
+                  echo "WARNING: $skill missing '## $section' section"
+                fi
+              done
+            else
+              # Knowledge skills use the standard section set
+              for section in "Core Principles" "Patterns" "Anti-patterns" "Decision Guide"; do
+                if ! grep -q "## $section" "$skill"; then
+                  echo "WARNING: $skill missing '## $section' section"
+                fi
+              done
+            fi
           done
 
           if [ $errors -gt 0 ]; then
@@ -58,54 +71,6 @@ jobs:
             exit 1
           fi
           echo "All skills validated successfully"
-
-  validate-commands:
-    name: Validate Commands
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-
-      - name: Check command frontmatter and structure
-        run: |
-          errors=0
-          if [ ! -d "commands" ] || [ -z "$(ls commands/*.md 2>/dev/null)" ]; then
-            echo "WARNING: No command files found in commands/"
-            exit 0
-          fi
-          for cmd in commands/*.md; do
-            # Check YAML frontmatter exists
-            if ! head -1 "$cmd" | grep -q "^---$"; then
-              echo "ERROR: $cmd missing YAML frontmatter"
-              errors=$((errors + 1))
-            fi
-
-            # Check description field
-            if ! grep -q "^description:" "$cmd"; then
-              echo "ERROR: $cmd missing 'description' in frontmatter"
-              errors=$((errors + 1))
-            fi
-
-            # Check line count (max 200)
-            lines=$(wc -l < "$cmd")
-            if [ "$lines" -gt 200 ]; then
-              echo "ERROR: $cmd has $lines lines (max 200)"
-              errors=$((errors + 1))
-            fi
-
-            # Check required sections
-            for section in "What" "When" "How"; do
-              if ! grep -q "## $section" "$cmd"; then
-                echo "WARNING: $cmd missing '## $section' section"
-              fi
-            done
-          done
-
-          if [ $errors -gt 0 ]; then
-            echo "$errors error(s) found"
-            exit 1
-          fi
-          count=$(ls commands/*.md 2>/dev/null | wc -l)
-          echo "All $count commands validated successfully"
 
   validate-rules:
     name: Validate Rules
@@ -145,7 +110,7 @@ jobs:
             echo "$errors error(s) found"
             exit 1
           fi
-          count=$(find rules -name "*.md" -type f | wc -l)
+          count=$(find .claude/rules rules -name "*.md" -type f 2>/dev/null | wc -l)
           echo "All $count rules validated successfully"
 
   validate-agents:
@@ -158,6 +123,20 @@ jobs:
         run: |
           errors=0
           for agent in agents/*.md; do
+            # Check YAML frontmatter (required for subagent routing)
+            if ! head -1 "$agent" | grep -q "^---$"; then
+              echo "ERROR: $agent missing YAML frontmatter"
+              errors=$((errors + 1))
+            fi
+            if ! grep -q "^name:" "$agent"; then
+              echo "ERROR: $agent missing 'name' in frontmatter"
+              errors=$((errors + 1))
+            fi
+            if ! grep -q "^description:" "$agent"; then
+              echo "ERROR: $agent missing 'description' in frontmatter"
+              errors=$((errors + 1))
+            fi
+
             # Check required sections
             for section in "Role Definition" "Skill Dependencies" "MCP Tool Usage" "Boundaries"; do
               if ! grep -q "## $section" "$agent"; then
@@ -192,13 +171,13 @@ jobs:
       - name: Check skill references resolve
         run: |
           errors=0
-          # Check commands reference existing skills
-          for cmd in commands/*.md; do
+          # Check skills reference existing skills
+          for skill_file in skills/*/SKILL.md; do
             while IFS= read -r skill; do
               if [ ! -f "skills/$skill/SKILL.md" ]; then
-                echo "WARNING: $cmd references skill '$skill' — not found"
+                echo "WARNING: $skill_file references skill '$skill' — not found"
               fi
-            done < <(grep -oP 'skills/[\w-]+' "$cmd" 2>/dev/null | sed 's|skills/||' | sort -u)
+            done < <(grep -oP 'skills/[\w-]+' "$skill_file" 2>/dev/null | sed 's|skills/||' | sort -u)
           done
 
           # Check AGENTS.md references existing skills and agents
@@ -299,7 +278,7 @@ jobs:
       - name: Validate component directories exist
         run: |
           errors=0
-          for path in skills/ agents/ commands/ .claude/rules/ hooks/hooks.json .mcp.json; do
+          for path in skills/ agents/ .claude/rules/ hooks/hooks.json .mcp.json; do
             if [ ! -e "$path" ]; then
               echo "ERROR: Expected '$path' but it does not exist"
               errors=$((errors + 1))

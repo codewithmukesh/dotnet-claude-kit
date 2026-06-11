@@ -1,4 +1,5 @@
 ---
+name: dotnet-init
 description: >
   Interactive project initialization. Detects project type, asks architecture
   questions, and generates a customized CLAUDE.md — no manual template copying.
