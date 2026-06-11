@@ -1,10 +1,13 @@
 ---
 name: migration-workflow
 description: >
-  Safe migration workflows for EF Core database migrations, .NET version upgrades,
-  and NuGet dependency updates. Includes rollback strategies and verification steps.
-  Load when: "migration", "add migration", "ef migration", "update database",
-  "upgrade nuget", "update packages", "dependency update", "version upgrade".
+  Safe upgrade workflows across THREE domains: EF Core schema migrations, .NET
+  version upgrades, and NuGet dependency updates — each with rollback strategies
+  and verification steps. The EF Core path is loaded automatically by the
+  /migrate workflow — for "add migration" or "update database", use /migrate.
+  Load this skill directly when: "upgrade to .NET", "version upgrade",
+  "upgrade nuget", "update packages", "dependency update", or planning a
+  framework or dependency migration.
 ---
 
 # Migration Workflow
@@ -28,8 +31,9 @@ Step-by-step workflow for creating and applying database migrations safely.
 # List all migrations and their status
 dotnet ef migrations list --project src/Infrastructure --startup-project src/Api
 
-# Verify the database is at the expected migration
-dotnet ef database update --project src/Infrastructure --startup-project src/Api -- --dry-run
+# Preview the SQL that would run — `database update` has no dry-run flag;
+# generate an idempotent script and review it instead
+dotnet ef migrations script --idempotent --project src/Infrastructure --startup-project src/Api
 ```
 
 **Step 2: Create Migration**

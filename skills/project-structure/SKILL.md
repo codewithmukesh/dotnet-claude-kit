@@ -69,6 +69,8 @@ MyApp/
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Versions below are illustrative — resolve the current stable versions
+         with `dotnet add package <name>` (no --version flag); see the packages rule -->
     <!-- ASP.NET Core -->
     <PackageVersion Include="Mediator.Abstractions" Version="3.0.0" />
     <PackageVersion Include="Mediator.SourceGenerator" Version="3.0.0" />

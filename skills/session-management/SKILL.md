@@ -1,13 +1,12 @@
 ---
 name: session-management
 description: >
-  End-to-end session lifecycle management for .NET projects. Handles session start
-  (load handoff, MEMORY.md, instincts, detect .NET solution), session end (capture
-  completed work, persist learnings, write handoff), and context preservation across
-  sessions. Load this skill when starting a new session, ending a session, when the
-  user says "new session", "pick up where we left off", "what were we working on",
-  "session start", "session end", "handoff", "context", "resume", or when Claude
-  needs to bootstrap itself in an unfamiliar project.
+  Session-START bootstrap for .NET projects: load .claude/handoff.md, MEMORY.md,
+  and instincts, detect the solution file, and present a resume summary. Load
+  this skill when starting or resuming a session, when the user says "new
+  session", "pick up where we left off", "what were we working on", "resume",
+  or when Claude needs to bootstrap itself in an unfamiliar project. Session
+  ENDING is handled by the /wrap-up workflow; mid-session saves by /checkpoint.
 ---
 
 # Session Management

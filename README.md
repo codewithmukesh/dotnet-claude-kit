@@ -14,7 +14,7 @@
   <a href="#quick-start">Quick Start</a> &bull;
   <a href="#what-makes-this-10x">10x Features</a> &bull;
   <a href="#slash-commands-16">Commands</a> &bull;
-  <a href="#skills-47">Skills</a> &bull;
+  <a href="#knowledge-skills-47">Skills</a> &bull;
   <a href="#agents-10">Agents</a> &bull;
   <a href="#rules-10">Rules</a> &bull;
   <a href="#templates-5">Templates</a> &bull;
@@ -56,7 +56,7 @@ v0.4.0 adds an **action layer** on top of the knowledge layer — Claude doesn't
 | **PR Review** | Multi-dimensional code review: anti-patterns, diagnostics, API surface changes, blast radius, architecture compliance, test coverage. |
 | **Convention Learning** | Detects project-specific patterns (naming, structure, modifiers) and enforces them in new code. Adapts to your codebase. |
 | **Smart Tools** | 15 Roslyn-powered MCP tools including dependency graphs, circular dependency detection, dead code finder, and test coverage mapping. |
-| **Active Hooks** | 6 hooks for automated quality: format on edit, anti-pattern checks on commit, test result analysis, structure validation. |
+| **Active Hooks** | Automated quality scripts: format on edit, destructive-command guard, restore on .csproj change, plus git pre-commit checks and test analysis utilities. |
 
 ## Why dotnet-claude-kit?
 
@@ -81,6 +81,8 @@ Install as a Claude Code plugin — all 60 skills (including 16 slash-command wo
 # In your terminal — install the Roslyn MCP server
 dotnet tool install -g CWM.RoslynNavigator
 ```
+
+> **macOS/Linux**: If the server fails with "No .NET SDKs were found", set `DOTNET_ROOT` to your .NET installation root (e.g. `/usr/local/share/dotnet`). See the [MCP server troubleshooting guide](mcp/CWM.RoslynNavigator/README.md#troubleshooting).
 
 Then inside a Claude Code session:
 
@@ -255,9 +257,9 @@ Always-loaded conventions that apply to every interaction. Zero configuration �
 | [hooks](.claude/rules/hooks.md) | Auto-accept formatting, never skip pre-commit hooks |
 | [packages](.claude/rules/packages.md) | Always use latest stable NuGet versions, never rely on training data versions |
 
-## Skills (47)
+## Knowledge Skills (47)
 
-Code-heavy reference files that teach Claude .NET best practices. Each skill is under 400 lines with concrete code examples, anti-patterns (BAD/GOOD comparisons), and decision guides.
+Code-heavy reference files that teach Claude .NET best practices. Each skill is under 400 lines with concrete code examples, anti-patterns (BAD/GOOD comparisons), and decision guides. (The other 13 of the 60 skills are the workflow orchestrators documented under [Slash Commands](#slash-commands-16).)
 
 | Category | Skills | What Claude Learns |
 |----------|--------|--------------------|

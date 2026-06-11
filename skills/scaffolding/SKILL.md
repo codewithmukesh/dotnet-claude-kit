@@ -1,11 +1,13 @@
 ---
 name: scaffolding
 description: >
-  Code scaffolding patterns for .NET 10 features, entities, and tests.
-  Generates complete feature slices, entities with EF Core configuration,
-  and integration tests following the project's chosen architecture.
-  Load when: "scaffold", "create feature", "add feature", "new endpoint",
-  "generate", "add entity", "new entity", "scaffold test", "add module".
+  The code-generation patterns behind the /scaffold workflow: complete feature
+  slices, entities with EF Core configuration, and integration tests for each
+  supported architecture (VSA, Clean Architecture, DDD, Modular Monolith),
+  with the completeness checklist every generated feature must satisfy.
+  Loaded automatically by /scaffold — to GENERATE a feature, use /scaffold.
+  Load this skill directly when customizing generation templates or defining
+  what a complete feature slice includes.
 ---
 
 # Scaffolding

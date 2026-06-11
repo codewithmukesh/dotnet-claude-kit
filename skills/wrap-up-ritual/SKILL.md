@@ -1,12 +1,12 @@
 ---
 name: wrap-up-ritual
 description: >
-  Structured session ending ritual that captures completed work, pending tasks,
-  and learnings before a session ends. Writes a handoff note to .claude/handoff.md
-  so the next session (or a different developer) can pick up exactly where this
-  session left off. Load this skill when the user signals they're wrapping up,
-  says "let's stop here", "that's all for now", "end of session", "wrap up",
-  "save progress", "handoff", or "I'm done for today".
+  The methodology behind the /wrap-up session ending: the handoff note
+  structure for .claude/handoff.md, learning extraction into MEMORY.md, and
+  multi-developer handoff templates. Loaded automatically by the /wrap-up
+  workflow — when the user says "wrap up" or "done for today", use /wrap-up.
+  Load this skill directly when designing handoff content, deciding what
+  counts as a capturable learning, or improving session-ending habits.
 ---
 
 # Wrap-Up Ritual

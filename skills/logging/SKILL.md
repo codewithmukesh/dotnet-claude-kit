@@ -1,12 +1,13 @@
 ---
 name: logging
 description: >
-  Observability for .NET 10 applications. Covers Serilog structured logging,
-  OpenTelemetry traces and metrics, health checks, and correlation IDs.
-  Load this skill when setting up logging, tracing, metrics, or health monitoring,
-  or when the user mentions "Serilog", "logging", "structured log", "OpenTelemetry",
-  "traces", "metrics", "health check", "correlation ID", "observability",
-  "telemetry", "log enrichment", or "ILogger".
+  Observability overview and glue for .NET 10: how the pieces fit together,
+  plus the cross-cutting parts owned here — ASP.NET health check endpoints
+  (/health), correlation IDs, and log-level strategy. For deep Serilog setup
+  load `serilog`; for traces and metrics load `opentelemetry`. Load this
+  skill when setting up observability from scratch, wiring health check
+  endpoints or correlation IDs, or when the user says "logging",
+  "observability", "monitoring setup", "liveness", "readiness", or "ILogger".
 ---
 
 # Logging & Observability

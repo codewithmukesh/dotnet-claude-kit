@@ -196,6 +196,8 @@ public abstract class AggregateRoot : Entity
     public void ClearDomainEvents() => _domainEvents.Clear();
 }
 
+// INotification comes from the MIT-licensed Mediator package (not MediatR —
+// see the packages rule). Use a plain marker interface if you don't use a mediator.
 public interface IDomainEvent : INotification
 {
     DateTimeOffset OccurredAt { get; }

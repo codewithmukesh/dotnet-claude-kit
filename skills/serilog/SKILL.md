@@ -193,6 +193,8 @@ Export Serilog events directly to any OTLP backend without the OpenTelemetry SDK
 
 ### Serilog.Expressions for Filtering
 
+Requires the `Serilog.Expressions` package.
+
 ```csharp
 // Exclude health check noise
 .Filter.ByExcluding("RequestPath like '/health%'")
@@ -200,6 +202,22 @@ Export Serilog events directly to any OTLP backend without the OpenTelemetry SDK
 // Route errors to a separate file
 .WriteTo.Conditional("@l = 'Error'",
     wt => wt.File("logs/errors-.log", rollingInterval: RollingInterval.Day))
+```
+
+### [LoggerMessage] Source Generator for Hot Paths
+
+Built into `Microsoft.Extensions.Logging.Abstractions` — compile-time generated, zero allocations when the level is disabled.
+
+```csharp
+public static partial class OrderLogs
+{
+    [LoggerMessage(Level = LogLevel.Information,
+        Message = "Order {OrderId} created for {CustomerId}")]
+    public static partial void OrderCreated(this ILogger logger, Guid orderId, Guid customerId);
+}
+
+// Usage
+logger.OrderCreated(order.Id, order.CustomerId);
 ```
 
 ## Anti-patterns
@@ -254,12 +272,15 @@ logger.LogInformation("Request: {@Request}", httpContext.Request);
 ### Don't Use the Deprecated Elasticsearch Sink
 
 ```csharp
-// BAD — Serilog.Sinks.Elasticsearch is deprecated
-.WriteTo.Elasticsearch(...)
+// BAD — the Serilog.Sinks.Elasticsearch PACKAGE is deprecated
+// <PackageReference Include="Serilog.Sinks.Elasticsearch" />
+.WriteTo.Elasticsearch("http://localhost:9200")
 
-// GOOD — use the official Elastic sink with ECS formatting
-// Package: Elastic.Serilog.Sinks
-.WriteTo.Elasticsearch(...)
+// GOOD — same method name, but from the official Elastic.Serilog.Sinks
+// package, which writes ECS-formatted documents to data streams
+// <PackageReference Include="Elastic.Serilog.Sinks" />
+.WriteTo.Elasticsearch([new Uri("https://elastic.example.com:9200")], opts =>
+    opts.DataStream = new DataStreamName("logs", "myapp"))
 ```
 
 ## Decision Guide

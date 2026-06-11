@@ -1,10 +1,12 @@
 ---
 name: checkpoint
 description: >
-  Save progress by creating a descriptive git commit and writing a handoff note.
-  Use when the user wants to checkpoint work, save progress before a risky change,
-  switch tasks, or pause for the day. Invoke when the user says "checkpoint",
-  "save progress", "commit and handoff", "save state", "pause here".
+  Mid-session save point: create a descriptive git commit and a minimal handoff
+  note, then keep working. Use before a risky change, when switching tasks, or
+  to bank progress without ending the session. Invoke when the user says
+  "checkpoint", "save progress", "save state", "commit what we have", or
+  "pause here". For a full end-of-session ritual with learning extraction,
+  use /wrap-up instead.
 ---
 
 # /checkpoint

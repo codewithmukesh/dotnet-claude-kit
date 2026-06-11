@@ -22,6 +22,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`plugin.json`** — Added `displayName`; description no longer claims 7 automatic hooks
 
 ### Fixed
+- **`migration-workflow` skill recommended a nonexistent `--dry-run` flag** — `dotnet ef database update -- --dry-run` passes the flag to the app host and applies the migration anyway; the skill now previews SQL with `dotnet ef migrations script --idempotent`
+- **`ci-cd` skill pinned GitHub Actions `@v4`** — examples updated to `@v5` (checkout, setup-dotnet, upload-artifact), matching the repo's own CI
+- **Skill routing collisions** — workflow/knowledge pairs shared trigger phrases ("verify", "wrap up", "code review", "scaffold", "migration"), so Claude couldn't reliably pick the right skill; knowledge-skill descriptions (verification-loop, wrap-up-ritual, code-review-workflow, scaffolding, migration-workflow, 80-20-review, session-management, logging, checkpoint) now state the methodology they own, point action phrases at their workflow, and keep only unique triggers
+- **Skill content polish from the full-portfolio audit** — serilog (correct `Elastic.Serilog.Sinks` example, `[LoggerMessage]` pattern, `Serilog.Expressions` package note), ddd (`IDomainEvent : INotification` clarified as the MIT Mediator package), project-structure (illustrative-version caveat on `Directory.Packages.props`), README count drift (skills anchor, hooks claim)
+- **MCP server logged to stdout, corrupting the JSON-RPC stream** (#10) — `CWM.RoslynNavigator` now routes all console logging to stderr (`LogToStandardErrorThreshold = Trace`), as required by the MCP stdio transport spec. Previously, log lines interleaved with protocol frames caused Claude Code to drop the connection with "JSON Parse error"
+- **MCP server failed with "No .NET SDKs were found" on macOS/Linux** (#9) — When `MSBuildLocator.RegisterDefaults()` cannot resolve the SDK (wrapper-script `dotnet` on PATH, e.g. Homebrew, with `DOTNET_ROOT` unset), the server now falls back to locating the SDK via `dotnet --list-sdks`. Install docs also document setting `DOTNET_ROOT` explicitly
 - **`pre-bash-guard.sh` destructive-command guard was inert** — It read the command from the legacy `CLAUDE_TOOL_INPUT` env var only; it now parses the PreToolUse JSON payload from stdin (jq with grep fallback), with the env var kept as fallback
 
 ## [0.7.0] — 2026-03-22

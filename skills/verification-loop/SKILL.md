@@ -1,12 +1,13 @@
 ---
 name: verification-loop
 description: >
-  7-phase .NET verification pipeline with structured PASS/FAIL reporting.
-  Ensures every change is build-verified, diagnostics-clean, anti-pattern-free,
-  test-passing, security-scanned, format-compliant, and diff-reviewed before
-  marking work as complete. Load this skill when: "verify", "check everything",
-  "run verification", "pre-PR check", "is this ready", "validate changes",
-  "build and test", "quality gate", "pipeline check", "ready to merge".
+  The methodology behind the /verify pipeline: 7 phases (build, diagnostics,
+  anti-patterns, tests, security, format, diff review) with PASS/FAIL reporting,
+  short-circuit rules, and fix-and-retry loops. Loaded automatically by the
+  /verify workflow — to RUN a verification, use /verify. Load this skill
+  directly when designing or tuning a verification strategy, choosing which
+  phases to run for a given change, or when the user mentions "quality gate",
+  "verification strategy", or "which checks should run".
 ---
 
 # Verification Loop

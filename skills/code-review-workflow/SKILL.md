@@ -1,11 +1,13 @@
 ---
 name: code-review-workflow
 description: >
-  Structured code review workflow for .NET projects using Roslyn MCP tools.
-  Multi-dimensional review covering correctness, security, performance,
-  architecture compliance, and test coverage.
-  Load when: "review PR", "review code", "code review", "PR review",
-  "review changes", "review my code", "check code quality".
+  The methodology behind the /code-review workflow: MCP-first analysis order,
+  review dimensions (correctness, security, performance, architecture
+  compliance, test coverage), severity classification, and finding format.
+  Loaded automatically by the /code-review workflow and the code-reviewer
+  agent — to RUN a review, use /code-review. Load this skill directly when
+  designing a review process, calibrating severity levels, or defining what
+  a review must cover.
 ---
 
 # Code Review Workflow

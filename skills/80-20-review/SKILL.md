@@ -1,13 +1,14 @@
 ---
 name: 80-20-review
 description: >
-  Focus code review effort on the 20% of code that causes 80% of issues.
-  Prioritizes data access, security, concurrency, and integration boundaries
-  over formatting and style. Uses blast radius scoring to determine review
-  depth. Includes checkpoint schedules, critical path identification, and
-  a batch review checklist. Load this skill when reviewing code, PRs, or
-  architecture, or when the user mentions "review", "code review", "PR review",
-  "what should I review", "review priorities", "blast radius", or "critical path".
+  Review PRIORITIZATION — decide where review effort goes, not how to review.
+  Focuses effort on the 20% of code that causes 80% of issues using blast
+  radius scoring: data access, security, concurrency, and integration
+  boundaries before formatting and style. Includes checkpoint schedules and
+  critical path identification. Load this skill when deciding what to review
+  or how deep, planning review checkpoints for a large change, or when the
+  user mentions "what should I review", "review priorities", "blast radius",
+  "critical path", or "review strategy". To RUN a review, use /code-review.
 ---
 
 # 80/20 Review
