@@ -154,6 +154,35 @@ nothing. The baseline also ignores the wrong files a text search would have surf
 and the false positives it would have returned — real costs that are simply not counted.
 The result understates savings, which is the correct direction of error for a public claim.
 
+### Aggregating across repositories
+
+`get_token_savings` answers for the repository in front of you. The `stats` CLI aggregates
+every repository and adds what telemetry alone cannot see — real measured spend and
+adoption rate, both read from Claude Code transcripts:
+
+```bash
+cd mcp/CWM.RoslynNavigator
+dotnet run --project stats/CWM.RoslynNavigator.Stats.csproj              # table
+dotnet run --project stats/CWM.RoslynNavigator.Stats.csproj -- --markdown
+dotnet run --project stats/CWM.RoslynNavigator.Stats.csproj -- --json
+dotnet run --project stats/CWM.RoslynNavigator.Stats.csproj -- --repo myapp
+```
+
+**Adoption rate** is the share of C# navigation that went through the MCP rather than raw
+file reads:
+
+```
+adoption = roslyn_calls / (roslyn_calls + Read/Grep/Glob calls targeting .cs)
+```
+
+Repositories where the server was never used are excluded from the denominator — including
+them would drag the aggregate down for reasons unrelated to the tools. The denominator
+counts only searches that demonstrably targeted C#, so an unfiltered `Grep` is left out;
+that biases adoption **upward**, and the report says so.
+
+Low adoption in a repository where the server *is* configured is usually the more
+actionable finding: it means a tool description is not attracting the work it should.
+
 ### The one number that is not measured
 
 `bytesPerToken` is currently **3.5, an uncalibrated estimate**. C# is denser than prose, so
@@ -162,8 +191,23 @@ measured token counts. Every report says so, and `get_token_savings` returns
 `DivisorCalibrated: false` until it has been.
 
 Calibrating means sampling real `.cs` files, getting exact counts from the Anthropic
-`count_tokens` endpoint, and regressing bytes against tokens. Until that runs, treat the
-figure as indicative rather than precise.
+`count_tokens` endpoint, and regressing bytes against tokens. The CLI does this:
+
+```bash
+dotnet run --project stats/CWM.RoslynNavigator.Stats.csproj -- calibrate \
+  --api-key $ANTHROPIC_API_KEY --path /path/to/a/dotnet/repo --sample 200
+```
+
+`count_tokens` is free and returns exact counts, so anyone can reproduce the result and
+check the claim. The run is manual and lives only in this CLI — the MCP server never calls
+it and stays fully offline. Sampling is seeded, so a run can be repeated exactly.
+
+Apply the output to `TokenEstimator` and record the sample size and R² beside the constant.
+A low R² would itself be a finding: it would mean C# token density varies too much for any
+single divisor, and the metric should report a range rather than a point.
+
+**This has not been run yet** — it needs an API key. Until it is, treat the figure as
+indicative rather than precise.
 
 ## Signal Quality
 
@@ -366,7 +410,15 @@ SolutionDiscovery.cs    → Auto-detect .sln/.slnx from args or working director
 SymbolResolver.cs       → Cross-project symbol resolution with disambiguation
 Tools/                  → MCP tool implementations (23 read-only tools)
 Responses/              → Token-optimized JSON response DTOs
+Telemetry/              → Opt-in local measurement, behind one call-tool filter
+
+stats/                  → Separate CLI: cross-repo aggregate + divisor calibration
 ```
+
+The Stats CLI deliberately does not reference the server project — it reads JSONL and has
+no business pulling in the Roslyn workspace stack. It mirrors the record type instead, and
+a contract test round-trips a real server record through the mirror so the two cannot drift
+apart silently.
 
 ## Scaling
 
@@ -417,6 +469,19 @@ dotnet run --project mcp/CWM.RoslynNavigator/src/CWM.RoslynNavigator.csproj -- -
 ```
 
 ## Changelog
+
+### 0.12.0
+
+- **`CWM.RoslynNavigator.Stats` CLI** — aggregates savings across every repository, with a
+  tool leaderboard, miss rates, and table / `--json` / `--markdown` output.
+- **Transcript mining** — real measured spend and adoption rate read from Claude Code
+  transcripts, so adoption is available even where telemetry was never enabled.
+- **`stats calibrate`** — derives the bytes-per-token divisor from exact `count_tokens`
+  results. Manual and offline-by-default; the server never calls it.
+- The repository join reads `cwd` from transcript line content rather than decoding the
+  directory name, which is lossy — `dotnet-claude-kit` cannot be recovered from
+  `C--Users-...-dotnet-claude-kit`. This was the design's flagged fragile point.
+- Reports distinguish "no data" from "data exists and the server was never invoked".
 
 ### 0.11.0
 

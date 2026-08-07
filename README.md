@@ -3,7 +3,7 @@
   <p align="center">
     <strong>Make Claude Code an expert .NET developer.</strong>
     <br />
-    47 skills &bull; 10 specialist agents &bull; 16 slash commands &bull; 10 rules &bull; 5 project templates &bull; 23 MCP tools &bull; automation hooks
+    48 skills &bull; 10 specialist agents &bull; 17 slash commands &bull; 10 rules &bull; 5 project templates &bull; 23 MCP tools &bull; automation hooks
     <br />
     Built for .NET 10 / C# 14. Architecture-aware. Token-efficient.
   </p>
@@ -97,7 +97,7 @@ An **action layer** on top of the knowledge layer — Claude doesn't just know t
 
 ### Plugin Install (Recommended)
 
-Install as a Claude Code plugin — all 47 skills (including 16 slash-command workflows), 10 agents, hooks, and MCP config activate globally. The 10 rules ship in this repo for you to copy into your project's `.claude/rules/`:
+Install as a Claude Code plugin — all 48 skills (including 17 slash-command workflows), 10 agents, hooks, and MCP config activate globally. The 10 rules ship in this repo for you to copy into your project's `.claude/rules/`:
 
 ```bash
 # In your terminal — install the Roslyn MCP server
@@ -151,7 +151,7 @@ Replace `[ProjectName]`, update tech stack, choose your architecture.
 
 </details>
 
-Start Claude Code — 47 skills, 10 agents, and 23 MCP tools activate automatically. Copy the 10 rules into your project's `.claude/rules/` to make them always-loaded.
+Start Claude Code — 48 skills, 10 agents, and 23 MCP tools activate automatically. Copy the 10 rules into your project's `.claude/rules/` to make them always-loaded.
 
 That's it. Claude now writes .NET code the way a senior .NET engineer would.
 
@@ -239,7 +239,7 @@ public sealed class OrderEndpoints : IEndpointGroup
 
 ---
 
-## Slash Commands (16)
+## Slash Commands (17)
 
 Shortcut workflows that orchestrate skills and agents. Type the command and Claude handles the rest. These are workflow skills — each lives at `skills/<name>/SKILL.md`, registers its `/name` automatically, and carries its methodology inline (no separate knowledge twin to load).
 
@@ -261,6 +261,7 @@ Shortcut workflows that orchestrate skills and agents. Type the command and Clau
 | `/wrap-up` | Session handoff lifecycle: end-of-session ritual + session-start loading | instinct-system skill |
 | `/outdated` | Dependency health: outdated packages, CVEs, and commercial-license traps | get_nuget_packages MCP tool |
 | `/arch-check` | Architecture conformance: dependency direction, layer violations, module leaks | get_project_graph MCP tool |
+| `/token-report` | Measured token savings, tool leaderboard, and adoption rate | get_token_savings MCP tool + Stats CLI |
 
 Instinct operations (status, export, import) are modes of the [instinct-system](skills/instinct-system/SKILL.md) skill — say "show instincts", "export instincts", or "import instincts".
 
@@ -283,7 +284,7 @@ Project-level conventions that apply to every interaction once loaded. Rules shi
 
 ## Knowledge Skills (31)
 
-Code-heavy reference files that teach Claude .NET best practices. Each skill is under 400 lines with concrete code examples, anti-patterns (BAD/GOOD comparisons), and decision guides. (The other 16 of the 47 skills are the workflow orchestrators documented under [Slash Commands](#slash-commands-16).)
+Code-heavy reference files that teach Claude .NET best practices. Each skill is under 400 lines with concrete code examples, anti-patterns (BAD/GOOD comparisons), and decision guides. (The other 16 of the 48 skills are the workflow orchestrators documented under [Slash Commands](#slash-commands-16).)
 
 | Category | Skills | What Claude Learns |
 |----------|--------|--------------------|
@@ -409,7 +410,7 @@ dotnet-claude-kit/
 ├── CLAUDE.md                    # Instructions for developing THIS repo
 ├── AGENTS.md                    # Agent routing & orchestration
 ├── agents/                      # 10 specialist agents
-├── skills/                      # 47 skills (incl. 16 slash-command workflows)
+├── skills/                      # 48 skills (incl. 17 slash-command workflows)
 ├── .claude/rules/               # 10 always-loaded rules
 ├── templates/                   # 5 drop-in CLAUDE.md templates
 ├── knowledge/                   # Living reference documents + ADRs
