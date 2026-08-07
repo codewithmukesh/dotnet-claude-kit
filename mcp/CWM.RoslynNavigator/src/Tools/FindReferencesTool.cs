@@ -25,9 +25,11 @@ public static class FindReferencesTool
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
         if (notReady is not null) return notReady;
 
+        var limit = Math.Max(1, maxResults);
+
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new ReferencesResult([], 0, 0));
+            return JsonSerializer.Serialize(new ReferencesResult([], 0, 0, false, limit));
 
         var resolved = await SymbolResolver.ResolveOrErrorAsync(workspace, symbolName, file, line, ct: ct);
         if (resolved.Failed) return resolved.Error;
@@ -45,7 +47,7 @@ public static class FindReferencesTool
         {
             foreach (var location in reference.Locations)
             {
-                if (results.Count >= maxResults) { capped = true; break; }
+                if (results.Count >= limit) { capped = true; break; }
 
                 var lineSpan = location.Location.GetLineSpan();
                 var document = solution.GetDocument(location.Document.Id);
@@ -70,7 +72,10 @@ public static class FindReferencesTool
             if (capped) break;
         }
 
-        return JsonSerializer.Serialize(new ReferencesResult(results, results.Count, totalFound));
+        // Snippets are built lazily as locations stream in, so this tool caps in the loop
+        // rather than via Paging — the contract it reports is identical.
+        return JsonSerializer.Serialize(new ReferencesResult(
+            results, results.Count, totalFound, totalFound > results.Count, limit));
     }
 
     private static string ClassifyReferenceKind(

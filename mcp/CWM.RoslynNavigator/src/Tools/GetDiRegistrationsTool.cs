@@ -30,7 +30,8 @@ public static class GetDiRegistrationsTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new DiRegistrationsResult([], [], [], 0, 0));
+            return JsonSerializer.Serialize(new DiRegistrationsResult(
+                [], [], [], 0, 0, false, Math.Max(1, maxResults)));
 
         var registrations = new List<DiRegistration>();
         var typeDeclarations = new Dictionary<string, TypeDeclarationSyntax>(StringComparer.Ordinal);
@@ -62,10 +63,10 @@ public static class GetDiRegistrationsTool
         var duplicates = FindDuplicates(registrations);
         var captiveRisks = FindCaptiveRisks(registrations, typeDeclarations);
 
-        var results = registrations.Take(Math.Max(1, maxResults)).ToList();
+        var page = Paging.Apply(registrations, maxResults);
 
         return JsonSerializer.Serialize(new DiRegistrationsResult(
-            results, duplicates, captiveRisks, results.Count, registrations.Count));
+            page.Items, duplicates, captiveRisks, page.Count, page.TotalFound, page.Truncated, page.Limit));
     }
 
     /// <summary>

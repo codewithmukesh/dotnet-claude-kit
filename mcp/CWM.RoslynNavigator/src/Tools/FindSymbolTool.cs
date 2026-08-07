@@ -21,8 +21,7 @@ public static class FindSymbolTool
 
         var symbols = await SymbolResolver.FindSymbolsByNameAsync(workspace, name, kind, ct);
 
-        var results = symbols
-            .Take(Math.Max(1, maxResults))
+        var all = symbols
             .Select(s =>
             {
                 var location = SymbolResolver.GetLocation(s);
@@ -34,6 +33,9 @@ public static class FindSymbolTool
                     Namespace: s.ContainingNamespace?.ToDisplayString() ?? "global");
             }).ToList();
 
-        return JsonSerializer.Serialize(new SymbolSearchResult(results, results.Count, symbols.Count));
+        var page = Paging.Apply(all, maxResults);
+
+        return JsonSerializer.Serialize(new SymbolSearchResult(
+            page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit));
     }
 }

@@ -23,7 +23,7 @@ public static class GetNugetPackagesTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new NugetPackagesResult([], 0, 0));
+            return JsonSerializer.Serialize(new NugetPackagesResult([], 0, 0, false, Math.Max(1, maxResults)));
 
         maxResults = Math.Max(1, maxResults);
 
@@ -61,7 +61,10 @@ public static class GetNugetPackagesTool
                 Packages: kept));
         }
 
-        return JsonSerializer.Serialize(new NugetPackagesResult(results, returned, total));
+        // The cap applies to packages across projects, so truncation is measured on the
+        // package count rather than the project list this tool returns.
+        return JsonSerializer.Serialize(new NugetPackagesResult(
+            results, returned, total, total > returned, maxResults));
     }
 
     /// <summary>

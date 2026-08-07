@@ -36,7 +36,7 @@ public static class GetEndpointMapTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new EndpointMapResult([], 0, 0));
+            return Serialize(Paging.Empty<EndpointEntry>(maxResults));
 
         var all = new List<EndpointEntry>();
         var seenFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -60,10 +60,12 @@ public static class GetEndpointMapTool
             }
         }
 
-        var results = all.Take(Math.Max(1, maxResults)).ToList();
-
-        return JsonSerializer.Serialize(new EndpointMapResult(results, results.Count, all.Count));
+        return Serialize(Paging.Apply(all, maxResults));
     }
+
+    private static string Serialize(Paging.Page<EndpointEntry> page) =>
+        JsonSerializer.Serialize(new EndpointMapResult(
+            page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit));
 
     /// <summary>
     /// Syntax-only endpoint extraction for one file. Internal for direct unit testing.

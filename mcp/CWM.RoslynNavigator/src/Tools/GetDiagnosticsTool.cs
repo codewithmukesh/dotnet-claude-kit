@@ -23,7 +23,8 @@ public static class GetDiagnosticsTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new DiagnosticsResult([], 0, 0, 0, 0, 0));
+            return JsonSerializer.Serialize(new DiagnosticsResult(
+                [], 0, 0, 0, 0, 0, false, Math.Max(1, maxResults)));
 
         var matched = new List<(Diagnostic Diagnostic, DiagnosticInfo Info)>();
 
@@ -65,16 +66,17 @@ public static class GetDiagnosticsTool
         var info = matched.Count(m => m.Diagnostic.Severity == DiagnosticSeverity.Info);
 
         // Errors first so truncation never hides the most important diagnostics
-        var diagnostics = matched
+        var ordered = matched
             .OrderByDescending(m => m.Diagnostic.Severity)
             .ThenBy(m => m.Info.File, StringComparer.OrdinalIgnoreCase)
             .ThenBy(m => m.Info.Line)
-            .Take(Math.Max(1, maxResults))
             .Select(m => m.Info)
             .ToList();
 
+        var page = Paging.Apply(ordered, maxResults);
+
         return JsonSerializer.Serialize(new DiagnosticsResult(
-            diagnostics, diagnostics.Count, matched.Count, errors, warnings, info));
+            page.Items, page.Count, page.TotalFound, errors, warnings, info, page.Truncated, page.Limit));
     }
 
     private static async Task<IReadOnlyList<Compilation>> GetCompilationsForFile(

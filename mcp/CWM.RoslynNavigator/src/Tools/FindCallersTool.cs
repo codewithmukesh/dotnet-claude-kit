@@ -23,7 +23,7 @@ public static class FindCallersTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new CallersResult([], 0, 0));
+            return Serialize(Paging.Empty<CallerInfo>(maxResults));
 
         // A className hint is just a qualifier — fold it in rather than resolving twice.
         var lookupName = className is not null && !methodName.Contains('.')
@@ -53,8 +53,10 @@ public static class FindCallersTool
             }
         }
 
-        var results = all.Take(Math.Max(1, maxResults)).ToList();
-
-        return JsonSerializer.Serialize(new CallersResult(results, results.Count, all.Count));
+        return Serialize(Paging.Apply(all, maxResults));
     }
+
+    private static string Serialize(Paging.Page<CallerInfo> page) =>
+        JsonSerializer.Serialize(new CallersResult(
+            page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit));
 }

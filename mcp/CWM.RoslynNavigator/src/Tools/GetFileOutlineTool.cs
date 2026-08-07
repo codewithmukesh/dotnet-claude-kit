@@ -24,7 +24,8 @@ public static class GetFileOutlineTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new FileOutlineResult("unknown", null, 0, [], 0, 0));
+            return JsonSerializer.Serialize(new FileOutlineResult(
+                "unknown", null, 0, [], 0, 0, false, Math.Max(1, maxResults)));
 
         var document = solution.Projects
             .SelectMany(p => p.Documents)
@@ -62,7 +63,9 @@ public static class GetFileOutlineTool
             UsingCount: usingCount,
             Types: types,
             Count: budget.Returned,
-            TotalFound: budget.Total));
+            TotalFound: budget.Total,
+            Truncated: budget.Total > budget.Returned,
+            Limit: Math.Max(1, maxResults)));
     }
 
     private sealed class OutlineBudget(int maxMembers)

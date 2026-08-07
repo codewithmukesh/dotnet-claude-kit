@@ -22,7 +22,7 @@ public static class FindImplementationsTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new ImplementationsResult([], 0, 0));
+            return Serialize(Paging.Empty<ImplementationInfo>(maxResults));
 
         var resolved = await SymbolResolver.ResolveOrErrorAsync(workspace, interfaceName, ct: ct);
         if (resolved.Failed) return resolved.Error;
@@ -51,8 +51,10 @@ public static class FindImplementationsTool
             }
         }
 
-        var results = all.Take(Math.Max(1, maxResults)).ToList();
-
-        return JsonSerializer.Serialize(new ImplementationsResult(results, results.Count, all.Count));
+        return Serialize(Paging.Apply(all, maxResults));
     }
+
+    private static string Serialize(Paging.Page<ImplementationInfo> page) =>
+        JsonSerializer.Serialize(new ImplementationsResult(
+            page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit));
 }

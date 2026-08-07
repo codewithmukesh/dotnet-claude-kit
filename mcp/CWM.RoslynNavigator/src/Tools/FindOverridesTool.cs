@@ -23,7 +23,7 @@ public static class FindOverridesTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new OverridesResult([], 0, 0));
+            return Serialize(Paging.Empty<OverrideInfo>(maxResults));
 
         var lookupName = className is not null && !methodName.Contains('.')
             ? $"{className}.{methodName}"
@@ -50,8 +50,10 @@ public static class FindOverridesTool
             }
         }
 
-        var results = all.Take(Math.Max(1, maxResults)).ToList();
-
-        return JsonSerializer.Serialize(new OverridesResult(results, results.Count, all.Count));
+        return Serialize(Paging.Apply(all, maxResults));
     }
+
+    private static string Serialize(Paging.Page<OverrideInfo> page) =>
+        JsonSerializer.Serialize(new OverridesResult(
+            page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit));
 }

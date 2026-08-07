@@ -2,9 +2,15 @@ namespace CWM.RoslynNavigator.Responses;
 
 // Token-optimized response records for MCP tools.
 // All responses use minimal property names and avoid unnecessary nesting.
-// List-returning tools follow a shared truncation contract: Count is the number of
-// entries returned, TotalFound the number that matched — re-query with a higher
-// maxResults when TotalFound exceeds Count.
+//
+// List-returning tools share one paging contract, produced by Responses.Paging:
+//   Count      entries in this response
+//   TotalFound entries that matched in total
+//   Truncated  true when the cap dropped entries — the single field to branch on
+//   Limit      the cap that was applied; re-query above it to see the rest
+// Truncated is stated rather than left to a Count/TotalFound comparison so a caller
+// never has to infer whether it is looking at a complete answer.
+//
 // Note: intentionally many records in one file — these are pure DTOs and a file per
 // two-line record would hurt navigability more than it helps.
 
@@ -37,21 +43,23 @@ internal sealed record ErrorResponse(
 
 internal sealed record SymbolLocation(string Name, string Kind, string File, int Line, string Namespace);
 
-internal sealed record SymbolSearchResult(List<SymbolLocation> Symbols, int Count, int TotalFound);
+internal sealed record SymbolSearchResult(List<SymbolLocation> Symbols, int Count, int TotalFound, bool Truncated, int Limit);
 
 internal sealed record ReferenceLocation(string File, int Line, string Snippet, string Kind);
 
-internal sealed record ReferencesResult(List<ReferenceLocation> References, int Count, int TotalFound);
+internal sealed record ReferencesResult(List<ReferenceLocation> References, int Count, int TotalFound, bool Truncated, int Limit);
 
 internal sealed record ImplementationInfo(string Type, string File, int Line);
 
-internal sealed record ImplementationsResult(List<ImplementationInfo> Implementations, int Count, int TotalFound);
+internal sealed record ImplementationsResult(List<ImplementationInfo> Implementations, int Count, int TotalFound, bool Truncated, int Limit);
 
 internal sealed record TypeHierarchyResult(
     List<string> BaseTypes,
     List<string> Interfaces,
     List<string> DerivedTypes,
-    int TotalDerived);
+    int TotalDerived,
+    bool Truncated,
+    int Limit);
 
 internal sealed record ProjectInfo(
     string Name,
@@ -63,7 +71,7 @@ internal sealed record ProjectGraphResult(string Solution, List<ProjectInfo> Pro
 
 internal sealed record MemberInfo(string Kind, string Signature, string Accessibility);
 
-internal sealed record PublicApiResult(string Type, List<MemberInfo> Members, int Count, int TotalFound);
+internal sealed record PublicApiResult(string Type, List<MemberInfo> Members, int Count, int TotalFound, bool Truncated, int Limit);
 
 internal sealed record DiagnosticInfo(string Id, string Severity, string Message, string File, int Line);
 
@@ -73,17 +81,19 @@ internal sealed record DiagnosticsResult(
     int TotalFound,
     int Errors,
     int Warnings,
-    int Info);
+    int Info,
+    bool Truncated,
+    int Limit);
 
 internal sealed record StatusResponse(string State, string Message);
 
 internal sealed record CallerInfo(string Method, string ContainingType, string File, int Line);
 
-internal sealed record CallersResult(List<CallerInfo> Callers, int Count, int TotalFound);
+internal sealed record CallersResult(List<CallerInfo> Callers, int Count, int TotalFound, bool Truncated, int Limit);
 
 internal sealed record OverrideInfo(string Method, string ContainingType, string File, int Line);
 
-internal sealed record OverridesResult(List<OverrideInfo> Overrides, int Count, int TotalFound);
+internal sealed record OverridesResult(List<OverrideInfo> Overrides, int Count, int TotalFound, bool Truncated, int Limit);
 
 internal sealed record ParameterDetail(string Name, string Type, string? DefaultValue);
 
@@ -140,6 +150,8 @@ internal sealed record AntiPatternsResult(
     List<AntiPatternInfo> Violations,
     int Count,
     int TotalFound,
+    bool Truncated,
+    int Limit,
     AntiPatternSummary? Summary = null);
 
 // Dead code detection
@@ -156,6 +168,8 @@ internal sealed record DeadCodeResult(
     List<DeadCodeInfo> Symbols,
     int Count,
     int TotalFound,
+    bool Truncated,
+    int Limit,
     int ConventionFiltered = 0);
 
 // Circular dependency detection
@@ -211,19 +225,21 @@ internal sealed record FileOutlineResult(
     int UsingCount,
     List<TypeOutline> Types,
     int Count,
-    int TotalFound);
+    int TotalFound,
+    bool Truncated,
+    int Limit);
 
 // NuGet packages
 internal sealed record PackageRef(string Id, string? Version);
 
 internal sealed record ProjectPackages(string Name, string TargetFramework, bool Cpm, List<PackageRef> Packages);
 
-internal sealed record NugetPackagesResult(List<ProjectPackages> Projects, int Count, int TotalFound);
+internal sealed record NugetPackagesResult(List<ProjectPackages> Projects, int Count, int TotalFound, bool Truncated, int Limit);
 
 // Endpoint map
 internal sealed record EndpointEntry(string Method, string Route, string Auth, string Kind, string File, int Line);
 
-internal sealed record EndpointMapResult(List<EndpointEntry> Endpoints, int Count, int TotalFound);
+internal sealed record EndpointMapResult(List<EndpointEntry> Endpoints, int Count, int TotalFound, bool Truncated, int Limit);
 
 // DI registrations
 internal sealed record DiRegistration(
@@ -244,4 +260,6 @@ internal sealed record DiRegistrationsResult(
     List<DiDuplicate> Duplicates,
     List<DiCaptiveRisk> CaptiveRisks,
     int Count,
-    int TotalFound);
+    int TotalFound,
+    bool Truncated,
+    int Limit);

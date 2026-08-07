@@ -58,6 +58,32 @@ public class FindSymbolTests(TestSolutionFixture fixture) : IClassFixture<TestSo
     }
 
     [Fact]
+    public async Task FindSymbol_MaxResultsBelowTotal_FlagsTruncatedAndReportsLimit()
+    {
+        var json = await FindSymbolTool.ExecuteAsync(
+            fixture.WorkspaceManager, "GetByIdAsync", "method", maxResults: 1,
+            ct: TestContext.Current.CancellationToken);
+        var result = JsonSerializer.Deserialize<SymbolSearchResult>(json)!;
+
+        Assert.True(result.Truncated);
+        Assert.Equal(1, result.Limit);
+        Assert.Single(result.Symbols);
+        Assert.True(result.TotalFound > 1);
+    }
+
+    [Fact]
+    public async Task FindSymbol_CompleteResultSet_IsNotFlaggedTruncated()
+    {
+        var json = await FindSymbolTool.ExecuteAsync(
+            fixture.WorkspaceManager, "OrderStatus", "enum", maxResults: 50,
+            ct: TestContext.Current.CancellationToken);
+        var result = JsonSerializer.Deserialize<SymbolSearchResult>(json)!;
+
+        Assert.False(result.Truncated);
+        Assert.Equal(result.TotalFound, result.Count);
+    }
+
+    [Fact]
     public async Task FindSymbol_TypeQualifiedMethod_NarrowsToOwningType()
     {
         var bare = JsonSerializer.Deserialize<SymbolSearchResult>(

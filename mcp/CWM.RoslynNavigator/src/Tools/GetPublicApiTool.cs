@@ -39,10 +39,11 @@ public static class GetPublicApiTool
                 Accessibility: m.DeclaredAccessibility.ToString().ToLowerInvariant()))
             .ToList();
 
-        var members = allMembers.Take(Math.Max(1, maxResults)).ToList();
+        var page = Paging.Apply(allMembers, maxResults);
         var typeKind = SymbolResolver.GetKindString(typeSymbol);
 
-        return JsonSerializer.Serialize(new PublicApiResult(typeKind, members, members.Count, allMembers.Count));
+        return JsonSerializer.Serialize(new PublicApiResult(
+            typeKind, page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit));
     }
 
     private static string GetMemberKind(ISymbol symbol) => symbol switch

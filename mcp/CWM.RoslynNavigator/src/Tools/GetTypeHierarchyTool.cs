@@ -22,7 +22,7 @@ public static class GetTypeHierarchyTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new TypeHierarchyResult([], [], [], 0));
+            return JsonSerializer.Serialize(new TypeHierarchyResult([], [], [], 0, false, Math.Max(1, maxResults)));
 
         var resolved = await SymbolResolver.ResolveOrErrorAsync(workspace, typeName, ct: ct);
         if (resolved.Failed) return resolved.Error;
@@ -65,8 +65,9 @@ public static class GetTypeHierarchyTool
             allDerived.AddRange(derived.Select(d => d.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)));
         }
 
-        var derivedTypes = allDerived.Take(Math.Max(1, maxResults)).ToList();
+        var page = Paging.Apply(allDerived, maxResults);
 
-        return JsonSerializer.Serialize(new TypeHierarchyResult(baseTypes, interfaces, derivedTypes, allDerived.Count));
+        return JsonSerializer.Serialize(new TypeHierarchyResult(
+            baseTypes, interfaces, page.Items, page.TotalFound, page.Truncated, page.Limit));
     }
 }

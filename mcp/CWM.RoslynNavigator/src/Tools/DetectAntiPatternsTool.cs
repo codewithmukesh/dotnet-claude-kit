@@ -41,7 +41,8 @@ public static class DetectAntiPatternsTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new AntiPatternsResult([], 0, 0));
+            return JsonSerializer.Serialize(new AntiPatternsResult(
+                [], 0, 0, false, Math.Max(1, maxResults)));
 
         var minSeverity = severity.Equals("error", StringComparison.OrdinalIgnoreCase)
             ? AntiPatternSeverity.Error
@@ -187,12 +188,14 @@ public static class DetectAntiPatternsTool
                 .Where(entry => entry.Violation.Confidence >= minConfidence)
                 .ToList();
 
+            var limit = Math.Max(1, maxResults);
+
             var violations = eligible
                 .OrderByDescending(entry => entry.Violation.Confidence)
                 .ThenByDescending(entry => entry.Violation.Severity)
                 .ThenBy(entry => entry.RelativePath, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(entry => entry.Violation.Line)
-                .Take(maxResults)
+                .Take(limit)
                 .Select(entry => new AntiPatternInfo(
                     entry.Violation.Id,
                     entry.Violation.Severity.ToString().ToLowerInvariant(),
@@ -229,7 +232,9 @@ public static class DetectAntiPatternsTool
                 MigrationFiles: _migration,
                 SuppressionConfig: suppressions.ConfigPath);
 
-            return new AntiPatternsResult(violations, violations.Count, eligible.Count, summary);
+            return new AntiPatternsResult(
+                violations, violations.Count, eligible.Count,
+                eligible.Count > violations.Count, limit, summary);
         }
     }
 
