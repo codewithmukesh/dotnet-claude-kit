@@ -66,8 +66,11 @@ public static class GetTypeHierarchyTool
         }
 
         var page = Paging.Apply(allDerived, maxResults);
+        var location = SymbolResolver.GetLocation(typeSymbol);
 
         return JsonSerializer.Serialize(new TypeHierarchyResult(
-            baseTypes, interfaces, page.Items, page.TotalFound, page.Truncated, page.Limit));
+            baseTypes, interfaces, page.Items, page.TotalFound, page.Truncated, page.Limit,
+            File: location is { } loc ? workspace.ToRelativePath(loc.File) : null,
+            Line: location?.Line ?? 0));
     }
 }

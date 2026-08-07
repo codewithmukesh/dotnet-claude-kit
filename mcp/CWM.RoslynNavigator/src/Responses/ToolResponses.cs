@@ -62,7 +62,9 @@ internal sealed record TypeHierarchyResult(
     List<string> DerivedTypes,
     int TotalDerived,
     bool Truncated,
-    int Limit);
+    int Limit,
+    string? File = null,
+    int Line = 0);
 
 internal sealed record ProjectInfo(
     string Name,
@@ -74,7 +76,15 @@ internal sealed record ProjectGraphResult(string Solution, List<ProjectInfo> Pro
 
 internal sealed record MemberInfo(string Kind, string Signature, string Accessibility);
 
-internal sealed record PublicApiResult(string Type, List<MemberInfo> Members, int Count, int TotalFound, bool Truncated, int Limit);
+internal sealed record PublicApiResult(
+    string Type,
+    List<MemberInfo> Members,
+    int Count,
+    int TotalFound,
+    bool Truncated,
+    int Limit,
+    string? File = null,
+    int Line = 0);
 
 internal sealed record DiagnosticInfo(string Id, string Severity, string Message, string File, int Line);
 
@@ -202,6 +212,41 @@ internal sealed record TestCoverageMapResult(
     string? NotApplicableReason = null,
     int TestMethodCount = 0,
     int TestClassCount = 0);
+
+// Token savings
+internal sealed record ToolUsage(
+    string Tool,
+    int Calls,
+    int Saved,
+    long MedianMs,
+    int ZeroResultPct);
+
+/// <summary>
+/// Methodology disclosure. Travels with the numbers rather than living only in a README,
+/// because a savings figure means nothing without the assumptions behind it.
+/// </summary>
+internal sealed record SavingsMethod(
+    string Baseline,
+    double BytesPerToken,
+    bool DivisorCalibrated,
+    int CalibrationSampleSize,
+    string Dedup,
+    string Excluded);
+
+internal sealed record TokenSavingsResult(
+    bool Enabled,
+    string Message,
+    int TotalCalls,
+    int SavedTokens,
+    int ResponseTokens,
+    int BaselineTokens,
+    int FilesCounted,
+    int RepoTokens,
+    int ZeroResultCalls,
+    int NotReadyCalls,
+    int ErrorCalls,
+    List<ToolUsage> ByTool,
+    SavingsMethod? Method);
 
 // Change impact analysis
 internal sealed record ImpactProject(string Name, int References, bool IsTest);

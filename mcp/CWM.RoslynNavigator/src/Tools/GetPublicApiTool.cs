@@ -41,9 +41,12 @@ public static class GetPublicApiTool
 
         var page = Paging.Apply(allMembers, maxResults);
         var typeKind = SymbolResolver.GetKindString(typeSymbol);
+        var location = SymbolResolver.GetLocation(typeSymbol);
 
         return JsonSerializer.Serialize(new PublicApiResult(
-            typeKind, page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit));
+            typeKind, page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit,
+            File: location is { } loc ? workspace.ToRelativePath(loc.File) : null,
+            Line: location?.Line ?? 0));
     }
 
     private static string GetMemberKind(ISymbol symbol) => symbol switch

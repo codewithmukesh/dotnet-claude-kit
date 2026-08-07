@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.0] — 2026-08-07
+
+Measures the kit's central claim instead of asserting it.
+
+### Added
+- **`get_token_savings` MCP tool (22 → 23)** in CWM.RoslynNavigator 0.11.0 — reports tokens saved in the current repository with a per-tool leaderboard and separate zero-result, not-ready, and error counts.
+- **Opt-in local telemetry** (`CWM_ROSLYN_TELEMETRY=on`, off by default). Nothing is transmitted — there is no network call anywhere in the collection path, no identity, and no cross-machine correlation. Records are appended under `%LOCALAPPDATA%`, outside the repository, so there is nothing to gitignore and no way to commit usage data by accident.
+
+### Changed
+- **The savings baseline is the file-read floor**, not a hardcoded per-tool constant: the on-disk size of the source files each answer was actually derived from. Three rules keep it conservative and all three push the number down — a file counts once per session (without the tool it would have been read once and stayed in context), paths deduplicate within a call, and no call may claim more than the repository contains. Errors, zero-result calls, and calls made while the workspace was loading contribute nothing.
+- **The bytes-per-token divisor is an uncalibrated estimate (3.5)** and every report says so, returning `DivisorCalibrated: false`. Calibration against measured token counts is deliberately deferred rather than quietly assumed.
+- Collection hangs off a **single MCP call-tool filter** rather than a line in each of the 22 tool methods — verified available in the pinned SDK 1.4.1, resolving the design's open question. Every tool is measured including ones added later, with no per-tool line to forget.
+- `get_public_api` and `get_type_hierarchy` now report the resolved type's `File` and `Line`. Useful independently, and it closes the only gap where a tool could not contribute a baseline.
+
 ## [0.12.0] — 2026-08-07
 
 Roslyn Navigator correctness release. Symbol resolution, response contracts, and workspace reload behaviour are corrected, and two tools are added: stack trace resolution and change impact analysis.
