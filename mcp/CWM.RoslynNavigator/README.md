@@ -361,8 +361,7 @@ dotnet run --project mcp/CWM.RoslynNavigator/src/CWM.RoslynNavigator.csproj -- -
 
 ### 0.10.0
 
-Correctness pass on symbol resolution and response contracts, prompted by a
-feature-by-feature audit against RoslynCodeLens.Mcp.
+Correctness pass on symbol resolution and response contracts.
 
 - **Qualified symbol names** — resolution accepted only a bare declared name, so
   `find_references("OrderService.CreateOrderAsync")` returned an empty result,
