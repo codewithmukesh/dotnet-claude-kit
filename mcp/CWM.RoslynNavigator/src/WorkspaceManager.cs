@@ -29,6 +29,10 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     private readonly ConcurrentDictionary<string, byte> _knownDocumentPaths = new(StringComparer.OrdinalIgnoreCase);
     private long _accessCounter;
     private int _loadCount;
+    private readonly CancellationTokenSource _backgroundCts = new();
+    private int _structuralScanRunning;
+    private int _newSourceFilesPending;
+    private Task _structuralScan = Task.CompletedTask;
     private int _rootsAttempted; // 0 = not tried, 1 = tried
     private long _lastRefreshTicks;
     private long _lastStructuralScanTicks;
@@ -488,17 +492,23 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             return;
         }
 
-        // Phase 2: scan for new source files (expensive directory walk, longer cooldown)
+        // Phase 2: act on whatever the last background scan found. The scan itself walks
+        // every project directory, so it never runs in-band — a tool call pays an
+        // interlocked read here, and the reload only once the scan has already found
+        // something. The finding is at most one cooldown stale, which is the same
+        // staleness the in-band version had.
+        if (Interlocked.Exchange(ref _newSourceFilesPending, 0) == 1)
+        {
+            logger.LogInformation("New source files detected. Reloading solution.");
+            await LoadSolutionAsync(_solutionPath, ct);
+            return;
+        }
+
         var lastStructural = Interlocked.Read(ref _lastStructuralScanTicks);
         if (now - lastStructural >= StructuralScanCooldownTicks)
         {
             Interlocked.Exchange(ref _lastStructuralScanTicks, now);
-            if (HasNewSourceFiles())
-            {
-                logger.LogInformation("New source files detected. Full reload needed.");
-                await LoadSolutionAsync(_solutionPath, ct);
-                return;
-            }
+            StartStructuralScan();
         }
 
         // Phase 3: collect changed documents without holding the lock (stat calls are
@@ -567,9 +577,50 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         return changed;
     }
 
-    private bool HasNewSourceFiles()
+    /// <summary>
+    /// Kicks off the directory walk on a background thread, at most one at a time. Fire and
+    /// forget by design: the caller is servicing a tool request and must not wait on it.
+    /// </summary>
+    private void StartStructuralScan()
     {
-        if (_solution is null) return false;
+        if (Interlocked.CompareExchange(ref _structuralScanRunning, 1, 0) != 0)
+            return;
+
+        _structuralScan = Task.Run(() =>
+        {
+            try
+            {
+                if (HasNewSourceFiles(_backgroundCts.Token))
+                    Interlocked.Exchange(ref _newSourceFilesPending, 1);
+            }
+            catch (OperationCanceledException)
+            {
+                // Shutting down.
+            }
+            catch (Exception ex)
+            {
+                // A transient IO error during the walk costs one missed scan, not a failed
+                // tool call — the next cooldown schedules another.
+                logger.LogWarning(ex, "Structural scan failed; will retry on the next cooldown.");
+            }
+            finally
+            {
+                Interlocked.Exchange(ref _structuralScanRunning, 0);
+            }
+        }, _backgroundCts.Token);
+    }
+
+    /// <summary>
+    /// Awaits the in-flight structural scan. Test seam — nothing in the request path
+    /// should ever wait on this.
+    /// </summary>
+    internal Task WaitForStructuralScanAsync() => _structuralScan;
+
+    private bool HasNewSourceFiles(CancellationToken ct)
+    {
+        // Captured once: a concurrent reload can swap the field mid-walk.
+        var solution = _solution;
+        if (solution is null) return false;
 
         var options = new EnumerationOptions
         {
@@ -578,9 +629,11 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             AttributesToSkip = FileAttributes.Hidden | FileAttributes.System
         };
 
-        foreach (var projectId in _solution.ProjectIds)
+        foreach (var projectId in solution.ProjectIds)
         {
-            var project = _solution.GetProject(projectId);
+            ct.ThrowIfCancellationRequested();
+
+            var project = solution.GetProject(projectId);
             if (project?.FilePath is null) continue;
 
             var projectDir = Path.GetDirectoryName(project.FilePath);
@@ -593,6 +646,8 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
 
             foreach (var file in Directory.EnumerateFiles(projectDir, "*.cs", options))
             {
+                ct.ThrowIfCancellationRequested();
+
                 if (file.StartsWith(binPrefix, StringComparison.OrdinalIgnoreCase) ||
                     file.StartsWith(objPrefix, StringComparison.OrdinalIgnoreCase))
                     continue;
@@ -607,6 +662,19 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
 
     public void Dispose()
     {
+        _backgroundCts.Cancel();
+
+        try
+        {
+            // Bounded so shutdown cannot block on a large directory walk.
+            _structuralScan.Wait(TimeSpan.FromSeconds(2));
+        }
+        catch (Exception)
+        {
+            // Cancellation or a failed scan; nothing left to salvage during teardown.
+        }
+
+        _backgroundCts.Dispose();
         _workspace?.Dispose();
         _writeLock.Dispose();
     }

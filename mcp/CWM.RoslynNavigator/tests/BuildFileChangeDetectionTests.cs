@@ -94,6 +94,53 @@ public sealed class BuildFileChangeDetectionTests : IDisposable
     }
 
     [Fact]
+    public async Task Refresh_NewSourceFile_DetectedByBackgroundScanNotInline()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await _workspace.LoadSolutionAsync(SolutionPath, ct);
+        var loadsAfterInitial = _workspace.LoadCount;
+
+        await File.WriteAllTextAsync(
+            Path.Combine(_root, "SampleApi", "BrandNewType.cs"),
+            "namespace SampleApi;\n\ninternal sealed class BrandNewType;\n",
+            ct);
+
+        // First refresh only schedules the walk — it must not reload, and must not block
+        // on the directory enumeration.
+        _clock.Advance(TimeSpan.FromSeconds(90));
+        await _workspace.RefreshChangedDocumentsAsync(ct);
+        Assert.Equal(loadsAfterInitial, _workspace.LoadCount);
+
+        await _workspace.WaitForStructuralScanAsync();
+
+        // The next refresh acts on what the completed scan found.
+        _clock.Advance(PastCooldown);
+        await _workspace.RefreshChangedDocumentsAsync(ct);
+
+        Assert.Equal(loadsAfterInitial + 1, _workspace.LoadCount);
+        Assert.Contains(
+            _workspace.GetSolution()!.Projects.SelectMany(p => p.Documents),
+            d => d.Name == "BrandNewType.cs");
+    }
+
+    [Fact]
+    public async Task Refresh_NoNewSourceFiles_BackgroundScanDoesNotTriggerReload()
+    {
+        var ct = TestContext.Current.CancellationToken;
+        await _workspace.LoadSolutionAsync(SolutionPath, ct);
+        var loadsAfterInitial = _workspace.LoadCount;
+
+        _clock.Advance(TimeSpan.FromSeconds(90));
+        await _workspace.RefreshChangedDocumentsAsync(ct);
+        await _workspace.WaitForStructuralScanAsync();
+
+        _clock.Advance(PastCooldown);
+        await _workspace.RefreshChangedDocumentsAsync(ct);
+
+        Assert.Equal(loadsAfterInitial, _workspace.LoadCount);
+    }
+
+    [Fact]
     public async Task Refresh_NothingChanged_DoesNotReload()
     {
         var ct = TestContext.Current.CancellationToken;
