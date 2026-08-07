@@ -203,6 +203,27 @@ internal sealed record TestCoverageMapResult(
     int TestMethodCount = 0,
     int TestClassCount = 0);
 
+// Stack trace resolution
+internal sealed record StackFrameInfo(
+    int Index,
+    string Method,
+    bool InSolution,
+    string? File,
+    int? Line,
+    int? DeclarationLine,
+    string? Snippet);
+
+internal sealed record StackTraceResult(
+    string? ExceptionType,
+    string? Message,
+    List<StackFrameInfo> Frames,
+    int Count,
+    int TotalFound,
+    bool Truncated,
+    int Limit,
+    int SolutionFrames,
+    int? FirstSolutionFrame);
+
 // Symbol source
 internal sealed record SymbolSourceResult(
     string Name,
