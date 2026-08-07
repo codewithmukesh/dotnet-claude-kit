@@ -28,12 +28,25 @@ public class FindReferencesTests(TestSolutionFixture fixture) : IClassFixture<Te
     }
 
     [Fact]
-    public async Task FindReferences_NonexistentSymbol_ReturnsZero()
+    public async Task FindReferences_NonexistentSymbol_ReturnsSymbolNotFound()
     {
         var json = await FindReferencesTool.ExecuteAsync(fixture.WorkspaceManager, "ZZZNonExistentXXX", ct: TestContext.Current.CancellationToken);
+        var error = JsonSerializer.Deserialize<ErrorResponse>(json)!;
+
+        Assert.Equal(ErrorCodes.SymbolNotFound, error.Error);
+    }
+
+    [Fact]
+    public async Task FindReferences_UnreferencedSymbol_ReturnsEmptyResultNotAnError()
+    {
+        // The distinction that matters: a real symbol with no references is a valid answer
+        // ("this is dead"), while a misspelled one is not an answer at all.
+        var json = await FindReferencesTool.ExecuteAsync(
+            fixture.WorkspaceManager, "UnusedHelper", ct: TestContext.Current.CancellationToken);
         var result = JsonSerializer.Deserialize<ReferencesResult>(json)!;
 
-        Assert.Equal(0, result.Count);
+        Assert.Equal(0, result.TotalFound);
+        Assert.Empty(result.References);
     }
 
     [Fact]

@@ -64,13 +64,13 @@ public class GetSymbolDetailTests(TestSolutionFixture fixture) : IClassFixture<T
     }
 
     [Fact]
-    public async Task GetSymbolDetail_Nonexistent_ReturnsNotFound()
+    public async Task GetSymbolDetail_Nonexistent_ReturnsSymbolNotFound()
     {
         var json = await GetSymbolDetailTool.ExecuteAsync(
             fixture.WorkspaceManager, "ZZZNonExistent12345",
             ct: TestContext.Current.CancellationToken);
-        var result = JsonSerializer.Deserialize<StatusResponse>(json)!;
+        var error = JsonSerializer.Deserialize<ErrorResponse>(json)!;
 
-        Assert.Equal("NotFound", result.State);
+        Assert.Equal(ErrorCodes.SymbolNotFound, error.Error);
     }
 }

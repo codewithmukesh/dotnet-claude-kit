@@ -20,14 +20,14 @@ public class FindOverridesTests(TestSolutionFixture fixture) : IClassFixture<Tes
     }
 
     [Fact]
-    public async Task FindOverrides_NonexistentMethod_ReturnsEmpty()
+    public async Task FindOverrides_NonexistentMethod_ReturnsSymbolNotFound()
     {
         var json = await FindOverridesTool.ExecuteAsync(
             fixture.WorkspaceManager, "NonExistentMethod12345",
             ct: TestContext.Current.CancellationToken);
-        var result = JsonSerializer.Deserialize<OverridesResult>(json)!;
+        var error = JsonSerializer.Deserialize<ErrorResponse>(json)!;
 
-        Assert.Equal(0, result.Count);
+        Assert.Equal(ErrorCodes.SymbolNotFound, error.Error);
     }
 
     [Fact]

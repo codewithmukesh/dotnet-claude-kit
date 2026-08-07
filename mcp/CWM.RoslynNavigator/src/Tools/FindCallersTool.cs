@@ -25,17 +25,15 @@ public static class FindCallersTool
         if (solution is null)
             return JsonSerializer.Serialize(new CallersResult([], 0, 0));
 
-        var symbol = await SymbolResolver.ResolveSymbolAsync(workspace, methodName, ct: ct);
+        // A className hint is just a qualifier — fold it in rather than resolving twice.
+        var lookupName = className is not null && !methodName.Contains('.')
+            ? $"{className}.{methodName}"
+            : methodName;
 
-        // If className is provided and the resolved symbol isn't in that type, try to find a better match
-        if (symbol is not null && className is not null && symbol.ContainingType?.Name != className)
-        {
-            var allSymbols = await SymbolResolver.FindSymbolsByNameAsync(workspace, methodName, ct: ct);
-            symbol = allSymbols.FirstOrDefault(s => s.ContainingType?.Name == className) ?? symbol;
-        }
+        var resolved = await SymbolResolver.ResolveOrErrorAsync(workspace, lookupName, ct: ct);
+        if (resolved.Failed) return resolved.Error;
 
-        if (symbol is null)
-            return JsonSerializer.Serialize(new CallersResult([], 0, 0));
+        var symbol = resolved.Symbol;
 
         var callers = await SymbolFinder.FindCallersAsync(symbol, solution, ct);
 

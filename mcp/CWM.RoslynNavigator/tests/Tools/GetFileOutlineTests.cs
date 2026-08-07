@@ -55,12 +55,12 @@ public class GetFileOutlineTests(TestSolutionFixture fixture) : IClassFixture<Te
     }
 
     [Fact]
-    public async Task GetFileOutline_UnknownFile_ReturnsNotFoundStatus()
+    public async Task GetFileOutline_UnknownFile_ReturnsFileNotFound()
     {
         var json = await GetFileOutlineTool.ExecuteAsync(
             fixture.WorkspaceManager, "NoSuchFile.cs", ct: TestContext.Current.CancellationToken);
-        var result = JsonSerializer.Deserialize<StatusResponse>(json)!;
+        var error = JsonSerializer.Deserialize<ErrorResponse>(json)!;
 
-        Assert.Equal("NotFound", result.State);
+        Assert.Equal(ErrorCodes.FileNotFound, error.Error);
     }
 }

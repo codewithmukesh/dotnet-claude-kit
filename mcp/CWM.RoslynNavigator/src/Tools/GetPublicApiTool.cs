@@ -19,9 +19,15 @@ public static class GetPublicApiTool
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
         if (notReady is not null) return notReady;
 
-        var symbol = await SymbolResolver.ResolveSymbolAsync(workspace, typeName, ct: ct);
+        var resolved = await SymbolResolver.ResolveOrErrorAsync(workspace, typeName, ct: ct);
+        if (resolved.Failed) return resolved.Error;
+
+        var symbol = resolved.Symbol;
+
         if (symbol is not INamedTypeSymbol typeSymbol)
-            return JsonSerializer.Serialize(new PublicApiResult("not found", [], 0, 0));
+            return JsonSerializer.Serialize(new ErrorResponse(
+                ErrorCodes.WrongSymbolKind,
+                $"'{typeName}' resolved to a {SymbolResolver.GetKindString(symbol)}, not a type."));
 
         var allMembers = typeSymbol.GetMembers()
             .Where(m => m.DeclaredAccessibility == Accessibility.Public)

@@ -44,12 +44,22 @@ public class GetPublicApiTests(TestSolutionFixture fixture) : IClassFixture<Test
     }
 
     [Fact]
-    public async Task GetPublicApi_NonexistentType_ReturnsNotFound()
+    public async Task GetPublicApi_NonexistentType_ReturnsSymbolNotFound()
     {
         var json = await GetPublicApiTool.ExecuteAsync(fixture.WorkspaceManager, "ZZZNonExistent", ct: TestContext.Current.CancellationToken);
-        var result = JsonSerializer.Deserialize<PublicApiResult>(json)!;
+        var error = JsonSerializer.Deserialize<ErrorResponse>(json)!;
 
-        Assert.Equal("not found", result.Type);
-        Assert.Empty(result.Members);
+        Assert.Equal(ErrorCodes.SymbolNotFound, error.Error);
+    }
+
+    [Fact]
+    public async Task GetPublicApi_SymbolIsNotAType_ReturnsWrongSymbolKind()
+    {
+        var json = await GetPublicApiTool.ExecuteAsync(
+            fixture.WorkspaceManager, "OrderService.GetOrderAsync", ct: TestContext.Current.CancellationToken);
+        var error = JsonSerializer.Deserialize<ErrorResponse>(json)!;
+
+        Assert.Equal(ErrorCodes.WrongSymbolKind, error.Error);
+        Assert.Contains("method", error.Message);
     }
 }

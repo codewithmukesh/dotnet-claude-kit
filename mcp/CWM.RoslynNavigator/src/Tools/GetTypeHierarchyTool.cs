@@ -24,9 +24,15 @@ public static class GetTypeHierarchyTool
         if (solution is null)
             return JsonSerializer.Serialize(new TypeHierarchyResult([], [], [], 0));
 
-        var symbol = await SymbolResolver.ResolveSymbolAsync(workspace, typeName, ct: ct);
+        var resolved = await SymbolResolver.ResolveOrErrorAsync(workspace, typeName, ct: ct);
+        if (resolved.Failed) return resolved.Error;
+
+        var symbol = resolved.Symbol;
+
         if (symbol is not INamedTypeSymbol typeSymbol)
-            return JsonSerializer.Serialize(new TypeHierarchyResult([], [], [], 0));
+            return JsonSerializer.Serialize(new ErrorResponse(
+                ErrorCodes.WrongSymbolKind,
+                $"'{typeName}' resolved to a {SymbolResolver.GetKindString(symbol)}, not a type."));
 
         // Get base types chain
         var baseTypes = new List<string>();

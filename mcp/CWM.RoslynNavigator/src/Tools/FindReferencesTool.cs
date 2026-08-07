@@ -29,9 +29,10 @@ public static class FindReferencesTool
         if (solution is null)
             return JsonSerializer.Serialize(new ReferencesResult([], 0, 0));
 
-        var symbol = await SymbolResolver.ResolveSymbolAsync(workspace, symbolName, file, line, ct);
-        if (symbol is null)
-            return JsonSerializer.Serialize(new ReferencesResult([], 0, 0));
+        var resolved = await SymbolResolver.ResolveOrErrorAsync(workspace, symbolName, file, line, ct: ct);
+        if (resolved.Failed) return resolved.Error;
+
+        var symbol = resolved.Symbol;
 
         var references = await SymbolFinder.FindReferencesAsync(symbol, solution, ct);
         var totalFound = references.Sum(r => r.Locations.Count());

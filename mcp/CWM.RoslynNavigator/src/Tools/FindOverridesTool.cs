@@ -25,16 +25,14 @@ public static class FindOverridesTool
         if (solution is null)
             return JsonSerializer.Serialize(new OverridesResult([], 0, 0));
 
-        var symbol = await SymbolResolver.ResolveSymbolAsync(workspace, methodName, ct: ct);
+        var lookupName = className is not null && !methodName.Contains('.')
+            ? $"{className}.{methodName}"
+            : methodName;
 
-        if (symbol is not null && className is not null && symbol.ContainingType?.Name != className)
-        {
-            var allSymbols = await SymbolResolver.FindSymbolsByNameAsync(workspace, methodName, ct: ct);
-            symbol = allSymbols.FirstOrDefault(s => s.ContainingType?.Name == className) ?? symbol;
-        }
+        var resolved = await SymbolResolver.ResolveOrErrorAsync(workspace, lookupName, ct: ct);
+        if (resolved.Failed) return resolved.Error;
 
-        if (symbol is null)
-            return JsonSerializer.Serialize(new OverridesResult([], 0, 0));
+        var symbol = resolved.Symbol;
 
         var overrides = await SymbolFinder.FindOverridesAsync(symbol, solution, cancellationToken: ct);
 

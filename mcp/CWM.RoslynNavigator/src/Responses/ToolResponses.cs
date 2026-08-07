@@ -8,6 +8,33 @@ namespace CWM.RoslynNavigator.Responses;
 // Note: intentionally many records in one file — these are pure DTOs and a file per
 // two-line record would hurt navigability more than it helps.
 
+/// <summary>
+/// Stable, enumerated failure codes. Callers branch on <see cref="ErrorResponse.Error"/>
+/// rather than parsing prose, and — critically — can tell "this symbol does not exist"
+/// apart from "this symbol exists and has no results".
+/// </summary>
+internal static class ErrorCodes
+{
+    public const string SymbolNotFound = "SymbolNotFound";
+    public const string AmbiguousMatch = "AmbiguousMatch";
+    public const string WrongSymbolKind = "WrongSymbolKind";
+    public const string FileNotFound = "FileNotFound";
+    public const string NoSource = "NoSource";
+    public const string InvalidArgument = "InvalidArgument";
+}
+
+/// <summary>One of several symbols a qualified name could have meant.</summary>
+internal sealed record SymbolCandidate(string Qualified, string Kind, string File, int Line);
+
+/// <summary>
+/// Structured failure. <see cref="Candidates"/> is populated for AmbiguousMatch so the
+/// caller can re-query with a fully-qualified name instead of guessing.
+/// </summary>
+internal sealed record ErrorResponse(
+    string Error,
+    string Message,
+    List<SymbolCandidate>? Candidates = null);
+
 internal sealed record SymbolLocation(string Name, string Kind, string File, int Line, string Namespace);
 
 internal sealed record SymbolSearchResult(List<SymbolLocation> Symbols, int Count, int TotalFound);

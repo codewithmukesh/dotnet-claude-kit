@@ -24,9 +24,15 @@ public static class FindImplementationsTool
         if (solution is null)
             return JsonSerializer.Serialize(new ImplementationsResult([], 0, 0));
 
-        var symbol = await SymbolResolver.ResolveSymbolAsync(workspace, interfaceName, ct: ct);
+        var resolved = await SymbolResolver.ResolveOrErrorAsync(workspace, interfaceName, ct: ct);
+        if (resolved.Failed) return resolved.Error;
+
+        var symbol = resolved.Symbol;
+
         if (symbol is not INamedTypeSymbol typeSymbol)
-            return JsonSerializer.Serialize(new ImplementationsResult([], 0, 0));
+            return JsonSerializer.Serialize(new ErrorResponse(
+                ErrorCodes.WrongSymbolKind,
+                $"'{interfaceName}' resolved to a {SymbolResolver.GetKindString(symbol)}, not an interface or class."));
 
         var implementations = typeSymbol.TypeKind == TypeKind.Interface
             ? await SymbolFinder.FindImplementationsAsync(typeSymbol, solution, cancellationToken: ct)

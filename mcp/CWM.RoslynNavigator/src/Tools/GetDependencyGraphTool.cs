@@ -28,9 +28,15 @@ public static class GetDependencyGraphTool
         if (solution is null)
             return JsonSerializer.Serialize(new DependencyGraphResult("unknown", [], 0, false));
 
-        var symbol = await SymbolResolver.ResolveSymbolAsync(workspace, symbolName, file, line, ct);
+        var resolved = await SymbolResolver.ResolveOrErrorAsync(workspace, symbolName, file, line, ct: ct);
+        if (resolved.Failed) return resolved.Error;
+
+        var symbol = resolved.Symbol;
+
         if (symbol is not IMethodSymbol rootMethod)
-            return JsonSerializer.Serialize(new DependencyGraphResult(symbolName, [], 0, false));
+            return JsonSerializer.Serialize(new ErrorResponse(
+                ErrorCodes.WrongSymbolKind,
+                $"'{symbolName}' resolved to a {SymbolResolver.GetKindString(symbol)}, not a method."));
 
         depth = Math.Clamp(depth, 1, 5);
 

@@ -31,23 +31,24 @@ public static class GetSymbolSourceTool
         // Qualified names resolve natively in SymbolResolver. An explicit containingType
         // argument is folded into the same qualified form, and only falls back to the bare
         // name when that yields nothing (e.g. symbolName is itself the type).
-        var symbol = symbolName.Contains('.') || containingType is null
-            ? await SymbolResolver.ResolveSymbolAsync(workspace, symbolName, file, line, ct)
-            : await SymbolResolver.ResolveSymbolAsync(workspace, $"{containingType}.{symbolName}", file, line, ct)
-              ?? await SymbolResolver.ResolveSymbolAsync(workspace, symbolName, file, line, ct);
+        var lookupName = containingType is not null && !symbolName.Contains('.')
+            ? $"{containingType}.{symbolName}"
+            : symbolName;
 
-        if (symbol is null)
-            return JsonSerializer.Serialize(new StatusResponse("NotFound", $"Symbol '{symbolName}' not found."));
+        var resolved = await SymbolResolver.ResolveOrErrorAsync(workspace, lookupName, file, line, ct: ct);
+        if (resolved.Failed) return resolved.Error;
+
+        var symbol = resolved.Symbol;
 
         var syntaxRef = symbol.DeclaringSyntaxReferences.FirstOrDefault();
         if (syntaxRef is null)
-            return JsonSerializer.Serialize(new StatusResponse("NotFound",
-                $"Symbol '{symbolName}' has no source in this solution (metadata symbol)."));
+            return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.NoSource,
+                $"'{symbolName}' has no source in this solution (metadata symbol)."));
 
         var node = (await syntaxRef.GetSyntaxAsync(ct)).FirstAncestorOrSelf<MemberDeclarationSyntax>();
         if (node is null)
-            return JsonSerializer.Serialize(new StatusResponse("NotFound",
-                $"Symbol '{symbolName}' does not map to a member declaration."));
+            return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.NoSource,
+                $"'{symbolName}' does not map to a member declaration."));
 
         maxChars = Math.Clamp(maxChars, MinChars, MaxChars);
 

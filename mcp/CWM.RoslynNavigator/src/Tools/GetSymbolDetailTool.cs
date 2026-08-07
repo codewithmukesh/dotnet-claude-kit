@@ -19,16 +19,14 @@ public static class GetSymbolDetailTool
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
         if (notReady is not null) return notReady;
 
-        var symbol = await SymbolResolver.ResolveSymbolAsync(workspace, symbolName, ct: ct);
+        var lookupName = containingType is not null && !symbolName.Contains('.')
+            ? $"{containingType}.{symbolName}"
+            : symbolName;
 
-        if (symbol is not null && containingType is not null && symbol.ContainingType?.Name != containingType)
-        {
-            var allSymbols = await SymbolResolver.FindSymbolsByNameAsync(workspace, symbolName, ct: ct);
-            symbol = allSymbols.FirstOrDefault(s => s.ContainingType?.Name == containingType) ?? symbol;
-        }
+        var resolved = await SymbolResolver.ResolveOrErrorAsync(workspace, lookupName, ct: ct);
+        if (resolved.Failed) return resolved.Error;
 
-        if (symbol is null)
-            return JsonSerializer.Serialize(new StatusResponse("NotFound", $"Symbol '{symbolName}' not found."));
+        var symbol = resolved.Symbol;
 
         var location = SymbolResolver.GetLocation(symbol);
         var summary = ExtractXmlSummary(symbol.GetDocumentationCommentXml());

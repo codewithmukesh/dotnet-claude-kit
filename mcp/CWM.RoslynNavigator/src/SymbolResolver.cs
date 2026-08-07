@@ -1,6 +1,7 @@
 using System.Text;
+using System.Text.Json;
+using CWM.RoslynNavigator.Responses;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.FindSymbols;
 
 namespace CWM.RoslynNavigator;
 
@@ -148,6 +149,8 @@ internal static class SymbolResolver
 
     /// <summary>
     /// Finds a single symbol by name, optionally disambiguated by file and line.
+    /// Picks the first candidate when the name remains ambiguous — prefer
+    /// <see cref="ResolveOrErrorAsync"/> in tools, which reports the ambiguity instead.
     /// </summary>
     public static async Task<ISymbol?> ResolveSymbolAsync(
         WorkspaceManager workspace,
@@ -157,37 +160,90 @@ internal static class SymbolResolver
         CancellationToken ct = default)
     {
         var symbols = await FindSymbolsByNameAsync(workspace, name, ct: ct);
+        if (symbols.Count == 0) return null;
+
+        return NarrowByLocation(symbols, file, line)[0];
+    }
+
+    /// <summary>
+    /// Resolves a symbol, producing a serialized <see cref="ErrorResponse"/> instead of null
+    /// when the name matches nothing or matches several distinct symbols.
+    /// </summary>
+    public static async Task<SymbolResolution> ResolveOrErrorAsync(
+        WorkspaceManager workspace,
+        string name,
+        string? file = null,
+        int? line = null,
+        string? kindFilter = null,
+        CancellationToken ct = default)
+    {
+        var symbols = await FindSymbolsByNameAsync(workspace, name, kindFilter, ct);
 
         if (symbols.Count == 0)
-            return null;
-
-        if (symbols.Count == 1)
-            return symbols[0];
-
-        // Disambiguate by file
-        if (file is not null)
         {
-            var byFile = symbols.Where(s =>
-                s.DeclaringSyntaxReferences.Any(r =>
-                    r.SyntaxTree.FilePath.EndsWith(file, StringComparison.OrdinalIgnoreCase)))
-                .ToList();
-
-            if (byFile.Count == 1)
-                return byFile[0];
-
-            if (byFile.Count > 1 && line.HasValue)
-            {
-                // Further disambiguate by line
-                return byFile.FirstOrDefault(s =>
-                    s.DeclaringSyntaxReferences.Any(r =>
-                        r.SyntaxTree.GetLineSpan(r.Span).StartLinePosition.Line + 1 == line.Value));
-            }
-
-            if (byFile.Count > 0)
-                return byFile[0];
+            return SymbolResolution.Failure(new ErrorResponse(
+                ErrorCodes.SymbolNotFound,
+                $"No symbol named '{name}' exists in the solution. Check the spelling, or search with find_symbol."));
         }
 
-        return symbols[0];
+        var narrowed = NarrowByLocation(symbols, file, line);
+
+        // Overloads, partial declarations, and per-target-framework duplicates all share a
+        // qualified name and kind — they are one logical symbol, not an ambiguity.
+        var distinct = narrowed
+            .GroupBy(s => (BuildQualifiedName(s), GetKindString(s)))
+            .ToList();
+
+        if (distinct.Count == 1)
+            return SymbolResolution.Success(narrowed[0]);
+
+        var candidates = distinct
+            .Take(MaxAmbiguityCandidates)
+            .Select(group =>
+            {
+                var location = GetLocation(group.First());
+                return new SymbolCandidate(
+                    Qualified: group.Key.Item1,
+                    Kind: group.Key.Item2,
+                    File: location is { } loc ? workspace.ToRelativePath(loc.File) : "unknown",
+                    Line: location?.Line ?? 0);
+            })
+            .ToList();
+
+        return SymbolResolution.Failure(new ErrorResponse(
+            ErrorCodes.AmbiguousMatch,
+            $"'{name}' matches {distinct.Count} distinct symbols. Re-query with a fully-qualified name, or pass file/line.",
+            candidates));
+    }
+
+    private const int MaxAmbiguityCandidates = 10;
+
+    /// <summary>
+    /// Narrows candidates using an optional file path then line number. Falls back to the
+    /// wider set whenever a hint eliminates everything, so a stale hint never turns a
+    /// resolvable name into a miss.
+    /// </summary>
+    private static IReadOnlyList<ISymbol> NarrowByLocation(
+        IReadOnlyList<ISymbol> symbols,
+        string? file,
+        int? line)
+    {
+        if (symbols.Count <= 1 || file is null) return symbols;
+
+        var byFile = symbols
+            .Where(s => s.DeclaringSyntaxReferences.Any(r =>
+                r.SyntaxTree.FilePath.EndsWith(file, StringComparison.OrdinalIgnoreCase)))
+            .ToList();
+
+        if (byFile.Count == 0) return symbols;
+        if (byFile.Count == 1 || !line.HasValue) return byFile;
+
+        var byLine = byFile
+            .Where(s => s.DeclaringSyntaxReferences.Any(r =>
+                r.SyntaxTree.GetLineSpan(r.Span).StartLinePosition.Line + 1 == line.Value))
+            .ToList();
+
+        return byLine.Count > 0 ? byLine : byFile;
     }
 
     /// <summary>

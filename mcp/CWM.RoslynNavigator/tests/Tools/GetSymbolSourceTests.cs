@@ -60,12 +60,12 @@ public class GetSymbolSourceTests(TestSolutionFixture fixture) : IClassFixture<T
     }
 
     [Fact]
-    public async Task GetSymbolSource_UnknownSymbol_ReturnsNotFoundStatus()
+    public async Task GetSymbolSource_UnknownSymbol_ReturnsSymbolNotFound()
     {
         var json = await GetSymbolSourceTool.ExecuteAsync(
             fixture.WorkspaceManager, "NoSuchSymbolXyz", ct: TestContext.Current.CancellationToken);
-        var result = JsonSerializer.Deserialize<StatusResponse>(json)!;
+        var error = JsonSerializer.Deserialize<ErrorResponse>(json)!;
 
-        Assert.Equal("NotFound", result.State);
+        Assert.Equal(ErrorCodes.SymbolNotFound, error.Error);
     }
 }

@@ -31,11 +31,13 @@ public static class GetFileOutlineTool
             .FirstOrDefault(d => d.FilePath?.EndsWith(filePath, StringComparison.OrdinalIgnoreCase) == true);
 
         if (document?.FilePath is null)
-            return JsonSerializer.Serialize(new StatusResponse("NotFound", $"File '{filePath}' not found in the solution."));
+            return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.FileNotFound,
+                $"File '{filePath}' is not part of any project in the solution."));
 
         var root = await document.GetSyntaxRootAsync(ct);
         if (root is null)
-            return JsonSerializer.Serialize(new StatusResponse("NotFound", $"File '{filePath}' has no syntax tree."));
+            return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.NoSource,
+                $"File '{filePath}' has no syntax tree."));
 
         var usingCount = root.DescendantNodes(n => n is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax)
             .OfType<UsingDirectiveSyntax>()

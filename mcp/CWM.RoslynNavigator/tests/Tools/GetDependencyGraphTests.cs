@@ -33,14 +33,24 @@ public class GetDependencyGraphTests(TestSolutionFixture fixture) : IClassFixtur
     }
 
     [Fact]
-    public async Task GetDependencyGraph_NonexistentMethod_ReturnsEmpty()
+    public async Task GetDependencyGraph_NonexistentMethod_ReturnsSymbolNotFound()
     {
         var json = await GetDependencyGraphTool.ExecuteAsync(
             fixture.WorkspaceManager, "NonExistentMethod12345",
             ct: TestContext.Current.CancellationToken);
-        var result = JsonSerializer.Deserialize<DependencyGraphResult>(json)!;
+        var error = JsonSerializer.Deserialize<ErrorResponse>(json)!;
 
-        Assert.Equal(0, result.TotalNodes);
+        Assert.Equal(ErrorCodes.SymbolNotFound, error.Error);
+    }
+
+    [Fact]
+    public async Task GetDependencyGraph_TypeInsteadOfMethod_ReturnsWrongSymbolKind()
+    {
+        var json = await GetDependencyGraphTool.ExecuteAsync(
+            fixture.WorkspaceManager, "OrderService", ct: TestContext.Current.CancellationToken);
+        var error = JsonSerializer.Deserialize<ErrorResponse>(json)!;
+
+        Assert.Equal(ErrorCodes.WrongSymbolKind, error.Error);
     }
 
     [Fact]

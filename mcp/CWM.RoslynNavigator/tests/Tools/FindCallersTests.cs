@@ -11,11 +11,27 @@ public class FindCallersTests(TestSolutionFixture fixture) : IClassFixture<TestS
     public async Task FindCallers_MethodCalledFromService_ReturnsCallers()
     {
         var json = await FindCallersTool.ExecuteAsync(
-            fixture.WorkspaceManager, "GetByIdAsync", ct: TestContext.Current.CancellationToken);
+            fixture.WorkspaceManager, "IOrderRepository.GetByIdAsync",
+            ct: TestContext.Current.CancellationToken);
         var result = JsonSerializer.Deserialize<CallersResult>(json)!;
 
-        // GetByIdAsync is called from OrderService and CachedOrderRepository
-        Assert.True(result.Count > 0, "Expected callers of GetByIdAsync");
+        // IOrderRepository.GetByIdAsync is called from OrderService and CachedOrderRepository
+        Assert.True(result.Count > 0, "Expected callers of IOrderRepository.GetByIdAsync");
+    }
+
+    [Fact]
+    public async Task FindCallers_AmbiguousBareName_ReportsCandidatesInsteadOfGuessing()
+    {
+        // GetByIdAsync is declared on two interfaces and three implementations. Picking one
+        // silently would report the wrong call sites with full confidence.
+        var json = await FindCallersTool.ExecuteAsync(
+            fixture.WorkspaceManager, "GetByIdAsync", ct: TestContext.Current.CancellationToken);
+        var error = JsonSerializer.Deserialize<ErrorResponse>(json)!;
+
+        Assert.Equal(ErrorCodes.AmbiguousMatch, error.Error);
+        Assert.NotNull(error.Candidates);
+        Assert.True(error.Candidates.Count > 1);
+        Assert.Contains(error.Candidates, c => c.Qualified == "SampleDomain.IOrderRepository.GetByIdAsync");
     }
 
     [Fact]
@@ -32,14 +48,15 @@ public class FindCallersTests(TestSolutionFixture fixture) : IClassFixture<TestS
     }
 
     [Fact]
-    public async Task FindCallers_NonexistentMethod_ReturnsEmpty()
+    public async Task FindCallers_NonexistentMethod_ReturnsSymbolNotFound()
     {
         var json = await FindCallersTool.ExecuteAsync(
             fixture.WorkspaceManager, "MethodThatDoesNotExist12345",
             ct: TestContext.Current.CancellationToken);
-        var result = JsonSerializer.Deserialize<CallersResult>(json)!;
+        var error = JsonSerializer.Deserialize<ErrorResponse>(json)!;
 
-        Assert.Equal(0, result.Count);
+        // Distinct from a real method with zero callers, which returns an empty CallersResult.
+        Assert.Equal(ErrorCodes.SymbolNotFound, error.Error);
     }
 
     [Fact]
