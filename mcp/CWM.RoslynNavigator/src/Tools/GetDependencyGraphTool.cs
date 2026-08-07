@@ -14,7 +14,7 @@ public static class GetDependencyGraphTool
     [McpServerTool(Name = "get_dependency_graph"), Description("Get the call dependency graph for a method, showing all methods it calls recursively up to a specified depth. Useful for impact analysis and understanding code flow.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("The method name to analyze")] string symbolName,
+        [Description("Method to analyze. Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified.")] string symbolName,
         [Description("Optional: file path to disambiguate")] string? file = null,
         [Description("Optional: line number to disambiguate")] int? line = null,
         [Description("Maximum recursion depth (1-5)")] int depth = 3,

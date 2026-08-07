@@ -13,7 +13,7 @@ public static class GetTypeHierarchyTool
     [McpServerTool(Name = "get_type_hierarchy"), Description("Get the full inheritance chain, interfaces, and derived types for a type. For interfaces, derived types include both derived interfaces and implementing types.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("The type name to get the hierarchy for")] string typeName,
+        [Description("Type name. Bare ('OrderService') or namespace-qualified ('MyApp.Orders.OrderService').")] string typeName,
         [Description("Maximum derived types to return. TotalDerived in the response reports the full count; re-query with a higher value if it exceeds the list length.")] int maxResults = 50,
         CancellationToken ct = default)
     {

@@ -58,6 +58,33 @@ public class FindSymbolTests(TestSolutionFixture fixture) : IClassFixture<TestSo
     }
 
     [Fact]
+    public async Task FindSymbol_TypeQualifiedMethod_NarrowsToOwningType()
+    {
+        var bare = JsonSerializer.Deserialize<SymbolSearchResult>(
+            await FindSymbolTool.ExecuteAsync(fixture.WorkspaceManager, "GetByIdAsync", "method",
+                ct: TestContext.Current.CancellationToken))!;
+
+        var qualified = JsonSerializer.Deserialize<SymbolSearchResult>(
+            await FindSymbolTool.ExecuteAsync(fixture.WorkspaceManager, "IOrderRepository.GetByIdAsync", "method",
+                ct: TestContext.Current.CancellationToken))!;
+
+        Assert.True(bare.TotalFound > 1);
+        Assert.Equal(1, qualified.TotalFound);
+        Assert.Equal("SampleDomain", qualified.Symbols[0].Namespace);
+    }
+
+    [Fact]
+    public async Task FindSymbol_FullyQualifiedType_Resolves()
+    {
+        var json = await FindSymbolTool.ExecuteAsync(
+            fixture.WorkspaceManager, "SampleDomain.Order", "class", ct: TestContext.Current.CancellationToken);
+        var result = JsonSerializer.Deserialize<SymbolSearchResult>(json)!;
+
+        Assert.Single(result.Symbols);
+        Assert.Equal("Order", result.Symbols[0].Name);
+    }
+
+    [Fact]
     public async Task FindSymbol_Record_ReturnsRecordKind()
     {
         var json = await FindSymbolTool.ExecuteAsync(fixture.WorkspaceManager, "OrderItem", "record", ct: TestContext.Current.CancellationToken);

@@ -12,7 +12,7 @@ public static class GetSymbolDetailTool
     [McpServerTool(Name = "get_symbol_detail"), Description("Get detailed information about a symbol including full signature, parameters, return type, modifiers, and XML documentation. Perfect for understanding APIs without reading the whole file.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("The symbol name (type, method, property)")] string symbolName,
+        [Description("Symbol name (type, method, property). Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified.")] string symbolName,
         [Description("Optional: containing type name for methods/properties")] string? containingType = null,
         CancellationToken ct = default)
     {

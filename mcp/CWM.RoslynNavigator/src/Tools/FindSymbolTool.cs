@@ -11,7 +11,7 @@ public static class FindSymbolTool
     [McpServerTool(Name = "find_symbol"), Description("Find where a type, method, or property is defined in the solution. Returns file path, line number, and namespace.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("The symbol name to search for (e.g., 'OrderRepository', 'CreateAsync')")] string name,
+        [Description("Symbol name. Bare ('CreateAsync'), type-qualified ('OrderService.CreateAsync'), or fully qualified ('MyApp.Orders.OrderService.CreateAsync'). Qualifying narrows results when a name is reused across types.")] string name,
         [Description("Filter by kind: 'type', 'class', 'interface', 'struct', 'enum', 'record', 'method', 'property', 'field', or 'any'")] string kind = "any",
         [Description("Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 50,
         CancellationToken ct = default)

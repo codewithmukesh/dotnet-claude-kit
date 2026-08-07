@@ -13,7 +13,7 @@ public static class FindCallersTool
     [McpServerTool(Name = "find_callers"), Description("Find all methods that call a specific method. Useful for impact analysis and understanding dependencies.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("The method name to find callers for")] string methodName,
+        [Description("Method to find callers for. Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified. Qualify when the name is reused across types.")] string methodName,
         [Description("Optional: containing class name to disambiguate")] string? className = null,
         [Description("Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 50,
         CancellationToken ct = default)

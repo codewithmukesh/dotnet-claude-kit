@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.FindSymbols;
 
@@ -5,12 +6,16 @@ namespace CWM.RoslynNavigator;
 
 /// <summary>
 /// Shared utility for resolving symbol names to ISymbol instances across all projects in the solution.
-/// Supports disambiguation by file path and line number.
+/// Accepts bare names ("CreateOrderAsync"), type-qualified names ("OrderService.CreateOrderAsync"),
+/// and fully-qualified names ("SampleApi.OrderService.CreateOrderAsync"), and supports further
+/// disambiguation by file path and line number.
 /// </summary>
 internal static class SymbolResolver
 {
     /// <summary>
     /// Finds all symbols matching the given name across the entire solution.
+    /// The name may be qualified; only the final segment is used for the declaration-table
+    /// lookup, with the leading segments applied as a suffix filter afterwards.
     /// </summary>
     public static async Task<IReadOnlyList<ISymbol>> FindSymbolsByNameAsync(
         WorkspaceManager workspace,
@@ -21,6 +26,12 @@ internal static class SymbolResolver
         var solution = workspace.GetSolution();
         if (solution is null) return [];
 
+        var normalized = NormalizeRequestedName(name);
+        if (normalized.Length == 0) return [];
+
+        var simpleName = GetSimpleName(normalized);
+        var isQualified = normalized.Length != simpleName.Length;
+
         var results = new List<ISymbol>();
 
         foreach (var projectId in solution.ProjectIds)
@@ -28,11 +39,14 @@ internal static class SymbolResolver
             var compilation = await workspace.GetCompilationAsync(projectId, ct);
             if (compilation is null) continue;
 
-            var symbols = compilation.GetSymbolsWithName(name, SymbolFilter.All, ct);
+            var symbols = compilation.GetSymbolsWithName(simpleName, SymbolFilter.All, ct);
 
             foreach (var symbol in symbols)
             {
                 if (kindFilter is not null && !MatchesKind(symbol, kindFilter))
+                    continue;
+
+                if (isQualified && !MatchesQualifiedName(symbol, normalized))
                     continue;
 
                 results.Add(symbol);
@@ -40,6 +54,96 @@ internal static class SymbolResolver
         }
 
         return results.Distinct(SymbolEqualityComparer.Default).ToList();
+    }
+
+    /// <summary>
+    /// Strips a parameter list, generic arguments, and metadata arity markers so that
+    /// "IRepository&lt;Order&gt;.GetByIdAsync(Guid, CancellationToken)" reduces to
+    /// "IRepository.GetByIdAsync". Segment separators are preserved.
+    /// </summary>
+    public static string NormalizeRequestedName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return string.Empty;
+
+        var span = name.AsSpan().Trim();
+
+        // A parameter list carries no information the declaration table can use.
+        var paren = span.IndexOf('(');
+        if (paren >= 0) span = span[..paren].TrimEnd();
+
+        var builder = new StringBuilder(span.Length);
+        var genericDepth = 0;
+
+        for (var i = 0; i < span.Length; i++)
+        {
+            var ch = span[i];
+
+            switch (ch)
+            {
+                case '<':
+                    genericDepth++;
+                    continue;
+                case '>' when genericDepth > 0:
+                    genericDepth--;
+                    continue;
+            }
+
+            if (genericDepth > 0) continue;
+
+            // Metadata arity: "IRepository`1" -> "IRepository"
+            if (ch == '`')
+            {
+                while (i + 1 < span.Length && char.IsAsciiDigit(span[i + 1])) i++;
+                continue;
+            }
+
+            if (char.IsWhiteSpace(ch)) continue;
+
+            builder.Append(ch);
+        }
+
+        return builder.ToString().Trim('.');
+    }
+
+    /// <summary>
+    /// Returns the final segment of a (possibly qualified) name — the symbol's own declared name.
+    /// </summary>
+    public static string GetSimpleName(string normalizedName)
+    {
+        var lastDot = normalizedName.LastIndexOf('.');
+        return lastDot < 0 ? normalizedName : normalizedName[(lastDot + 1)..];
+    }
+
+    /// <summary>
+    /// True when the requested qualified name matches the symbol exactly or is a
+    /// segment-aligned suffix of it. "OrderService.GetOrderAsync" matches
+    /// SampleApi.OrderService.GetOrderAsync but not SampleApi.ProductService.GetOrderAsync.
+    /// </summary>
+    public static bool MatchesQualifiedName(ISymbol symbol, string normalizedRequest)
+    {
+        var qualified = BuildQualifiedName(symbol);
+
+        return qualified.Equals(normalizedRequest, StringComparison.Ordinal)
+            || qualified.EndsWith($".{normalizedRequest}", StringComparison.Ordinal);
+    }
+
+    /// <summary>
+    /// Builds the dotted namespace/containing-type/name chain for a symbol, using declared
+    /// names so generic arity and type arguments never appear (Roslyn's ContainingNamespace
+    /// already skips past containing types, so nested types resolve correctly).
+    /// </summary>
+    public static string BuildQualifiedName(ISymbol symbol)
+    {
+        var parts = new Stack<string>();
+        parts.Push(symbol.Name);
+
+        for (var type = symbol.ContainingType; type is not null; type = type.ContainingType)
+            parts.Push(type.Name);
+
+        for (var ns = symbol.ContainingNamespace; ns is { IsGlobalNamespace: false }; ns = ns.ContainingNamespace)
+            parts.Push(ns.Name);
+
+        return string.Join('.', parts);
     }
 
     /// <summary>

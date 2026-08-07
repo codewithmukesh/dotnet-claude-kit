@@ -12,7 +12,7 @@ public static class GetPublicApiTool
     [McpServerTool(Name = "get_public_api"), Description("Get the public members of a type without reading the full source file. Returns method signatures, properties, events.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("The type name to get the public API for")] string typeName,
+        [Description("Type name. Bare ('OrderService') or namespace-qualified ('MyApp.Orders.OrderService').")] string typeName,
         [Description("Maximum members to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 50,
         CancellationToken ct = default)
     {

@@ -16,7 +16,7 @@ public static class FindReferencesTool
     [McpServerTool(Name = "find_references"), Description("Find all usages of a symbol across the solution. Returns file, line, snippet, and reference kind (usage, inheritance, invocation, instantiation, parameter, type-argument, assignment, implementation).")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("The symbol name to find references for")] string symbolName,
+        [Description("Symbol to find references for. Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified. Qualify when the name is reused across types.")] string symbolName,
         [Description("Optional: file path to disambiguate (e.g., 'IOrderRepository.cs')")] string? file = null,
         [Description("Optional: line number to disambiguate")] int? line = null,
         [Description("Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 50,
