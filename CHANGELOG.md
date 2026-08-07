@@ -5,7 +5,9 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.12.0] — 2026-08-07
+
+Roslyn Navigator correctness release. Prompted by a feature-by-feature audit against [RoslynCodeLens.Mcp](https://www.nuget.org/packages/RoslynCodeLens.Mcp): the gaps that were genuine defects rather than missing features are closed, and the two highest-value tools it had that we lacked are added.
 
 ### Added
 - **2 new MCP tools (20 → 22)** in CWM.RoslynNavigator 0.10.0:
