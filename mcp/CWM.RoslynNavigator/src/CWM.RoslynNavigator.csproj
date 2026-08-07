@@ -15,12 +15,12 @@
 
     <!-- NuGet package metadata -->
     <PackageId>CWM.RoslynNavigator</PackageId>
-    <Version>0.9.0</Version>
+    <Version>0.10.0</Version>
     <Authors>Mukesh Murugan</Authors>
     <Company>codewithmukesh</Company>
     <Product>CWM.RoslynNavigator</Product>
     <Title>CWM Roslyn Navigator — MCP Server for .NET</Title>
-    <Description>A Model Context Protocol (MCP) server that gives AI coding assistants semantic understanding of .NET codebases via Roslyn. 20 read-only tools for symbol navigation, reference finding, type hierarchy, dependency graphs, anti-pattern detection, dead code analysis, diagnostics, file outlines, symbol source extraction, NuGet package inventory, endpoint maps, and DI registration analysis — all returning token-optimized responses. Part of the dotnet-claude-kit ecosystem.</Description>
+    <Description>A Model Context Protocol (MCP) server that gives AI coding assistants semantic understanding of .NET codebases via Roslyn. 22 read-only tools for symbol navigation, reference finding, type hierarchy, dependency graphs, anti-pattern detection, dead code analysis, diagnostics, file outlines, symbol source extraction, NuGet package inventory, endpoint maps, DI registration analysis, stack trace resolution, and change impact analysis — all returning token-optimized responses with structured error codes. Part of the dotnet-claude-kit ecosystem.</Description>
     <PackageTags>mcp;roslyn;dotnet;claude;ai;code-analysis;semantic-analysis;codebase-navigation;model-context-protocol;claude-code</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/codewithmukesh/dotnet-claude-kit</PackageProjectUrl>

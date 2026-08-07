@@ -1,8 +1,8 @@
 {
   "name": "dotnet-claude-kit",
   "displayName": "dotnet Claude Kit",
-  "version": "0.11.0",
-  "description": "The definitive Claude Code companion for .NET developers. 47 skills (including 16 slash-command workflows), 10 agents, 10 rules, 5 templates, 20 MCP tools, and automation hooks for modern .NET 10 / C# 14.",
+  "version": "0.12.0",
+  "description": "The definitive Claude Code companion for .NET developers. 47 skills (including 16 slash-command workflows), 10 agents, 10 rules, 5 templates, 22 MCP tools, and automation hooks for modern .NET 10 / C# 14.",
   "author": {
     "name": "Mukesh Murugan",
     "url": "https://codewithmukesh.com"

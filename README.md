@@ -3,7 +3,7 @@
   <p align="center">
     <strong>Make Claude Code an expert .NET developer.</strong>
     <br />
-    47 skills &bull; 10 specialist agents &bull; 16 slash commands &bull; 10 rules &bull; 5 project templates &bull; 20 MCP tools &bull; automation hooks
+    47 skills &bull; 10 specialist agents &bull; 16 slash commands &bull; 10 rules &bull; 5 project templates &bull; 22 MCP tools &bull; automation hooks
     <br />
     Built for .NET 10 / C# 14. Architecture-aware. Token-efficient.
   </p>
@@ -65,7 +65,7 @@ An **action layer** on top of the knowledge layer — Claude doesn't just know t
 
 | Capability | What It Does |
 |-----------|-------------|
-| **Surgical Code Analysis** | 20 Roslyn-powered MCP tools with guaranteed bounded responses. `get_symbol_source` reads ONE method body instead of the whole file. `get_file_outline` shows what's in a file before reading it. Every list-returning tool is capped with `TotalFound` — no tool can blow your context window. |
+| **Surgical Code Analysis** | 22 Roslyn-powered MCP tools with guaranteed bounded responses. `get_symbol_source` reads ONE method body instead of the whole file. `get_file_outline` shows what's in a file before reading it. `resolve_stack_trace` turns an exception into file:line in your own code. `analyze_change_impact` answers "what breaks if I change this?" in one call. Every list-returning tool reports `Truncated` — no tool can blow your context window. |
 | **Architecture Enforcement** | `/arch-check` verifies the code still matches its declared architecture (VSA, Clean, DDD, Modular Monolith): dependency direction, layer violations, module leaks, cycles — with file:line evidence and fixes. |
 | **Dependency Health** | `/outdated` reports stale packages, CVEs, and commercial-license traps (MediatR 13+, MassTransit 9+, FluentAssertions 8+, AutoMapper 15+) before an innocent update-all changes your legal position. |
 | **Security Mapping** | `get_endpoint_map` inventories every route with its auth posture (`authorized`/`anonymous`/`unmarked`) in one token-cheap call — `/security-scan` starts every auth audit there. |
@@ -151,7 +151,7 @@ Replace `[ProjectName]`, update tech stack, choose your architecture.
 
 </details>
 
-Start Claude Code — 47 skills, 10 agents, and 20 MCP tools activate automatically. Copy the 10 rules into your project's `.claude/rules/` to make them always-loaded.
+Start Claude Code — 47 skills, 10 agents, and 22 MCP tools activate automatically. Copy the 10 rules into your project's `.claude/rules/` to make them always-loaded.
 
 That's it. Claude now writes .NET code the way a senior .NET engineer would.
 
@@ -413,7 +413,7 @@ dotnet-claude-kit/
 ├── .claude/rules/               # 10 always-loaded rules
 ├── templates/                   # 5 drop-in CLAUDE.md templates
 ├── knowledge/                   # Living reference documents + ADRs
-├── mcp/CWM.RoslynNavigator/     # Roslyn MCP server (20 tools)
+├── mcp/CWM.RoslynNavigator/     # Roslyn MCP server (22 tools)
 ├── mcp-configs/                 # MCP server config templates
 ├── hooks/                       # Claude Code hooks + git hooks + utilities
 ├── docs/                        # Shorthand + longform guides

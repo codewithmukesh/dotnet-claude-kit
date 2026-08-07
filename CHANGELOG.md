@@ -7,7 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **2 new MCP tools (20 → 22)** in CWM.RoslynNavigator 0.10.0:
+  - `resolve_stack_trace` — maps a .NET exception onto the solution. Undoes compiler rewrites for async state machines, lambdas, and local functions (the frames hardest to grep for), marks which frames are yours, and points at the topmost one in your own code
+  - `analyze_change_impact` — "what breaks if I change this?" in one call: references grouped by project and by file, implementations and overrides that must change alongside a signature, transitive callers, assembly-boundary exposure, and a risk rating with its rationale
+- **Container distribution** for the MCP server via SDK container publishing (no Dockerfile), removing the host-SDK and `DOTNET_ROOT` setup that trips up macOS and Linux installs
+
 ### Changed
+- **CWM.RoslynNavigator 0.9.0 → 0.10.0 — symbol resolution and response-contract correctness pass**, prompted by a feature-by-feature audit against RoslynCodeLens.Mcp:
+  - **Qualified symbol names now resolve.** Lookup accepted only a bare declared name, so `find_references("OrderService.CreateOrderAsync")` returned empty — indistinguishable from a symbol with no references
+  - **Structured error codes replace empty results.** Nine tools returned an empty list for an unresolvable symbol, and ambiguity was resolved by `return symbols[0]` — a bare name matching several types answered about the wrong one with full confidence. Now `SymbolNotFound`, `AmbiguousMatch` (with candidates), `WrongSymbolKind`, `FileNotFound`, `NoSource`
+  - **`Truncated` and `Limit` on every list response**, so truncation is stated rather than inferred from `Count` vs `TotalFound` — a comparison that is wrong when the result set is exactly the limit
+  - **`IsGenerated` on navigation results**, so an agent does not edit a `.g.cs` file the next build overwrites
+  - **`find_dead_code` grades against reflection.** A type resolved via `Type.GetType("...")` has zero references and was reported at high confidence; a name in any string literal now drops to `low`, and `AssemblyScanningDetected` flags solutions that register types by scanning
+  - **Reloads only on real build-file changes.** csproj comparison was timestamp-only, so a branch switch re-evaluated MSBuild for identical content. Build files now carry a content hash, and `Directory.Build.props` / `Directory.Packages.props` / `Directory.Build.targets` / `global.json` / `nuget.config` are tracked — previously invisible despite governing every project beneath them
+  - **Structural file scan moved to the background**, so no tool call pays for a recursive directory walk
+  - **Fixed: compilation cache survived a reload**, leaving orphaned `ProjectId` entries pinning whole Roslyn compilations in memory
 - **`hooks/pre-commit-antipattern.sh` rewritten** ([#23](https://github.com/codewithmukesh/dotnet-claude-kit/issues/23)) — the naive whole-file grep is replaced by a comment- and string-aware scanner (`hooks/lib/antipattern-scan.awk`) that mirrors the Roslyn detectors' rule IDs (AP001–AP004), severities, and `SourceKind` exemptions:
   - Only the lines a commit **adds** are checked — a legacy `DateTime.Now` no longer blocks unrelated edits to the same file
   - Comments, string, verbatim, and raw-string literals are stripped, tracking state across line boundaries
