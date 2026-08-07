@@ -191,6 +191,43 @@ Then add to your project's `.mcp.json`:
 dotnet run --project mcp/CWM.RoslynNavigator/src/CWM.RoslynNavigator.csproj -- --solution /path/to/your/Solution.sln
 ```
 
+### As a Container
+
+Use this when you do not want a .NET 10 SDK on the host — it sidesteps the
+`DOTNET_ROOT` setup that a global-tool install needs on macOS and Linux (see
+[Troubleshooting](#no-net-sdks-were-found-on-startup-macoslinux)).
+
+The image is produced by the .NET SDK's container publishing, so there is no
+Dockerfile to maintain:
+
+```bash
+cd mcp/CWM.RoslynNavigator
+dotnet publish src/CWM.RoslynNavigator.csproj -c Release --os linux --arch x64 /t:PublishContainer
+```
+
+That builds `cwm-roslyn-navigator:latest` locally. Register it with Claude Code by
+bind-mounting the solution at the image's working directory, `/workspace`:
+
+```bash
+claude mcp add --scope user cwm-roslyn-navigator -- \
+  docker run -i --rm -v "$PWD:/workspace" cwm-roslyn-navigator:latest --solution /workspace
+```
+
+`-i` is required: the server speaks MCP over stdio, so the container must keep
+stdin open. The mount is read-only as far as this server is concerned — every tool
+is read-only — but leave it writable if the same checkout is being built on the host.
+
+**Base image**: `mcr.microsoft.com/dotnet/sdk:10.0`, not a runtime image. `MSBuildLocator`
+needs a real SDK installation to open a solution; on `aspnet` or `runtime` the server
+starts and then fails every call with "No .NET SDKs were found".
+
+To publish somewhere other than the local daemon, set the registry on the command line:
+
+```bash
+dotnet publish src/CWM.RoslynNavigator.csproj -c Release --os linux --arch x64 \
+  /t:PublishContainer -p:ContainerRegistry=ghcr.io -p:ContainerRepository=you/cwm-roslyn-navigator
+```
+
 ## Solution Discovery
 
 The server resolves the solution file in this order:

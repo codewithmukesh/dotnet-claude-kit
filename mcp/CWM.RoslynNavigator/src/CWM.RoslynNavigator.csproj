@@ -28,6 +28,16 @@
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
 
+    <!--
+      Container publishing via the .NET 10 SDK — no Dockerfile, per the kit's own
+      container-publish guidance. The base image is the SDK rather than the runtime
+      because MSBuildLocator needs a real SDK installation to open a solution;
+      the aspnet/runtime images would fail at startup with "No .NET SDKs were found".
+    -->
+    <ContainerRepository>cwm-roslyn-navigator</ContainerRepository>
+    <ContainerBaseImage>mcr.microsoft.com/dotnet/sdk:10.0</ContainerBaseImage>
+    <ContainerWorkingDirectory>/workspace</ContainerWorkingDirectory>
+
     <!-- Source linking and reproducibility -->
     <PublishRepositoryUrl>true</PublishRepositoryUrl>
     <EmbedUntrackedSources>true</EmbedUntrackedSources>
