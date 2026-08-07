@@ -51,6 +51,11 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     internal IServiceProvider? Services { get; set; }
 
     /// <summary>
+    /// Number of compilations currently cached. Test seam for verifying reload eviction.
+    /// </summary>
+    internal int CachedCompilationCount => _compilationCache.Count;
+
+    /// <summary>
     /// Loads the solution at the specified path. Call this once on startup.
     /// </summary>
     public async Task LoadSolutionAsync(string solutionPath, CancellationToken ct = default)
@@ -61,6 +66,12 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             State = WorkspaceState.Loading;
             _solutionPath = solutionPath;
             _errorMessage = null;
+
+            // A reload mints fresh ProjectIds, so every cached Compilation is keyed on a
+            // dead id. Clearing here (rather than at each call site) keeps the roots-discovery
+            // and error-retry paths from resurrecting stale entries.
+            _compilationCache.Clear();
+            _cacheAccessOrder.Clear();
 
             logger.LogInformation("Loading solution: {SolutionPath}", solutionPath);
 
@@ -395,8 +406,6 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         if (HasProjectFileChanged())
         {
             logger.LogInformation("Project file changed. Full reload needed.");
-            _compilationCache.Clear();
-            _cacheAccessOrder.Clear();
             await LoadSolutionAsync(_solutionPath, ct);
             return;
         }
@@ -409,8 +418,6 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             if (HasNewSourceFiles())
             {
                 logger.LogInformation("New source files detected. Full reload needed.");
-                _compilationCache.Clear();
-                _cacheAccessOrder.Clear();
                 await LoadSolutionAsync(_solutionPath, ct);
                 return;
             }

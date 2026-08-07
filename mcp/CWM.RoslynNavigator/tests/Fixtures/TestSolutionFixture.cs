@@ -45,6 +45,17 @@ public class TestSolutionFixture : IAsyncLifetime
         }
     }
 
+    /// <summary>
+    /// Locates the sample solution for tests that need their own isolated WorkspaceManager
+    /// instead of the shared one (e.g. reload behaviour, which mutates workspace state).
+    /// </summary>
+    public static string SampleSolutionPath => FindSampleSolutionPath();
+
+    /// <summary>
+    /// Registers MSBuild for tests that construct a WorkspaceManager directly.
+    /// </summary>
+    public static void RegisterMSBuild() => EnsureMSBuildRegistered();
+
     private static string FindSampleSolutionPath()
     {
         // Walk up from the test output directory to find the TestData folder
