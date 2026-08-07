@@ -203,6 +203,36 @@ internal sealed record TestCoverageMapResult(
     int TestMethodCount = 0,
     int TestClassCount = 0);
 
+// Change impact analysis
+internal sealed record ImpactProject(string Name, int References, bool IsTest);
+
+internal sealed record ImpactFile(string File, int References, bool IsTest);
+
+/// <summary>
+/// The blast radius of changing one symbol. Answers "what breaks and how far does it
+/// reach" in a single call, so a caller does not have to stitch together find_references,
+/// find_implementations, find_overrides, and the project graph.
+/// </summary>
+internal sealed record ChangeImpactResult(
+    string Symbol,
+    string Kind,
+    string Accessibility,
+    bool CrossesAssemblyBoundary,
+    int DirectReferences,
+    int AffectedProjects,
+    int AffectedFiles,
+    int TestReferences,
+    int ImplementationsToUpdate,
+    int OverridesToUpdate,
+    List<ImpactProject> Projects,
+    List<ImpactFile> Files,
+    List<string> TransitiveCallers,
+    int TransitiveCallerCount,
+    bool Truncated,
+    int Limit,
+    string Risk,
+    string Rationale);
+
 // Stack trace resolution
 internal sealed record StackFrameInfo(
     int Index,
