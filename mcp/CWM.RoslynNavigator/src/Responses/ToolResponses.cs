@@ -173,7 +173,8 @@ internal sealed record DeadCodeResult(
     int TotalFound,
     bool Truncated,
     int Limit,
-    int ConventionFiltered = 0);
+    int ConventionFiltered = 0,
+    bool AssemblyScanningDetected = false);
 
 // Circular dependency detection
 internal sealed record CircularDependencyChain(List<string> Chain, string Level);

@@ -62,7 +62,7 @@ public static class FindDeadCodeTool
         "Module", "Installer", "Registrar", "Factory", "Converter"
     ];
 
-    [McpServerTool(Name = "find_dead_code"), Description("Find unused types, methods, and properties across the solution. Identifies symbols with zero references that are not public API entry points, interface implementations, or overrides. Symbols discovered by convention (EF entity configurations, hosted services, migrations, extension-method hosts) are filtered out because a reference search cannot see assembly scanning or DI registration; the count removed is reported as conventionFiltered. Remaining hits whose names match a convention suffix are returned at medium confidence with a note. Uses a fast identifier-match pre-filter: symbols whose exact name appears as an identifier token in another file are assumed referenced without a full reference search, so occasional false negatives are possible for heavily-reused names.")]
+    [McpServerTool(Name = "find_dead_code"), Description("Find unused types, methods, and properties across the solution. Identifies symbols with zero references that are not public API entry points, interface implementations, or overrides. Symbols discovered by convention (EF entity configurations, hosted services, migrations, extension-method hosts) are filtered out because a reference search cannot see assembly scanning or DI registration; the count removed is reported as conventionFiltered. Findings are graded: 'low' when the name appears in a string literal (likely reflection-bound), 'medium' when it matches a convention suffix, 'high' otherwise — delete only high-confidence hits without checking. AssemblyScanningDetected reports whether the solution registers types by scanning at all, which softens every result. Uses a fast identifier-match pre-filter: symbols whose exact name appears as an identifier token in another file are assumed referenced without a full reference search, so occasional false negatives are possible for heavily-reused names.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
         [Description("Scope: 'file', 'project', or 'solution'")] string scope = "solution",
@@ -135,14 +135,25 @@ public static class FindDeadCodeTool
             .DistinctBy(c => c.Symbol.ToDisplayString())
             .ToList();
 
-        // Pre-collect all source texts for fast name-based pre-filter
+        // Pre-collect all source texts for fast name-based pre-filter, and index the two
+        // reflection paths a reference search is blind to. Both walks cover the whole
+        // solution, not just the requested scope: a type scoped out of the scan can still
+        // be the thing that names this one.
         var sourceTexts = new Dictionary<SyntaxTree, string>();
-        foreach (var proj in projects)
+        var reflection = new ReflectionIndex();
+
+        foreach (var proj in solution.Projects)
         {
             var comp = await workspace.GetCompilationAsync(proj.Id, ct);
             if (comp is null) continue;
+
             foreach (var tree in comp.SyntaxTrees)
-                sourceTexts.TryAdd(tree, (await tree.GetTextAsync(ct)).ToString());
+            {
+                if (!sourceTexts.TryAdd(tree, (await tree.GetTextAsync(ct)).ToString()))
+                    continue;
+
+                reflection.Add(await tree.GetRootAsync(ct), ct);
+            }
         }
 
         // Check references for each candidate
@@ -172,7 +183,7 @@ public static class FindDeadCodeTool
                 totalFound++;
                 if (deadCode.Count < maxResults)
                 {
-                    var conventionSuffix = MatchingConventionSuffix(symbol.Name);
+                    var (confidence, note) = Grade(symbol, reflection);
 
                     deadCode.Add(new DeadCodeInfo(
                         Name: symbol.Name,
@@ -180,17 +191,16 @@ public static class FindDeadCodeTool
                         File: workspace.ToRelativePath(symbolFile),
                         Line: symbolLine,
                         ContainingType: symbol.ContainingType?.Name,
-                        Confidence: conventionSuffix is null ? "high" : "medium",
-                        Note: conventionSuffix is null
-                            ? null
-                            : $"Name ends in '{conventionSuffix}' — verify it is not bound by reflection, DI scanning, or a source generator before removing"));
+                        Confidence: confidence,
+                        Note: note));
                 }
             }
         }
 
         return JsonSerializer.Serialize(new DeadCodeResult(
             deadCode, deadCode.Count, totalFound,
-            totalFound > deadCode.Count, Math.Max(1, maxResults), conventionFiltered));
+            totalFound > deadCode.Count, Math.Max(1, maxResults), conventionFiltered,
+            reflection.AssemblyScanningDetected));
     }
 
     /// <summary>
@@ -222,6 +232,31 @@ public static class FindDeadCodeTool
             return true;
 
         return false;
+    }
+
+    /// <summary>
+    /// Rates how safe a zero-reference symbol is to delete. A name that appears in a string
+    /// literal is the strongest counter-signal available — that is exactly how reflection
+    /// binds a type it never references — so it outranks the weaker suffix heuristic.
+    /// </summary>
+    private static (string Confidence, string? Note) Grade(ISymbol symbol, ReflectionIndex reflection)
+    {
+        if (reflection.IsNamedInStringLiteral(symbol.Name))
+        {
+            return ("low",
+                $"'{symbol.Name}' appears in a string literal — likely resolved by reflection " +
+                "(Type.GetType, Activator.CreateInstance, or configuration). Confirm before removing.");
+        }
+
+        var conventionSuffix = MatchingConventionSuffix(symbol.Name);
+        if (conventionSuffix is not null)
+        {
+            return ("medium",
+                $"Name ends in '{conventionSuffix}' — verify it is not bound by reflection, " +
+                "DI scanning, or a source generator before removing");
+        }
+
+        return ("high", null);
     }
 
     private static string? MatchingConventionSuffix(string name)

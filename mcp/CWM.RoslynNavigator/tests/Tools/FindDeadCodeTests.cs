@@ -21,6 +21,46 @@ public class FindDeadCodeTests(TestSolutionFixture fixture) : IClassFixture<Test
     }
 
     [Fact]
+    public async Task FindDeadCode_ReflectionBoundType_IsDowngradedNotDeleted()
+    {
+        // LegacyPricingPlugin is resolved via Type.GetType on a string literal, so it has
+        // zero references. Reporting it at high confidence would invite a breaking deletion.
+        var json = await FindDeadCodeTool.ExecuteAsync(
+            fixture.WorkspaceManager, scope: "solution", maxResults: 200,
+            ct: TestContext.Current.CancellationToken);
+        var result = JsonSerializer.Deserialize<DeadCodeResult>(json)!;
+
+        var plugin = Assert.Single(result.Symbols, s => s.Name == "LegacyPricingPlugin");
+        Assert.Equal("low", plugin.Confidence);
+        Assert.Contains("string literal", plugin.Note);
+    }
+
+    [Fact]
+    public async Task FindDeadCode_UnreferencedTypeWithNoReflectionSignal_StaysHighConfidence()
+    {
+        var json = await FindDeadCodeTool.ExecuteAsync(
+            fixture.WorkspaceManager, scope: "solution", maxResults: 200,
+            ct: TestContext.Current.CancellationToken);
+        var result = JsonSerializer.Deserialize<DeadCodeResult>(json)!;
+
+        var calculator = Assert.Single(result.Symbols, s => s.Name == "TrulyUnusedCalculator");
+        Assert.Equal("high", calculator.Confidence);
+        Assert.Null(calculator.Note);
+    }
+
+    [Fact]
+    public async Task FindDeadCode_SolutionUsingReflection_ReportsScanningDetected()
+    {
+        var json = await FindDeadCodeTool.ExecuteAsync(
+            fixture.WorkspaceManager, scope: "solution",
+            ct: TestContext.Current.CancellationToken);
+        var result = JsonSerializer.Deserialize<DeadCodeResult>(json)!;
+
+        // PluginLoader calls Type.GetType and Activator.CreateInstance.
+        Assert.True(result.AssemblyScanningDetected);
+    }
+
+    [Fact]
     public async Task FindDeadCode_ProjectScope_FiltersCorrectly()
     {
         var json = await FindDeadCodeTool.ExecuteAsync(
