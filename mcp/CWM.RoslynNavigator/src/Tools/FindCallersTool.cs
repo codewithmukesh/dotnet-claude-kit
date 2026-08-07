@@ -10,7 +10,7 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class FindCallersTool
 {
-    [McpServerTool(Name = "find_callers"), Description("Find all methods that call a specific method. Useful for impact analysis and understanding dependencies.")]
+    [McpServerTool(Name = "find_callers"), Description("Find all methods that call a specific method. Useful for impact analysis and understanding dependencies. Each caller carries IsGenerated so generated call sites can be skipped.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
         [Description("Method to find callers for. Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified. Qualify when the name is reused across types.")] string methodName,
@@ -37,7 +37,9 @@ public static class FindCallersTool
 
         var callers = await SymbolFinder.FindCallersAsync(symbol, solution, ct);
 
+        var generated = new GeneratedCodeIndex(workspace);
         var all = new List<CallerInfo>();
+
         foreach (var caller in callers)
         {
             if (!caller.IsDirect) continue;
@@ -49,7 +51,8 @@ public static class FindCallersTool
                     Method: caller.CallingSymbol.Name,
                     ContainingType: caller.CallingSymbol.ContainingType?.Name ?? "unknown",
                     File: workspace.ToRelativePath(location.Value.File),
-                    Line: location.Value.Line));
+                    Line: location.Value.Line,
+                    IsGenerated: generated.IsGenerated(caller.CallingSymbol, ct)));
             }
         }
 

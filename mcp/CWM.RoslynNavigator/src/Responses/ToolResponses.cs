@@ -11,6 +11,9 @@ namespace CWM.RoslynNavigator.Responses;
 // Truncated is stated rather than left to a Count/TotalFound comparison so a caller
 // never has to infer whether it is looking at a complete answer.
 //
+// Navigation results carry IsGenerated so a caller can skip source-generator and
+// tooling output rather than trying to edit a file that will be regenerated.
+//
 // Note: intentionally many records in one file — these are pure DTOs and a file per
 // two-line record would hurt navigability more than it helps.
 
@@ -41,15 +44,15 @@ internal sealed record ErrorResponse(
     string Message,
     List<SymbolCandidate>? Candidates = null);
 
-internal sealed record SymbolLocation(string Name, string Kind, string File, int Line, string Namespace);
+internal sealed record SymbolLocation(string Name, string Kind, string File, int Line, string Namespace, bool IsGenerated);
 
 internal sealed record SymbolSearchResult(List<SymbolLocation> Symbols, int Count, int TotalFound, bool Truncated, int Limit);
 
-internal sealed record ReferenceLocation(string File, int Line, string Snippet, string Kind);
+internal sealed record ReferenceLocation(string File, int Line, string Snippet, string Kind, bool IsGenerated);
 
 internal sealed record ReferencesResult(List<ReferenceLocation> References, int Count, int TotalFound, bool Truncated, int Limit);
 
-internal sealed record ImplementationInfo(string Type, string File, int Line);
+internal sealed record ImplementationInfo(string Type, string File, int Line, bool IsGenerated);
 
 internal sealed record ImplementationsResult(List<ImplementationInfo> Implementations, int Count, int TotalFound, bool Truncated, int Limit);
 
@@ -87,11 +90,11 @@ internal sealed record DiagnosticsResult(
 
 internal sealed record StatusResponse(string State, string Message);
 
-internal sealed record CallerInfo(string Method, string ContainingType, string File, int Line);
+internal sealed record CallerInfo(string Method, string ContainingType, string File, int Line, bool IsGenerated);
 
 internal sealed record CallersResult(List<CallerInfo> Callers, int Count, int TotalFound, bool Truncated, int Limit);
 
-internal sealed record OverrideInfo(string Method, string ContainingType, string File, int Line);
+internal sealed record OverrideInfo(string Method, string ContainingType, string File, int Line, bool IsGenerated);
 
 internal sealed record OverridesResult(List<OverrideInfo> Overrides, int Count, int TotalFound, bool Truncated, int Limit);
 

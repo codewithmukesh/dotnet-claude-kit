@@ -13,7 +13,7 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class FindReferencesTool
 {
-    [McpServerTool(Name = "find_references"), Description("Find all usages of a symbol across the solution. Returns file, line, snippet, and reference kind (usage, inheritance, invocation, instantiation, parameter, type-argument, assignment, implementation).")]
+    [McpServerTool(Name = "find_references"), Description("Find all usages of a symbol across the solution. Returns file, line, snippet, and reference kind (usage, inheritance, invocation, instantiation, parameter, type-argument, assignment, implementation). Each result carries IsGenerated so generated call sites can be skipped.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
         [Description("Symbol to find references for. Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified. Qualify when the name is reused across types.")] string symbolName,
@@ -39,6 +39,7 @@ public static class FindReferencesTool
         var references = await SymbolFinder.FindReferencesAsync(symbol, solution, ct);
         var totalFound = references.Sum(r => r.Locations.Count());
 
+        var generated = new GeneratedCodeIndex(workspace);
         var textCache = new Dictionary<DocumentId, Microsoft.CodeAnalysis.Text.SourceText>();
         var results = new List<RefLocation>();
         var capped = false;
@@ -67,7 +68,8 @@ public static class FindReferencesTool
                     File: workspace.ToRelativePath(lineSpan.Path),
                     Line: lineSpan.StartLinePosition.Line + 1,
                     Snippet: snippet,
-                    Kind: ClassifyReferenceKind(location, ct)));
+                    Kind: ClassifyReferenceKind(location, ct),
+                    IsGenerated: generated.IsGenerated(location.Location.SourceTree, ct)));
             }
             if (capped) break;
         }

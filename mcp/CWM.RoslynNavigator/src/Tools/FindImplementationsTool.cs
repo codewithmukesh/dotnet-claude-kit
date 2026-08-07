@@ -10,7 +10,7 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class FindImplementationsTool
 {
-    [McpServerTool(Name = "find_implementations"), Description("Find all types that implement an interface or derive from a base class.")]
+    [McpServerTool(Name = "find_implementations"), Description("Find all types that implement an interface or derive from a base class. Each result carries IsGenerated so generated implementations can be skipped.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
         [Description("The interface or base class name to find implementations for")] string interfaceName,
@@ -38,7 +38,9 @@ public static class FindImplementationsTool
             ? await SymbolFinder.FindImplementationsAsync(typeSymbol, solution, cancellationToken: ct)
             : await SymbolFinder.FindDerivedClassesAsync(typeSymbol, solution, cancellationToken: ct);
 
+        var generated = new GeneratedCodeIndex(workspace);
         var all = new List<ImplementationInfo>();
+
         foreach (var impl in implementations)
         {
             var location = SymbolResolver.GetLocation(impl);
@@ -47,7 +49,8 @@ public static class FindImplementationsTool
                 all.Add(new ImplementationInfo(
                     impl.Name,
                     workspace.ToRelativePath(location.Value.File),
-                    location.Value.Line));
+                    location.Value.Line,
+                    generated.IsGenerated(impl, ct)));
             }
         }
 

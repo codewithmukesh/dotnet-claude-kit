@@ -8,7 +8,7 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class FindSymbolTool
 {
-    [McpServerTool(Name = "find_symbol"), Description("Find where a type, method, or property is defined in the solution. Returns file path, line number, and namespace.")]
+    [McpServerTool(Name = "find_symbol"), Description("Find where a type, method, or property is defined in the solution. Returns file path, line number, namespace, and an IsGenerated flag marking source-generator or tooling output.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
         [Description("Symbol name. Bare ('CreateAsync'), type-qualified ('OrderService.CreateAsync'), or fully qualified ('MyApp.Orders.OrderService.CreateAsync'). Qualifying narrows results when a name is reused across types.")] string name,
@@ -21,6 +21,8 @@ public static class FindSymbolTool
 
         var symbols = await SymbolResolver.FindSymbolsByNameAsync(workspace, name, kind, ct);
 
+        var generated = new GeneratedCodeIndex(workspace);
+
         var all = symbols
             .Select(s =>
             {
@@ -30,7 +32,8 @@ public static class FindSymbolTool
                     Kind: SymbolResolver.GetKindString(s),
                     File: location is { } loc ? workspace.ToRelativePath(loc.File) : "unknown",
                     Line: location?.Line ?? 0,
-                    Namespace: s.ContainingNamespace?.ToDisplayString() ?? "global");
+                    Namespace: s.ContainingNamespace?.ToDisplayString() ?? "global",
+                    IsGenerated: generated.IsGenerated(s, ct));
             }).ToList();
 
         var page = Paging.Apply(all, maxResults);

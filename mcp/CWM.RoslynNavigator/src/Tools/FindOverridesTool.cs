@@ -10,7 +10,7 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class FindOverridesTool
 {
-    [McpServerTool(Name = "find_overrides"), Description("Find all overrides of a virtual or abstract method across the solution. Useful for understanding polymorphic behavior.")]
+    [McpServerTool(Name = "find_overrides"), Description("Find all overrides of a virtual or abstract method across the solution. Useful for understanding polymorphic behavior. Each result carries IsGenerated so generated overrides can be skipped.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
         [Description("The virtual or abstract method name to find overrides for")] string methodName,
@@ -36,7 +36,9 @@ public static class FindOverridesTool
 
         var overrides = await SymbolFinder.FindOverridesAsync(symbol, solution, cancellationToken: ct);
 
+        var generated = new GeneratedCodeIndex(workspace);
         var all = new List<OverrideInfo>();
+
         foreach (var overrideSymbol in overrides)
         {
             var location = SymbolResolver.GetLocation(overrideSymbol);
@@ -46,7 +48,8 @@ public static class FindOverridesTool
                     Method: overrideSymbol.Name,
                     ContainingType: overrideSymbol.ContainingType?.Name ?? "unknown",
                     File: workspace.ToRelativePath(location.Value.File),
-                    Line: location.Value.Line));
+                    Line: location.Value.Line,
+                    IsGenerated: generated.IsGenerated(overrideSymbol, ct)));
             }
         }
 
