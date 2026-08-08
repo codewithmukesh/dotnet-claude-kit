@@ -71,7 +71,28 @@ while [[ "$DIR" != "/" && "$DIR" != "." ]]; do
 done
 
 if [[ -n "$PROJECT" ]]; then
-    dotnet format "$PROJECT" --include "$FILE" --no-restore 2>/dev/null || true
+    # `dotnet format --include` takes paths relative to the current directory;
+    # an absolute path matches no file. The project argument in turn must be a
+    # native path — the C:/... form this script builds for the directory walk
+    # also makes --include match nothing. Either mistake formats nothing and
+    # still exits 0, which `2>/dev/null || true` then hides.
+    CWD=$(pwd)
+    if command -v cygpath >/dev/null 2>&1; then
+        # Git Bash: pwd is /c/..., while FILE was normalized above to C:/...
+        CWD=$(cygpath -m "$CWD" 2>/dev/null || echo "$CWD")
+        PROJECT=$(cygpath -w "$PROJECT" 2>/dev/null || echo "$PROJECT")
+    fi
+    INCLUDE="$FILE"
+    case "$FILE" in
+        "$CWD"/*) INCLUDE="${FILE#"$CWD"/}" ;;
+    esac
+    # Report a failed format instead of discarding it — that is what kept the
+    # path bug above invisible. Still exit 0: mid-edit files routinely fail to
+    # compile, and a hook that fails there would interrupt an ordinary edit.
+    if ! FORMAT_OUTPUT=$(dotnet format "$PROJECT" --include "$INCLUDE" --no-restore 2>&1); then
+        echo "post-edit-format: dotnet format failed for $INCLUDE (file left unformatted)"
+        echo "$FORMAT_OUTPUT"
+    fi
 else
     echo "No .csproj or .sln found for $FILE, skipping format"
 fi
