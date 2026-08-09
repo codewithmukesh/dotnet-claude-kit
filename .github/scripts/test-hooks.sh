@@ -11,6 +11,13 @@
 #                          payload that merely MENTIONS "reset --hard" in a
 #                          string field    -> exit 0 (regression test for the
 #                          no-jq raw-payload over-blocking bug)
+#                          a destructive string quoted, commented or fed to a
+#                          heredoc        -> exit 0 (it is data, not a command)
+#                          the same command word reached through sudo, env,
+#                          sh -c, $(...), xargs or find -exec -> exit 2
+#
+# Nothing here executes a destructive command: every case is a command STRING
+# handed to the guard inside a payload.
 set -u
 
 cd "$(dirname "$0")/../.." || exit 1
@@ -32,7 +39,10 @@ run_with_timeout() {
     timeout --kill-after=5 "$limit" "$@"
     return $?
   fi
-  "$@" &
+  # <&0 is load-bearing: without an explicit redirection bash gives an
+  # asynchronous command /dev/null for stdin, so the hook under test would read
+  # an empty payload, block nothing, and every case would "pass".
+  "$@" <&0 &
   local pid=$!
   (
     sleep "$limit"
@@ -141,6 +151,116 @@ else
   echo "  output was: [$(cat "$WORKDIR/o5" "$WORKDIR/e5")]"
   fail "pre-bash-guard exited $rc (expected 0) — over-blocking regression: payload text matched instead of the parsed command"
 fi
+
+echo ""
+echo "=== pre-bash-guard.sh: command word vs command text ==="
+
+# The guard must judge what a command RUNS, not what its text contains. These
+# cases pair each destructive command with a benign one that merely mentions it.
+json_escape() {
+  local s=$1
+  s=${s//\\/\\\\}
+  s=${s//\"/\\\"}
+  s=${s//$'\n'/\\n}
+  s=${s//$'\t'/\\t}
+  printf '%s' "$s"
+}
+
+# guard_case <expected-exit> <label> <command string>
+guard_case() {
+  local expect="$1" label="$2" cmd="$3"
+  printf '{"session_id":"ci","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"%s","description":"ci case"}}' \
+    "$(json_escape "$cmd")" >"$WORKDIR/g.json"
+  run_hook 10 hooks/pre-bash-guard.sh "$WORKDIR/g.json" "$WORKDIR/go" "$WORKDIR/ge"
+  local rc=$?
+  if [ "$rc" -eq "$expect" ]; then
+    pass "$label"
+  else
+    echo "  stdout: [$(cat "$WORKDIR/go")]"
+    echo "  stderr: [$(cat "$WORKDIR/ge")]"
+    fail "$label (exit $rc, expected $expect)"
+  fi
+}
+
+# 6. A destructive string as DATA — quoted argument, comment, heredoc body.
+#    Each of these was blocked before the guard parsed commands.
+guard_case 0 "allows a grep whose search pattern is 'rm -rf'" \
+  "grep -rn 'rm -rf' docs/"
+guard_case 0 "allows a command with the phrase in a trailing # comment" \
+  "python3 build.py  # the old cleanup used rm -rf and shutil.rmtree"
+guard_case 0 "allows git log --grep for a destructive phrase" \
+  "git log --grep='git reset --hard' --oneline"
+guard_case 0 "allows a heredoc script body containing the phrase" \
+  "python3 - <<'PY'
+import shutil
+# replaced the old rm -rf call
+print(1)
+PY"
+guard_case 0 "allows echoing documentation about force push" \
+  'echo "never run git push --force on main"'
+guard_case 0 "allows a commit message naming a destructive command" \
+  'git commit -m "docs: warn against rm -rf in scripts"'
+
+# 7. Every pre-existing block must still block.
+guard_case 2 "still blocks git reset --hard" "git reset --hard HEAD~1"
+guard_case 2 "still blocks git clean -fd" "git clean -fd"
+guard_case 2 "still blocks git checkout ." "git checkout ."
+guard_case 2 "still blocks git push -f" "git push -f origin main"
+guard_case 2 "still blocks rm -rf on a project path" "rm -rf /Users/dev/project/src"
+
+# 8. Safe rm -rf targets must stay allowed.
+guard_case 0 "allows rm -rf bin" "rm -rf bin"
+guard_case 0 "allows rm -rf on a nested obj directory" "rm -rf ./src/App/obj"
+guard_case 0 "allows rm -rf under /tmp" "rm -rf /tmp/scratch"
+guard_case 0 "allows rm -rf bin with a redirect" "rm -rf bin > /dev/null"
+
+# 9. Reaching the same command word indirectly must not evade the guard.
+guard_case 2 "blocks rm -rf behind a leading path" "/bin/rm -rf /Users/dev/project"
+guard_case 2 "blocks rm -rf behind env assignments and sudo" \
+  "FOO=bar sudo rm -rf /Users/dev/project"
+guard_case 2 "blocks rm -rf in a later segment" \
+  "echo building && rm -rf /Users/dev/project"
+guard_case 2 "blocks rm -rf inside sh -c" "sh -c 'rm -rf /Users/dev/project'"
+guard_case 2 "blocks rm -rf inside a combined bash -lc flag" \
+  "bash -lc 'rm -rf /Users/dev/project'"
+guard_case 2 "blocks git reset --hard inside bash -cx" \
+  "bash -cx 'git reset --hard HEAD~1'"
+guard_case 2 "blocks rm -rf inside a command substitution" \
+  'echo $(rm -rf /Users/dev/project)'
+guard_case 2 "blocks rm -rf passed through xargs" \
+  "find . -name obj | xargs rm -rf /Users/dev/project"
+guard_case 2 "blocks rm -rf passed through find -exec" \
+  "find . -name '*.tmp' -exec rm -rf /Users/dev/project {} ;"
+
+echo ""
+echo "=== pre-bash-guard.sh: shared machine resources ==="
+
+# 10. Process kills that match by pattern reap whatever else is running.
+guard_case 2 "blocks pkill by pattern" "pkill -f dotnet"
+guard_case 2 "blocks killall by process name" "killall dotnet"
+guard_case 2 "blocks killall reached by absolute path" "/usr/bin/killall node"
+guard_case 2 "blocks kill against a pgrep substitution" 'kill -9 $(pgrep -f MyApp)'
+guard_case 2 "blocks kill against a process name" "kill dotnet"
+guard_case 0 "allows kill against a numeric PID" "kill -9 12345"
+guard_case 0 "allows kill -s with a numeric PID" "kill -s TERM 4242"
+guard_case 0 "allows kill against a PID held in a variable" 'kill $SERVER_PID'
+guard_case 0 "allows pgrep, which only reads" "pgrep -f dotnet"
+guard_case 0 "allows a command that merely mentions pkill" \
+  'echo "run pkill -f dotnet if it hangs"'
+
+# 11. Daemons and caches shared by every project on the machine.
+guard_case 2 "blocks dotnet build-server shutdown" "dotnet build-server shutdown"
+guard_case 0 "allows dotnet build" "dotnet build -c Release"
+guard_case 2 "blocks recursive delete of the NuGet package cache" \
+  "rm -rf ~/.nuget/packages"
+guard_case 2 "blocks recursive delete of ~/.dotnet without -f" "rm -r ~/.dotnet"
+guard_case 2 "blocks a cache path whose leaf looks like build output" \
+  "rm -rf ~/.dotnet/bin"
+guard_case 2 "blocks the cache path spelled with \$HOME" \
+  'rm -rf $HOME/.nuget/packages'
+guard_case 0 "allows rm -rf on project build output" "rm -rf src/App/obj"
+guard_case 0 "allows a command that merely mentions the cache path" \
+  'echo "clear ~/.nuget/packages if restore is wedged"'
 
 echo ""
 if [ "$FAILURES" -gt 0 ]; then
