@@ -16,7 +16,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **ADR-007** — why the Bash guard parses commands instead of matching text, the alternatives rejected, and the two-directional test every new rule needs
-- 24 hook behavior tests covering both directions of each guard rule: the destructive command blocked, and a benign command that merely mentions it allowed
+- 42 hook behavior tests covering both directions of each guard rule: the destructive command blocked, and a benign command that merely mentions it allowed
+- **`hooks/pre-bash-guard.sh` guards resources shared across the machine**, not just the working tree — on a developer box running several agents, or any shared build host, these reach past the current project:
+  - `pkill` and `killall` match by name or pattern, so they reap every match on the machine. `kill` is blocked when its target is not a numeric PID, a job spec, or a `$VAR` holding one — `kill $(pgrep -f MyApp)` kills whatever else matched
+  - `dotnet build-server shutdown` stops the MSBuild, Razor and VB/C# compiler servers for every process on the machine, not just the current build
+  - Recursive deletes of `~/.nuget`, `~/.dotnet`, `~/.templateengine` and `~/.local/share/NuGet`, with or without `-f`. `rm -rf ~/.dotnet/bin` was previously allowed outright, since the target ends in `bin`
 
 ## [0.12.0] — 2026-08-07
 

@@ -312,6 +312,18 @@ block() {
 
 # ── Rules ───────────────────────────────────────────────────────────
 
+# Recursive rm onto a package/tool cache shared by every project on the
+# machine, whether or not -f was passed.
+is_shared_cache() {
+  local t=${1//\\//}
+  t=${t%/}
+  [[ -n "$HOME" ]] && t=${t/#"$HOME"/'~'}
+  t=${t/#'$HOME'/'~'}
+  t=${t/#'${HOME}'/'~'}
+  local cache_re='^~/(\.nuget|\.dotnet|\.templateengine|\.local/share/NuGet)(/.*)?$'
+  [[ "$t" =~ $cache_re ]]
+}
+
 # The targets rm -rf may have without a prompt: build output and scratch space.
 # Relative and ./-prefixed paths are allowed (./bin, src/MyApp/obj); absolute
 # paths are not, except /tmp.
@@ -386,7 +398,12 @@ check_rm() {
       *) targets+=("$t") ;;
     esac
   done
-  ((rec && force)) || return 0
+  ((rec)) || return 0
+  for t in "${targets[@]}"; do
+    is_shared_cache "$t" &&
+      block "recursive delete of the shared package cache '$t'. Every project on this machine restores from it — clear a single package or use 'dotnet nuget locals' deliberately instead."
+  done
+  ((force)) || return 0
   for t in "${targets[@]}"; do
     is_safe_target "$t" ||
       block "rm -rf detected in a project directory. Verify the target path is intentional."
@@ -395,16 +412,46 @@ check_rm() {
 
 check_dotnet() {
   local -a a=("$@")
-  local i=0 sub=""
+  local i=0 sub="" t
   while ((i < ${#a[@]})); do
     case ${a[i]} in
       -*) i=$((i + 1)) ;;
       *) sub=${a[i]}; break ;;
     esac
   done
-  if [[ "$sub" == run ]]; then
-    echo "WARNING: dotnet run detected. Ensure launchSettings.json exists and the correct profile is selected."
-  fi
+  case $sub in
+    run)
+      echo "WARNING: dotnet run detected. Ensure launchSettings.json exists and the correct profile is selected."
+      ;;
+    build-server)
+      for t in "${a[@]:i+1}"; do
+        [[ "$t" == shutdown ]] &&
+          block "dotnet build-server shutdown kills the MSBuild, Razor and VB/C# compiler servers for every process on this machine, not just this build. Discuss with the user first."
+      done
+      ;;
+  esac
+}
+
+# kill is fine against a PID the agent already holds. It is not fine against a
+# process it has to go looking for — on a shared machine that reaps somebody
+# else's build, test run or editor.
+check_kill() {
+  local -a a=("$@")
+  local i=0 t
+  local pid_re='^[0-9]+$'
+  local var_re='^\$\{?[A-Za-z_][A-Za-z0-9_]*\}?$'
+  while ((i < ${#a[@]})); do
+    t=${a[i]}
+    i=$((i + 1))
+    case $t in
+      -s | --signal | -n | -q) i=$((i + 1)); continue ;;
+      -*) continue ;;
+      %*) continue ;;
+    esac
+    [[ "$t" =~ $pid_re ]] && continue
+    [[ "$t" =~ $var_re ]] && continue
+    block "kill targets '$t' rather than a numeric PID. On a shared machine that can reap another agent's or developer's processes — resolve the PID first and kill that."
+  done
 }
 
 # Wrappers that build a command out of their own arguments. Without these the
@@ -496,7 +543,11 @@ check_segment() {
     git) check_git "${args[@]}" ;;
     rm) check_rm "${args[@]}" ;;
     dotnet) check_dotnet "${args[@]}" ;;
+    kill) check_kill "${args[@]}" ;;
     xargs | timeout | find) check_wrapper "$cmd" "$depth" "${args[@]}" ;;
+    pkill | killall)
+      block "$cmd matches processes by name or pattern, so it reaps every match on the machine — including another agent's or developer's. Resolve the PID you mean and kill that."
+      ;;
     sh | bash | zsh | dash | ksh | busybox)
       # -c takes the next word as a command string. The flag is often combined
       # (-lc, -cx, -ec), so match any short cluster containing c rather than an

@@ -101,6 +101,36 @@ piece, with quote and substitution state carried across pieces in globals. The
 same command now takes ~250ms, and a typical one ~15ms — faster than the six
 `echo | grep` subprocesses it replaced.
 
+### What the rules cover
+
+The guard's original rules all protect the working tree: force push, `git reset
+--hard`, `git clean -f`, `git checkout .`, `rm -rf`. That is the right scope for
+one agent on one checkout, and the wrong scope for how the kit is actually used
+— a developer box frequently runs several agents at once, and a build host runs
+whatever CI puts on it.
+
+So the rules extend to resources that outlive the current project:
+
+| Rule | Reaches past the project because |
+|---|---|
+| `pkill`, `killall` | they match by name or pattern; `pkill -f dotnet` does not know which `dotnet` was yours |
+| `kill` with a non-PID target | `kill $(pgrep -f MyApp)` kills every match, not the one you meant |
+| `dotnet build-server shutdown` | it stops the MSBuild, Razor and VB/C# compiler servers machine-wide |
+| recursive `rm` on `~/.nuget`, `~/.dotnet` | every project on the machine restores from them |
+
+`kill` against a numeric PID, a `%job` spec, or a `$VAR` holding one is allowed:
+the agent already resolved a specific process, which is the distinction that
+matters. `pgrep` is allowed — it only reads.
+
+The cache rule fires on recursive `rm` whether or not `-f` was passed, and it is
+checked before the build-output allowlist. `rm -rf ~/.dotnet/bin` ends in `bin`
+and would otherwise be waved through as build output.
+
+Node and Python caches (`~/.npm`, `~/.cache/pip`) are deliberately not covered.
+This is a .NET kit; `node_modules` appears in the allowlist only because .NET
+web projects vendor a front-end, and a guard for another ecosystem's caches
+belongs in that ecosystem's kit.
+
 ### Adding a rule
 
 Add a `check_<command>` function, dispatch to it from the `case` in

@@ -10,7 +10,7 @@ Claude works:
 
 | Script | Event | Purpose |
 |---|---|---|
-| `pre-bash-guard.sh` | PreToolUse (Bash) | Blocks destructive commands (force push, `git reset --hard`, unsafe `rm -rf`) — see [below](#why-does-the-bash-guard-parse-commands-instead-of-grepping-them) |
+| `pre-bash-guard.sh` | PreToolUse (Bash) | Blocks destructive commands (force push, `git reset --hard`, unsafe `rm -rf`, unscoped process kills, shared-cache deletes) — see [below](#why-does-the-bash-guard-parse-commands-instead-of-grepping-them) |
 | `post-edit-format.sh` | PostToolUse (Edit\|Write) | Runs `dotnet format` on edited `.cs` files |
 | `post-scaffold-restore.sh` | PostToolUse (Edit\|Write) | Runs `dotnet restore` after `.csproj` changes |
 
@@ -48,6 +48,22 @@ Deliberate obfuscation (`eval`, base64, a variable holding the command name)
 still gets through. This is a guardrail against accidents, not a sandbox.
 Rationale, alternatives, and the process for adding a rule:
 [ADR-007](../knowledge/decisions/007-command-word-guard.md).
+
+### What the guard blocks
+
+| Rule | Blocked | Allowed |
+|---|---|---|
+| Force push | `git push --force`, `git push -f` | `git push origin feature/x` |
+| History and worktree loss | `git reset --hard`, `git clean -fd`, `git checkout .` | `git clean -nd`, `git checkout main` |
+| Recursive delete | `rm -rf /any/other/path` | `rm -rf bin`, `obj`, `TestResults`, `node_modules`, `.vs`, anything under `/tmp` |
+| Shared package caches | `rm -r ~/.nuget`, `~/.dotnet`, `~/.templateengine`, `~/.local/share/NuGet` — with or without `-f` | project build output, including `src/App/bin` |
+| Unscoped process kills | `pkill`, `killall`, `kill $(pgrep …)`, `kill <name>` | `kill 12345`, `kill -s TERM 4242`, `kill $SERVER_PID`, `pgrep` |
+| Shared daemons | `dotnet build-server shutdown` | `dotnet build`, `dotnet nuget locals all --list` |
+| Risky but allowed | — | `dotnet run` (warns about `launchSettings.json`) |
+
+The process rules exist because a developer box often runs more than one agent.
+`pkill -f dotnet` does not know which `dotnet` was yours. If you hold a PID,
+kill it; the guard only stops kills that go looking for a target.
 
 ## Git pre-commit hooks (install manually)
 

@@ -233,6 +233,36 @@ guard_case 2 "blocks rm -rf passed through find -exec" \
   "find . -name '*.tmp' -exec rm -rf /Users/dev/project {} ;"
 
 echo ""
+echo "=== pre-bash-guard.sh: shared machine resources ==="
+
+# 10. Process kills that match by pattern reap whatever else is running.
+guard_case 2 "blocks pkill by pattern" "pkill -f dotnet"
+guard_case 2 "blocks killall by process name" "killall dotnet"
+guard_case 2 "blocks killall reached by absolute path" "/usr/bin/killall node"
+guard_case 2 "blocks kill against a pgrep substitution" 'kill -9 $(pgrep -f MyApp)'
+guard_case 2 "blocks kill against a process name" "kill dotnet"
+guard_case 0 "allows kill against a numeric PID" "kill -9 12345"
+guard_case 0 "allows kill -s with a numeric PID" "kill -s TERM 4242"
+guard_case 0 "allows kill against a PID held in a variable" 'kill $SERVER_PID'
+guard_case 0 "allows pgrep, which only reads" "pgrep -f dotnet"
+guard_case 0 "allows a command that merely mentions pkill" \
+  'echo "run pkill -f dotnet if it hangs"'
+
+# 11. Daemons and caches shared by every project on the machine.
+guard_case 2 "blocks dotnet build-server shutdown" "dotnet build-server shutdown"
+guard_case 0 "allows dotnet build" "dotnet build -c Release"
+guard_case 2 "blocks recursive delete of the NuGet package cache" \
+  "rm -rf ~/.nuget/packages"
+guard_case 2 "blocks recursive delete of ~/.dotnet without -f" "rm -r ~/.dotnet"
+guard_case 2 "blocks a cache path whose leaf looks like build output" \
+  "rm -rf ~/.dotnet/bin"
+guard_case 2 "blocks the cache path spelled with \$HOME" \
+  'rm -rf $HOME/.nuget/packages'
+guard_case 0 "allows rm -rf on project build output" "rm -rf src/App/obj"
+guard_case 0 "allows a command that merely mentions the cache path" \
+  'echo "clear ~/.nuget/packages if restore is wedged"'
+
+echo ""
 if [ "$FAILURES" -gt 0 ]; then
   echo "$FAILURES hook test(s) failed"
   exit 1
