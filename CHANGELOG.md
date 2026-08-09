@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **`hooks/pre-bash-guard.sh` now matches command words, not command text** — the guard grepped the raw command string, so it blocked commands that merely *mentioned* a destructive one: a `grep` searching for `rm -rf`, a `#` comment describing an old cleanup, `git log --grep='git reset --hard'`, `echo`ing docs about force push, and any heredoc script body containing the phrase. It now splits the command on `;`, `&&`, `||`, `|`, newlines and grouping, and matches only each segment's command word — taken after stripping `VAR=value` assignments, `sudo`/`env`/`command`/`nohup`, and any leading path, so `/bin/rm` still reads as `rm`
+  - Quoted strings, comments, and heredoc bodies are data and never trigger a rule
+  - Coverage went up rather than down: `sudo rm -rf`, `xargs rm -rf`, `find -exec rm -rf`, `$(...)` and `` `...` `` bodies, and combined `sh -c` flag spellings (`-lc`, `-cx`, `-ec`) are now recognised — an exact `-c` token match had been one letter away from a bypass
+  - Parsing runs in-process instead of spawning six `echo | grep` pipelines, so a typical command costs ~15ms instead of ~79ms
+- **`.github/scripts/test-hooks.sh` reported false passes where `timeout` is absent** — the watchdog fallback backgrounds the hook, and bash gives an asynchronous command `/dev/null` for stdin unless it carries its own redirection. The hook under test read an empty payload, blocked nothing, and every case "passed". On macOS and minimal Linux images the whole pre-bash-guard suite was vacuous
+
+### Added
+- **ADR-007** — why the Bash guard parses commands instead of matching text, the alternatives rejected, and the two-directional test every new rule needs
+- 24 hook behavior tests covering both directions of each guard rule: the destructive command blocked, and a benign command that merely mentions it allowed
+
 ## [0.12.0] — 2026-08-07
 
 Roslyn Navigator correctness release. Symbol resolution, response contracts, and workspace reload behaviour are corrected, and two tools are added: stack trace resolution and change impact analysis.
