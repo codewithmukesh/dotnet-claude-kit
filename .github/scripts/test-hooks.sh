@@ -142,6 +142,59 @@ else
   fail "pre-bash-guard exited $rc (expected 0) — over-blocking regression: payload text matched instead of the parsed command"
 fi
 
+# 6-9. Regression: a guarded phrase appearing as DATA inside the command must
+#    not block. Test 5 covers the phrase in another JSON field; these cover it
+#    in the command itself — a grep pattern, a commit message, and a word that
+#    merely ends in the letters "rm". None of them delete or discard anything,
+#    and the first is a command that reads the guard's own source.
+allow_command() {
+  local label="$1" command_json="$2" n="$3"
+  printf '{"session_id":"ci","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"%s"}}' \
+    "$command_json" >"$WORKDIR/p$n.json"
+  run_hook 10 hooks/pre-bash-guard.sh "$WORKDIR/p$n.json" "$WORKDIR/o$n" "$WORKDIR/e$n"
+  local rc=$?
+  if [ "$rc" -eq 0 ]; then
+    pass "pre-bash-guard allows $label"
+  else
+    echo "  output was: [$(cat "$WORKDIR/o$n" "$WORKDIR/e$n")]"
+    fail "pre-bash-guard exited $rc (expected 0) — over-blocking: $label"
+  fi
+}
+
+allow_command "a grep pattern containing the guarded phrase" \
+  "grep -n 'Remove-Item\\\\|rm -rf\\\\|BLOCKED' hooks/pre-bash-guard.sh" 6
+allow_command "a commit message documenting the guard" \
+  "git commit -m \\\"docs: explain why rm -rf is blocked\\\"" 7
+allow_command "a word that merely ends in r-m" \
+  "confirm -rf task" 8
+allow_command "grepping the docs for a guarded git phrase" \
+  "grep -rn 'git reset --hard' docs/" 9
+allow_command "a commit message that merely names a shell wrapper" \
+  "git commit -m \\\"use bash -c to run it, never rm -rf /tmp/x\\\"" 12
+allow_command "a heredoc commit message about the guard" \
+  "cat > /tmp/m.txt <<'EOF'\\ndocs: explain why rm -rf is blocked\\nand why bash -c is treated as a command\\nEOF\\ngit commit -F /tmp/m.txt" 13
+
+# 10-11. The other half of the same change: masking quoted text must not let a
+#    real command through. A shell wrapper hands its quoted argument back to a
+#    shell, so that argument is a command again and still has to be blocked.
+block_command() {
+  local label="$1" command_json="$2" n="$3"
+  printf '{"session_id":"ci","hook_event_name":"PreToolUse","tool_name":"Bash","tool_input":{"command":"%s"}}' \
+    "$command_json" >"$WORKDIR/p$n.json"
+  run_hook 10 hooks/pre-bash-guard.sh "$WORKDIR/p$n.json" "$WORKDIR/o$n" "$WORKDIR/e$n"
+  local rc=$?
+  if [ "$rc" -eq 2 ]; then
+    pass "pre-bash-guard still blocks $label"
+  else
+    fail "pre-bash-guard exited $rc (expected 2) — under-blocking: $label"
+  fi
+}
+
+block_command "a recursive force delete of a project directory" \
+  "rm -rf src/MyApp/Controllers" 10
+block_command "a recursive force delete wrapped in bash -c" \
+  "bash -c \\\"rm -rf /\\\"" 11
+
 echo ""
 if [ "$FAILURES" -gt 0 ]; then
   echo "$FAILURES hook test(s) failed"
