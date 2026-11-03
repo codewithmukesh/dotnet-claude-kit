@@ -118,6 +118,38 @@ internal sealed record DiagnosticsResult(
 
 internal sealed record StatusResponse(string State, string Message);
 
+// Workspace health
+internal sealed record ProjectHealthInfo(string Name, string Path, int Documents, List<string> Issues);
+
+internal sealed record LoadDiagnosticInfo(
+    string Kind,
+    string Message,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Project = null);
+
+/// <summary>
+/// What the server has loaded and how completely. <see cref="Healthy"/> is false when any
+/// project loaded or compiled incompletely, or the workspace reported a load failure — the
+/// case in which an empty answer from another tool may be a false negative.
+/// Count/TotalFound describe <see cref="IncompleteProjects"/>.
+/// </summary>
+internal sealed record WorkspaceStatusResult(
+    string State,
+    string Message,
+    bool Healthy,
+    int SnapshotVersion,
+    int LoadCount,
+    List<SolutionSummary> Solutions,
+    int ProjectCount,
+    int DocumentCount,
+    WarmUpProgress WarmUp,
+    List<ProjectHealthInfo> IncompleteProjects,
+    int Count,
+    int TotalFound,
+    List<LoadDiagnosticInfo> LoadDiagnostics,
+    int LoadDiagnosticCount,
+    bool Truncated,
+    int Limit);
+
 /// <summary>
 /// <see cref="Via"/> is "direct" when the call binds to the requested method itself, or
 /// "interface" / "base" / "implementation" when it binds to a related member that dispatches
