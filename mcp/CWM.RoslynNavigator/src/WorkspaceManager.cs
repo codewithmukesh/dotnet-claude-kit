@@ -164,16 +164,20 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     /// <summary>
     /// Build hosts for a solution declaring <paramref name="projectCount"/> projects. Each host
     /// costs a process start and loads its group's shared references again, which only pays off
-    /// once there are enough projects to keep every host busy.
+    /// once there are enough projects to keep every host busy. A host also holds up to ~1 GB
+    /// while it evaluates (ABP: 4 hosts plus the server peaked at 4.5 GB, against 2.1 GB with
+    /// one), so automatic mode allows one host per 8 GB of memory as well as per 4 cores.
     /// </summary>
     internal int EffectiveLoadParallelism(int projectCount)
     {
         if (LoadParallelism > 0)
             return Math.Min(LoadParallelism, Math.Max(projectCount, 1));
 
-        return projectCount < AutoParallelLoadMinProjects
-            ? 1
-            : Math.Clamp(Environment.ProcessorCount / 4, 1, AutoParallelLoadMaxHosts);
+        if (projectCount < AutoParallelLoadMinProjects)
+            return 1;
+
+        var byMemory = (int)Math.Round(GC.GetGCMemoryInfo().TotalAvailableMemoryBytes / (8.0 * 1024 * 1024 * 1024));
+        return Math.Clamp(Math.Min(Environment.ProcessorCount / 4, byMemory), 1, AutoParallelLoadMaxHosts);
     }
 
     /// <summary>

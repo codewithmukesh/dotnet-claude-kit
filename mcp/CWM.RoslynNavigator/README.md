@@ -589,12 +589,14 @@ One strategy for every solution size:
   design-time-builds projects one at a time in a single build host, which is nearly all of
   the load time on a large solution. When a solution declares 12 or more projects, the
   server reads the `ProjectReference` graph from the project files and splits the projects
-  into up to 4 groups (one per 4 cores), each loaded through a solution filter over the real
-  solution by its own build host, then merged so shared projects exist once. Each group
-  also loads its references, so this only pays off when no project references nearly
-  everything: the server estimates the speed-up from the graph and splits only above 1.8×.
-  Measured: eShop ready 7.2 s → 4.5 s, ABP 74 s → 53 s; OrchardCore (whose web host
-  references 228 of its 257 projects) and jellyfin stay on one host. `--load-parallelism N`
+  into up to 4 groups (one per 4 cores and per 8 GB of memory), each loaded through a
+  solution filter over the real solution by its own build host, then merged so shared
+  projects exist once. Each group also loads its references, so this only pays off when no
+  project references nearly everything: the server estimates the speed-up from the graph and
+  splits only above 1.8×. Measured: eShop ready 7.2 s → 4.5 s, ABP 74 s → 53 s; OrchardCore
+  (whose web host references 228 of its 257 projects) and jellyfin stay on one host. The
+  cost is memory while loading: each build host holds up to ~1 GB until the load ends (ABP
+  with 4 hosts: 4.5 GB for server plus hosts, against 2.1 GB with one). `--load-parallelism N`
   forces N hosts (`1` turns it off); the server logs a `Load profile` line after every load
   showing where the time went.
 - **One target framework per project.** MSBuild loads a multi-targeted project once per
