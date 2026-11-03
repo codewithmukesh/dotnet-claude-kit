@@ -34,19 +34,42 @@ internal static class ErrorCodes
     public const string InvalidArgument = "InvalidArgument";
 }
 
-/// <summary>One of several symbols a qualified name could have meant.</summary>
-internal sealed record SymbolCandidate(string Qualified, string Kind, string File, int Line);
+/// <summary>
+/// One of several symbols a qualified name could have meant. <see cref="SymbolId"/> can be
+/// passed back as the name to pick exactly this one.
+/// </summary>
+internal sealed record SymbolCandidate(
+    string Qualified,
+    string Kind,
+    string File,
+    int Line,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SymbolId = null);
 
 /// <summary>
 /// Structured failure. <see cref="Candidates"/> is populated for AmbiguousMatch so the
 /// caller can re-query with a fully-qualified name instead of guessing.
+/// <see cref="DidYouMean"/> is populated for SymbolNotFound with up to five close names.
 /// </summary>
 internal sealed record ErrorResponse(
     string Error,
     string Message,
-    List<SymbolCandidate>? Candidates = null);
+    List<SymbolCandidate>? Candidates = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<SymbolCandidate>? DidYouMean = null);
 
-internal sealed record SymbolLocation(string Name, string Kind, string File, int Line, string Namespace, bool IsGenerated);
+/// <summary>
+/// <see cref="Match"/> (exact / prefix / camelhump / substring) appears only for a fuzzy
+/// search, where results are ranked by it.
+/// </summary>
+internal sealed record SymbolLocation(
+    string Name,
+    string Kind,
+    string File,
+    int Line,
+    string Namespace,
+    bool IsGenerated,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Match = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ContainingType = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SymbolId = null);
 
 internal sealed record SymbolSearchResult(List<SymbolLocation> Symbols, int Count, int TotalFound, bool Truncated, int Limit);
 
@@ -118,7 +141,51 @@ internal sealed record DiagnosticsResult(
 
 internal sealed record StatusResponse(string State, string Message);
 
-internal sealed record CallerInfo(string Method, string ContainingType, string File, int Line, bool IsGenerated);
+// Workspace health
+internal sealed record ProjectHealthInfo(string Name, string Path, int Documents, List<string> Issues);
+
+internal sealed record LoadDiagnosticInfo(
+    string Kind,
+    string Message,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Project = null);
+
+/// <summary>
+/// What the server has loaded and how completely. <see cref="Healthy"/> is false when any
+/// project loaded or compiled incompletely, or the workspace reported a load failure — the
+/// case in which an empty answer from another tool may be a false negative.
+/// Count/TotalFound describe <see cref="IncompleteProjects"/>.
+/// </summary>
+internal sealed record WorkspaceStatusResult(
+    string State,
+    string Message,
+    bool Healthy,
+    int SnapshotVersion,
+    int LoadCount,
+    List<SolutionSummary> Solutions,
+    int ProjectCount,
+    int DocumentCount,
+    WarmUpProgress WarmUp,
+    List<ProjectHealthInfo> IncompleteProjects,
+    int Count,
+    int TotalFound,
+    List<LoadDiagnosticInfo> LoadDiagnostics,
+    int LoadDiagnosticCount,
+    bool Truncated,
+    int Limit);
+
+/// <summary>
+/// <see cref="Via"/> is "direct" when the call binds to the requested method itself, or
+/// "interface" / "base" / "implementation" when it binds to a related member that dispatches
+/// to it — <see cref="ViaSymbol"/> then names that member ("IOrderRepository.GetByIdAsync").
+/// </summary>
+internal sealed record CallerInfo(
+    string Method,
+    string ContainingType,
+    string File,
+    int Line,
+    bool IsGenerated,
+    string Via = "direct",
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ViaSymbol = null);
 
 internal sealed record CallersResult(List<CallerInfo> Callers, int Count, int TotalFound, bool Truncated, int Limit);
 
@@ -294,7 +361,9 @@ internal sealed record ChangeImpactResult(
     bool Truncated,
     int Limit,
     string Risk,
-    string Rationale);
+    string Rationale,
+    // Of TransitiveCallerCount, how many reach the symbol only through an interface or base member.
+    int IndirectCallers = 0);
 
 // Stack trace resolution
 internal sealed record StackFrameInfo(
@@ -316,6 +385,60 @@ internal sealed record StackTraceResult(
     int Limit,
     int SolutionFrames,
     int? FirstSolutionFrame);
+
+// Position lookup
+/// <summary>
+/// The symbol at a file position. <see cref="Token"/>/<see cref="Line"/>/<see cref="Column"/>
+/// echo what was actually resolved, so a caller can confirm it hit the identifier it meant.
+/// Type fields: <see cref="DeclaredType"/> is the symbol's own type (a local's, a property's,
+/// a method's return type) with <see cref="DeclaredNullability"/>; <see cref="ExpressionType"/>
+/// is the compiler's type for the expression at the position, with its flow-state nullability.
+/// </summary>
+internal sealed record SymbolAtResult(
+    string Token,
+    int Line,
+    int Column,
+    string Name,
+    string Kind,
+    string Signature,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ContainingType,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Namespace,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SymbolId,
+    bool IsDeclaration,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? DeclaredType,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? DeclaredNullability,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ExpressionType,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ExpressionNullability,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ConvertedType,
+    string DefinitionFile,
+    int DefinitionLine,
+    bool IsGenerated,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Assembly = null);
+
+// Rename preview
+/// <summary>One changed line: its text before and after the rename, trimmed.</summary>
+internal sealed record RenameEdit(string File, int Line, string Old, string New);
+
+/// <summary>
+/// What a rename would change. Count/TotalFound/Truncated describe <see cref="Changes"/>;
+/// <see cref="Conflicts"/> are compiler errors the rename would introduce (capped at 20,
+/// <see cref="ConflictCount"/> is the full number).
+/// </summary>
+internal sealed record RenamePreviewResult(
+    string Symbol,
+    string Kind,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SymbolId,
+    string OldName,
+    string NewName,
+    List<RenameEdit> Changes,
+    int Count,
+    int TotalFound,
+    int Files,
+    bool Truncated,
+    int Limit,
+    List<DiagnosticInfo> Conflicts,
+    int ConflictCount,
+    string Note);
 
 // Symbol source
 internal sealed record SymbolSourceResult(

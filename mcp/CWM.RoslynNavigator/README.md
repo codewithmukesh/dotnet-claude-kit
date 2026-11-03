@@ -17,10 +17,10 @@ CWM.RoslynNavigator is a Model Context Protocol (MCP) server that provides Claud
 
 | Tool | Description |
 |------|-------------|
-| `find_symbol` | Find where a type, method, or property is defined |
+| `find_symbol` | Find where a type, method, or property is defined. `match`: `exact` (default), `prefix`, `camelhump`, or `substring` — see [Fuzzy search](#fuzzy-search) |
 | `find_references` | All usages of a symbol across the solution |
 | `find_implementations` | Types that implement an interface or derive from a base class |
-| `find_callers` | All methods that call a specific method |
+| `find_callers` | All methods that call a specific method, including calls through an interface or base member (`Via`: direct / interface / base / implementation, plus `ViaSymbol`) |
 | `find_overrides` | Overrides of a virtual or abstract method |
 | `find_dead_code` | Unused types, methods, and properties |
 | `get_type_hierarchy` | Inheritance chain, interfaces, and derived types |
@@ -38,8 +38,11 @@ CWM.RoslynNavigator is a Model Context Protocol (MCP) server that provides Claud
 | `get_endpoint_map` | ASP.NET Core route inventory: Minimal APIs (MapGroup-composed) + controllers, with auth posture per endpoint |
 | `get_di_registrations` | DI registration map with duplicate detection and captive-dependency (singleton→scoped) risk flags |
 | `resolve_stack_trace` | Map an exception stack trace onto the solution — undoes async/lambda/local-function rewrites, marks which frames are yours |
-| `analyze_change_impact` | Blast radius of changing one symbol: references by project and file, implementations and overrides that must move with it, transitive callers, risk rating |
+| `analyze_change_impact` | Blast radius of changing one symbol: references by project and file, implementations and overrides that must move with it, transitive callers (interface/base dispatch included, counted in `IndirectCallers`), risk rating |
 | `get_token_savings` | Tokens this server has saved in this repository, with a per-tool leaderboard. Opt-in — see [Token savings](#token-savings) |
+| `get_symbol_at` | The symbol at a file position — pass the identifier `text` (or a `column`) on a `line`. Kind, signature, containing type, definition, `SymbolId`, and declared/expression types with nullability |
+| `preview_rename` | What a semantic rename **would** change — per-line old/new text across implementations, overrides and call sites, plus compiler errors it would introduce. Never writes to disk or the workspace — see [Rename preview](#rename-preview) |
+| `get_workspace_status` | What is loaded and how completely: solutions, project/document counts, warm-up progress, snapshot version, and every project that loaded or compiled incompletely — see [Workspace health](#workspace-health) |
 
 ### Symbol names
 
@@ -51,6 +54,19 @@ OrderService.CreateOrderAsync                 # type-qualified
 MyApp.Orders.OrderService.CreateOrderAsync    # fully qualified
 ```
 
+A fourth form names one symbol exactly, overload included — a **SymbolId**, the
+documentation-comment ID that `find_symbol`, `get_symbol_at`, and `AmbiguousMatch`
+candidates return:
+
+```
+M:MyApp.Orders.OrderService.CreateOrderAsync(System.String,System.Threading.CancellationToken)
+T:MyApp.Orders.OrderService
+```
+
+Pass it wherever a name goes; it is resolved centrally, so every symbol-taking tool
+accepts it. The `X:` prefix cannot begin a C# name, so it never collides with one. Roslyn
+may append `~ReturnType` to method IDs; both forms resolve.
+
 Parameter lists, generic arguments, and metadata arity are ignored, so
 `IRepository<Order>.GetByIdAsync(Guid, CancellationToken)` resolves the same as
 `IRepository.GetByIdAsync`. Qualifiers match on segment boundaries — `derService.Get`
@@ -58,7 +74,27 @@ will not match `OrderService.Get`.
 
 When a bare name matches several distinct symbols, tools return an `AmbiguousMatch` error
 listing the candidates rather than silently picking one. Overloads, partial declarations,
-and per-target-framework duplicates count as one symbol, not an ambiguity.
+and per-target-framework duplicates count as one symbol, not an ambiguity. Each candidate's
+`File` and `Line` can be passed straight back as `file`/`line`.
+
+### Fuzzy search
+
+`find_symbol` matches the exact name by default. When you only know part of it, set
+`match`:
+
+| `match` | Finds | Example for `GetByIdAsync` |
+|---------|-------|----------------------------|
+| `exact` | The name itself (case-sensitive) | `GetByIdAsync` |
+| `prefix` | + names starting with the text | `getby` |
+| `camelhump` | + names whose humps start with the query's humps, anchored on the first | `GBIA`, `gbia`, `GetByAsync` |
+| `substring` | + names containing the text anywhere | `IdAsync` |
+
+Each mode includes the tighter ones. Results are ranked exact > prefix > camelhump >
+substring, then types before members, then by project and qualified name, and each
+carries its `Match` tier. A qualifier still matches exactly — `OrderService.Cre` with
+`prefix` finds only `OrderService.CreateOrderAsync`. The search runs as a predicate over
+each project's declaration table (names only, no binding), so it costs about as much as
+an exact lookup.
 
 ### Errors
 
@@ -68,7 +104,7 @@ and has no references".
 
 | Code | Meaning |
 |------|---------|
-| `SymbolNotFound` | No symbol by that name. Check spelling, or search with `find_symbol`. |
+| `SymbolNotFound` | No symbol by that name. `DidYouMean` lists up to five close names (typos, prefixes, camel humps) when there are any. |
 | `AmbiguousMatch` | Several distinct symbols match. `Candidates` lists them; re-query fully qualified, or pass `file`/`line`. |
 | `WrongSymbolKind` | Resolved, but to the wrong kind (e.g. a method where a type was required). |
 | `FileNotFound` | The path is not part of any project in the solution. |
@@ -106,6 +142,47 @@ capped response never hides the important picture.
 into a `.g.cs` file that the next build overwrites. Detection uses file conventions
 (`.g.cs`, `.Designer.cs`, `obj/`), an `<auto-generated>` header, and Roslyn's
 `IsImplicitlyDeclared` for compiler-synthesized members.
+
+### Workspace health
+
+MSBuildWorkspace keeps going when a project fails to evaluate, a project reference points
+nowhere, or restore never ran — the solution opens and every tool answers from whatever did
+load. `get_workspace_status` makes that visible. It reports `Healthy` plus, per incomplete
+project, the issues found:
+
+- declared in a solution but not loaded (missing or unloadable project file)
+- a workspace load failure naming the project (e.g. a missing `ProjectReference`)
+- no source documents (only the SDK's `obj/` files)
+- compilation threw, or the core library is unresolved (references missing — run `dotnet restore`)
+- an analyzer or source generator file that does not exist
+
+It also carries the raw `LoadDiagnostics`, background warm-up progress (`WarmUp`:
+`Compiled` of `Total`), and `SnapshotVersion`, which increments on every reload or
+in-place document refresh.
+
+When the workspace is incomplete, any tool result that comes back **empty** — `TotalFound`
+(or `Count`) of 0, or a `SymbolNotFound` / `FileNotFound` error — gains a `WorkspaceWarning`
+property naming the incomplete projects, so "nothing found" is not mistaken for "nothing
+exists". Non-empty results and healthy workspaces are untouched.
+
+### Rename preview
+
+`preview_rename` runs Roslyn's renamer (`Renamer.RenameSymbolAsync`) on the immutable
+`Solution` snapshot and diffs the result. The workspace is never updated and nothing is
+written — the server's tools stay read-only; apply the edits yourself.
+
+| Field | Meaning |
+|-------|---------|
+| `Changes` | One entry per changed line: `File`, `Line`, `Old`, `New` (trimmed), capped by `maxResults` with the usual `Count`/`TotalFound`/`Truncated`/`Limit` |
+| `Files` | Distinct files touched |
+| `Conflicts` | Errors present after the rename but not before (e.g. `CS0111` when the new name duplicates a member), up to 20; `ConflictCount` is the total |
+
+Conflicts are checked where a rename can break things without a full rebuild: semantic
+errors in the changed documents, and declaration errors (duplicate members, clashing type
+names) across the projects that contain them. Roslyn's own conflict-resolution details are
+not public API, so they are not reported separately. `newName` must be a valid C#
+identifier (`@` escapes a keyword); `renameOverloads`, `renameInStrings`, and
+`renameInComments` mirror the IDE options.
 
 ## Token savings
 
@@ -472,7 +549,7 @@ WorkspaceInitializer.cs → BackgroundService triggers workspace load on startup
 SolutionDiscovery.cs    → Auto-detect .sln/.slnx from args or working directory
 SolutionFileReader.cs   → List a solution's projects (multi-solution dedupe and membership)
 SymbolResolver.cs       → Cross-project symbol resolution with disambiguation
-Tools/                  → MCP tool implementations (23 read-only tools)
+Tools/                  → MCP tool implementations (26 read-only tools)
 Responses/              → Token-optimized JSON response DTOs
 Telemetry/              → Opt-in local measurement, behind one call-tool filter
 

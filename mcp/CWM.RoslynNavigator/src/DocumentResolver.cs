@@ -26,6 +26,18 @@ internal static class DocumentResolver
             .ToList();
     }
 
+    /// <summary>
+    /// True when <paramref name="filePath"/> is the file <paramref name="requestedPath"/> names:
+    /// equal to it or ending with it on a directory boundary, separators normalized. So
+    /// "SampleDomain/IOrderRepository.cs" matches a Windows path, and "Service.cs" does not
+    /// match "OrderService.cs".
+    /// </summary>
+    public static bool PathMatches(string filePath, string requestedPath)
+    {
+        var needle = Normalize(requestedPath);
+        return needle.Length > 0 && Matches(Normalize(filePath), needle);
+    }
+
     internal static string Normalize(string path)
     {
         var normalized = path.Trim().Replace('\\', '/');

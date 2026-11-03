@@ -53,6 +53,8 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     private Dictionary<string, List<string>> _projectSolutions = new(StringComparer.OrdinalIgnoreCase);
     private string? _rootDirectory;
     private string? _errorMessage;
+    private int _snapshotVersion;
+    private readonly WorkspaceHealth _health = new(clock);
 
     public WorkspaceState State { get; private set; } = WorkspaceState.NotStarted;
     public string? ErrorMessage => _errorMessage;
@@ -74,6 +76,19 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     /// no-op build-file rewrite does not trigger a reload.
     /// </summary>
     internal int LoadCount => _loadCount;
+
+    /// <summary>
+    /// Bumped whenever the solution snapshot changes — a load, or an in-place document
+    /// refresh. Lets a caller tell whether two answers came from the same snapshot.
+    /// </summary>
+    public int SnapshotVersion => Volatile.Read(ref _snapshotVersion);
+
+    /// <summary>Load and warm-up problems recorded for the current load.</summary>
+    internal WorkspaceHealth Health => _health;
+
+    /// <summary>Projects that loaded or compiled incompletely in the current snapshot.</summary>
+    internal IReadOnlyList<ProjectProblem> GetProjectProblems() =>
+        _health.GetProblems(_solution, _loadedSolutions, SnapshotVersion);
 
     /// <summary>
     /// Loads the solution at the specified path. Call this once on startup.
@@ -123,8 +138,12 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             // Shadow-copying host: analyzers and generators load from temp copies, never from
             // ~/.nuget/packages, so this long-lived process cannot block `dotnet restore` (#25).
             _workspace = MSBuildWorkspace.Create(ShadowCopyAnalyzerService.HostServices);
+            _health.Reset();
             _workspace.RegisterWorkspaceFailedHandler(args =>
             {
+                // Logged and kept: a failure here means a project loaded partially or not at
+                // all, which get_workspace_status and empty results must be able to report.
+                _health.RecordDiagnostic(args.Diagnostic.Kind, args.Diagnostic.Message);
                 if (args.Diagnostic.Kind == WorkspaceDiagnosticKind.Failure)
                     logger.LogError("Workspace failure: {Message}", args.Diagnostic.Message);
                 else
@@ -141,6 +160,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             _loadedSolutions = loaded;
             _projectSolutions = BuildMembership(loaded);
             Interlocked.Increment(ref _loadCount);
+            Interlocked.Increment(ref _snapshotVersion);
 
             if (solutionPaths.Count == 1)
                 logger.LogInformation("Solution loaded: {ProjectCount} projects", _solution.ProjectIds.Count);
@@ -386,7 +406,8 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     /// scheduled leaves-first so a worker rarely blocks on a dependency nobody has started,
     /// and results are returned in <see cref="Solution.ProjectIds"/> order regardless.
     /// </summary>
-    private static async Task<Compilation?[]> CompileAllAsync(Solution solution, CancellationToken ct)
+    private static async Task<Compilation?[]> CompileAllAsync(
+        Solution solution, CancellationToken ct, WorkspaceHealth? health = null, int generation = 0)
     {
         var projectIds = solution.ProjectIds;
         var results = new Compilation?[projectIds.Count];
@@ -401,8 +422,26 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount, CancellationToken = ct },
             async (projectId, token) =>
             {
-                if (index.TryGetValue(projectId, out var i) && solution.GetProject(projectId) is { } project)
+                if (!index.TryGetValue(projectId, out var i) || solution.GetProject(projectId) is not { } project)
+                    return;
+
+                if (health is null)
+                {
                     results[i] = await project.GetCompilationAsync(token);
+                    return;
+                }
+
+                // Warm-up: one project failing must not stop the rest, and the failure is
+                // recorded so a later empty answer can be explained.
+                try
+                {
+                    results[i] = await project.GetCompilationAsync(token);
+                    health.ProjectCompiled(generation, projectId, results[i], null);
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    health.ProjectCompiled(generation, projectId, null, ex);
+                }
             });
 
         return results;
@@ -543,6 +582,9 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         _warmUpCts = cts;
         var token = cts.Token;
 
+        var generation = _health.Generation;
+        _health.WarmUpStarted(generation, solution.ProjectIds.Count);
+
         _warmUp = Task.Run(async () =>
         {
             var started = clock.GetTimestamp();
@@ -550,18 +592,21 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             {
                 logger.LogInformation("Warming compilations for {Count} projects in the background...",
                     solution.ProjectIds.Count);
-                await CompileAllAsync(solution, token);
+                await CompileAllAsync(solution, token, _health, generation);
+                _health.WarmUpFinished(generation, "completed");
                 logger.LogInformation("All compilations warmed in {Elapsed} ms.",
                     (long)clock.GetElapsedTime(started).TotalMilliseconds);
             }
             catch (OperationCanceledException)
             {
                 // Superseded by a reload, or shutting down.
+                _health.WarmUpFinished(generation, "cancelled");
             }
             catch (Exception ex)
             {
                 // Warm-up is an optimization: a project that fails to compile here fails the
                 // same way, with a proper error, when a tool asks for it.
+                _health.WarmUpFinished(generation, "failed");
                 logger.LogWarning(ex, "Background compilation warm-up failed.");
             }
         }, CancellationToken.None);
@@ -1027,6 +1072,8 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         foreach (var addition in additions)
             solution = AddNewDocument(solution, addition);
 
+        if (!ReferenceEquals(solution, _solution))
+            Interlocked.Increment(ref _snapshotVersion);
         _solution = solution;
     }
 

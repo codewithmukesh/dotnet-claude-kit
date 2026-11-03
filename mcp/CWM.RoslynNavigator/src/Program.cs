@@ -32,13 +32,24 @@ builder.Services.AddHostedService<TelemetryWriter>();
 
 // Configure MCP server with stdio transport.
 //
-// Measurement hangs off a single call-tool filter rather than a line in each of the 22
-// tool methods. One registration covers every tool including ones added later, and there
+// Measurement hangs off a single call-tool filter rather than a line in each
+// tool method. One registration covers every tool including ones added later, and there
 // is no per-tool line to forget — a forgotten line would be a silent measurement gap.
 builder.Services.AddMcpServer()
     .WithStdioServerTransport()
     .WithToolsFromAssembly()
-    .WithRequestFilters(filters => filters.AddCallToolFilter(next => async (context, ct) =>
+    .WithRequestFilters(filters => filters
+    // An empty answer from a partially loaded workspace says so (see IncompleteWorkspaceNote).
+    // Done here, once, so no tool's response shape changes and new tools are covered.
+    .AddCallToolFilter(next => async (context, ct) =>
+    {
+        var result = await next(context, ct);
+        var workspace = context.Services?.GetService<WorkspaceManager>();
+        return workspace is null || context.Params?.Name == "get_workspace_status"
+            ? result
+            : IncompleteWorkspaceNote.Apply(result, workspace);
+    })
+    .AddCallToolFilter(next => async (context, ct) =>
     {
         var telemetry = context.Services?.GetService<ToolTelemetry>();
         if (telemetry is not { Enabled: true })

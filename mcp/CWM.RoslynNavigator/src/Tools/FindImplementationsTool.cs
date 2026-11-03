@@ -13,7 +13,7 @@ public static class FindImplementationsTool
     [McpServerTool(Name = "find_implementations"), Description("Find all types that implement an interface or derive from a base class. Each result carries IsGenerated so generated implementations can be skipped.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("The interface or base class name to find implementations for")] string interfaceName,
+        [Description("The interface or base class name to find implementations for. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).")] string interfaceName,
         [Description("Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 50,
         CancellationToken ct = default)
     {

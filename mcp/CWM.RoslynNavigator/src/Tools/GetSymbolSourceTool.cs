@@ -17,7 +17,7 @@ public static class GetSymbolSourceTool
     [McpServerTool(Name = "get_symbol_source"), Description("Get the exact source of ONE symbol without reading the whole file. Members (methods, properties) return their full source including doc comment and attributes. Types return a signatures-only skeleton unless includeBodies is set. Output is capped by maxChars with a Truncated flag. Accepts dotted names like 'OrderService.GetOrderAsync'.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("The symbol name. Dotted form 'ContainingType.Member' disambiguates members.")] string symbolName,
+        [Description("The symbol name. Dotted form 'ContainingType.Member' disambiguates members. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).")] string symbolName,
         [Description("Optional: containing type name for methods/properties")] string? containingType = null,
         [Description("Optional: file path to disambiguate")] string? file = null,
         [Description("Optional: line number to disambiguate")] int? line = null,
@@ -31,9 +31,7 @@ public static class GetSymbolSourceTool
         // Qualified names resolve natively in SymbolResolver. An explicit containingType
         // argument is folded into the same qualified form, and only falls back to the bare
         // name when that yields nothing (e.g. symbolName is itself the type).
-        var lookupName = containingType is not null && !symbolName.Contains('.')
-            ? $"{containingType}.{symbolName}"
-            : symbolName;
+        var lookupName = SymbolResolver.Qualify(symbolName, containingType);
 
         var resolved = await SymbolResolver.ResolveOrErrorAsync(workspace, lookupName, file, line, ct: ct);
         if (resolved.Failed) return resolved.Error;

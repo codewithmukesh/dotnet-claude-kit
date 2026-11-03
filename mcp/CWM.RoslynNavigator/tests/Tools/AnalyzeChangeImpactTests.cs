@@ -60,6 +60,21 @@ public class AnalyzeChangeImpactTests(TestSolutionFixture fixture)
     }
 
     [Fact]
+    public async Task AnalyzeChangeImpact_ConcreteMethod_CountsCallersThroughInterface()
+    {
+        // Nothing calls InMemoryOrderRepository.GetByIdAsync on the concrete type; every
+        // caller goes through IOrderRepository. They are still affected by the change.
+        var result = JsonSerializer.Deserialize<ChangeImpactResult>(
+            await AnalyzeChangeImpactTool.ExecuteAsync(
+                fixture.WorkspaceManager, "InMemoryOrderRepository.GetByIdAsync", depth: 1,
+                ct: TestContext.Current.CancellationToken))!;
+
+        Assert.Contains(result.TransitiveCallers, c => c.EndsWith("OrderService.GetOrderAsync"));
+        Assert.True(result.IndirectCallers > 0);
+        Assert.True(result.IndirectCallers <= result.TransitiveCallerCount);
+    }
+
+    [Fact]
     public async Task AnalyzeChangeImpact_DeeperWalk_NeverReturnsFewerCallers()
     {
         var shallow = JsonSerializer.Deserialize<ChangeImpactResult>(
