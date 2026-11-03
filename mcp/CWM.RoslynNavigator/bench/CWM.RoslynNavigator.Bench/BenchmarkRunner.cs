@@ -181,8 +181,10 @@ internal sealed class BenchmarkRunner(BenchSettings settings, TextWriter log)
         // workspace status count is the comparable number where the tool exists.
         if (session.ToolNames.Contains("get_workspace_status"))
         {
+            // Its payload carries a State field, which the harness reads as "not-ready"; the
+            // count is present either way.
             var status = await session.CallAsync("get_workspace_status", [], TimeSpan.FromMinutes(2), ct);
-            if (status.Status == "ok" && status.Payload is not null)
+            if (status.Payload is not null)
             {
                 try
                 {

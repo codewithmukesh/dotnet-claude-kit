@@ -95,6 +95,11 @@ Other verbs:
 
 - `probe --corpus <def> --corpus-root <dir> --server <label=path>` checks that a corpus loads.
   It prints the server version, the time to ready, the project graph, and any load problems.
+- `call --corpus <def> --corpus-root <dir> --server <label=path> --tool <name> --args <json>`
+  makes one call and prints the response. `--warm` waits for warm-up first, `--repeat N`
+  repeats the call N times for warm timings out of process, and `--quiet` skips the payload.
+- `run ... --date <name>` writes into `results/<name>` instead of today's date, so a
+  follow-up run never overwrites a committed folder.
 - `select --corpus <def> --corpus-root <dir> --server <label=path>` regenerates a corpus's
   targets. Only run it when you add or bump a corpus. Committed targets keep runs comparable.
 
@@ -219,6 +224,12 @@ between 25 s and 130 s per corpus.
 
 These were found during the committed run. The server source was left unchanged, because
 the bench is black-box.
+
+Since then, items 2, 3, and 5 below and the `find_dead_code` and `detect_antipatterns`
+costs were addressed; the follow-up run against the same targets (current build only, with
+the 2026-11-04 current run copied in as the "before" build) is in
+[`results/2026-11-04-tools-round2/`](results/2026-11-04-tools-round2/report.md). The
+`find_callers` warm figure in item 6 did not reproduce out of process (77-93 ms on abp).
 
 1. **Unbuilt in-solution analyzers make `find_implementations` throw.** Corpora: jellyfin and
    orchardcore, restored but not built. Call: `find_implementations {"interfaceName":"IFileSystem","maxResults":1}`.
