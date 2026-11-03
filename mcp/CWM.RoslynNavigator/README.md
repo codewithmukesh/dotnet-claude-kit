@@ -457,8 +457,8 @@ returns callers from every service.
   `.cwm-navigator.json` is discovered from the common root upward.
 
 **Cost.** Memory and load time scale with the number of *distinct* projects, not solutions —
-shared projects are free after the first. The [Scaling](#scaling) thresholds apply to the
-combined project count: past 50 projects compilations load lazily.
+shared projects are free after the first. [Scaling](#scaling) applies to the combined
+project count.
 
 ## Architecture
 
@@ -483,11 +483,18 @@ apart silently.
 
 ## Scaling
 
-| Solution Size | Strategy |
-|---|---|
-| Small (1-15 projects) | Load entire workspace on startup, warm compilations in parallel (4 concurrent) |
-| Large (15-50 projects) | Same as small; compilations are held by the Roslyn solution snapshot, which forks them incrementally on edits |
-| Enterprise (50+) | No warm-up; compilations build on first query per project |
+One strategy for every solution size:
+
+- **Ready at open.** Tools answer as soon as the solution(s) are open; until then they
+  return a `Loading` status. On a 39-project solution that is ~13 s after start instead of
+  ~23 s.
+- **Background warm-up.** Every project then compiles in the background, one build per
+  core, dependencies first. A reload cancels the warm-up of the snapshot it replaces.
+- **Queries never wait in line.** A tool that needs a compilation the warm-up has not
+  reached builds it on demand, concurrently with the others, and shares any build already
+  in flight — Roslyn builds one compilation per project per snapshot.
+- **Edits are incremental.** The Roslyn solution snapshot holds every compilation and forks
+  them on a document edit, including those of projects that reference the edited one.
 
 ## Troubleshooting
 

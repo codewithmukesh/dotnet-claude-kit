@@ -30,7 +30,8 @@ internal sealed class WorkspaceInitializer(
         {
             logger.LogInformation("Initializing workspace with solution: {SolutionPath}", string.Join(", ", SolutionPaths));
             await workspaceManager.LoadSolutionsAsync(SolutionPaths, stoppingToken);
-            logger.LogInformation("Workspace initialization complete. {ProjectCount} projects loaded.",
+            logger.LogInformation(
+                "Workspace ready: {ProjectCount} projects loaded. Compilations warm up in the background.",
                 workspaceManager.ProjectCount);
         }
         catch (OperationCanceledException)

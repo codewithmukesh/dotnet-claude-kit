@@ -35,11 +35,10 @@ internal static class SymbolResolver
 
         var results = new List<ISymbol>();
 
-        foreach (var projectId in solution.ProjectIds)
+        // Compiles any project not yet built concurrently, in project order, so a cold
+        // lookup costs the slowest build rather than the sum of them.
+        foreach (var compilation in await workspace.GetAllCompilationsAsync(ct))
         {
-            var compilation = await workspace.GetCompilationAsync(projectId, ct);
-            if (compilation is null) continue;
-
             var symbols = compilation.GetSymbolsWithName(simpleName, SymbolFilter.All, ct);
 
             foreach (var symbol in symbols)
