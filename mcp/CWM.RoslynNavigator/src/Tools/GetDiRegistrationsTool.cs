@@ -33,37 +33,35 @@ public static class GetDiRegistrationsTool
             return JsonSerializer.Serialize(new DiRegistrationsResult(
                 [], [], [], 0, 0, false, Math.Max(1, maxResults)));
 
+        var seenFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var documents = solution.Projects
+            .SelectMany(p => p.Documents)
+            .Where(d => d.FilePath is not null && seenFiles.Add(d.FilePath))
+            .ToArray();
+
+        // Files are analysed in parallel into per-document slots, then merged in document
+        // order so first-wins type lookup, registration order and truncation match a
+        // sequential pass exactly.
+        var scans = new DocumentScan[documents.Length];
+
+        await Parallel.ForEachAsync(
+            Enumerable.Range(0, documents.Length),
+            new ParallelOptions { CancellationToken = ct },
+            async (index, token) => scans[index] = await ScanDocumentAsync(documents[index], file, workspace, token));
+
         var registrations = new List<DiRegistration>();
         var typeDeclarations = new Dictionary<string, TypeDeclarationSyntax>(StringComparer.Ordinal);
-        var seenFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var unrecognized = new Dictionary<string, int>(StringComparer.Ordinal);
 
-        foreach (var document in solution.Projects.SelectMany(p => p.Documents))
+        foreach (var scan in scans)
         {
-            ct.ThrowIfCancellationRequested();
-
-            if (document.FilePath is null || !seenFiles.Add(document.FilePath))
-                continue;
-
-            var root = await document.GetSyntaxRootAsync(ct);
-            if (root is null) continue;
-
-            // Collect type declarations solution-wide for captive-dependency analysis
-            foreach (var typeDecl in root.DescendantNodes().OfType<TypeDeclarationSyntax>())
+            foreach (var typeDecl in scan.TypeDeclarations)
                 typeDeclarations.TryAdd(typeDecl.Identifier.Text, typeDecl);
 
-            if (file is not null && !document.FilePath.Contains(file, StringComparison.OrdinalIgnoreCase))
-                continue;
+            registrations.AddRange(scan.Registrations);
 
-            // Only pay for a semantic model when the file has Register*/Bind*/For calls worth resolving
-            var model = root.DescendantNodes().OfType<InvocationExpressionSyntax>().Any(DiContainerSupport.IsContainerCandidate)
-                ? await document.GetSemanticModelAsync(ct)
-                : null;
-
-            foreach (var registration in AnalyzeRoot(root, document.FilePath, model, unrecognized))
-            {
-                registrations.Add(registration with { File = workspace.ToRelativePath(registration.File) });
-            }
+            foreach (var (label, count) in scan.Unrecognized)
+                unrecognized[label] = unrecognized.GetValueOrDefault(label) + count;
         }
 
         var duplicates = FindDuplicates(registrations);
@@ -74,6 +72,41 @@ public static class GetDiRegistrationsTool
         return JsonSerializer.Serialize(new DiRegistrationsResult(
             page.Items, duplicates, captiveRisks, page.Count, page.TotalFound, page.Truncated, page.Limit,
             DiContainerSupport.BuildNote(registrations.Count, unrecognized)));
+    }
+
+    private sealed record DocumentScan(
+        List<TypeDeclarationSyntax> TypeDeclarations,
+        List<DiRegistration> Registrations,
+        Dictionary<string, int> Unrecognized);
+
+    private static async Task<DocumentScan> ScanDocumentAsync(
+        Document document,
+        string? file,
+        WorkspaceManager workspace,
+        CancellationToken ct)
+    {
+        var unrecognized = new Dictionary<string, int>(StringComparer.Ordinal);
+
+        var root = await document.GetSyntaxRootAsync(ct);
+        if (root is null)
+            return new DocumentScan([], [], unrecognized);
+
+        // Collect type declarations solution-wide for captive-dependency analysis
+        var typeDeclarations = root.DescendantNodes().OfType<TypeDeclarationSyntax>().ToList();
+
+        if (file is not null && !document.FilePath!.Contains(file, StringComparison.OrdinalIgnoreCase))
+            return new DocumentScan(typeDeclarations, [], unrecognized);
+
+        // Only pay for a semantic model when the file has Register*/Bind*/For calls worth resolving
+        var model = root.DescendantNodes().OfType<InvocationExpressionSyntax>().Any(DiContainerSupport.IsContainerCandidate)
+            ? await document.GetSemanticModelAsync(ct)
+            : null;
+
+        var registrations = AnalyzeRoot(root, document.FilePath!, model, unrecognized)
+            .Select(registration => registration with { File = workspace.ToRelativePath(registration.File) })
+            .ToList();
+
+        return new DocumentScan(typeDeclarations, registrations, unrecognized);
     }
 
     /// <summary>
