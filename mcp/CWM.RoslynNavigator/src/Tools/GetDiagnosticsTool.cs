@@ -42,6 +42,12 @@ public static class GetDiagnosticsTool
             fileScopePaths = documents.Select(d => d.FilePath!).ToHashSet(StringComparer.OrdinalIgnoreCase);
         }
 
+        if (scope.Equals("project", StringComparison.OrdinalIgnoreCase)
+            && ArgumentChecks.UnknownProject(solution, path, p =>
+                p.Name.Equals(path, StringComparison.OrdinalIgnoreCase)
+                || p.FilePath?.EndsWith(path!, StringComparison.OrdinalIgnoreCase) == true) is { } unknownProject)
+            return unknownProject;
+
         var matched = new List<(Diagnostic Diagnostic, DiagnosticInfo Info)>();
 
         var compilations = scope.ToLowerInvariant() switch

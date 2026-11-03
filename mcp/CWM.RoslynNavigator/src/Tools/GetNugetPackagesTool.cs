@@ -27,6 +27,11 @@ public static class GetNugetPackagesTool
 
         maxResults = Math.Max(1, maxResults);
 
+        if (ArgumentChecks.UnknownProject(solution, projectFilter, p =>
+                p.Name.Equals(projectFilter, StringComparison.OrdinalIgnoreCase)
+                || p.Name.StartsWith(projectFilter + "(", StringComparison.OrdinalIgnoreCase)) is { } unknown)
+            return unknown;
+
         var results = new List<ProjectPackages>();
         var seenProjectFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var returned = 0;

@@ -62,7 +62,7 @@ public static class ToolArguments
         ["get_diagnostics"] = new() { ["scope"] = "galaxy" },
         ["get_endpoint_map"] = new() { ["file"] = "NoSuchFile12345.cs" },
         ["get_file_outline"] = new() { ["filePath"] = "NoSuchFile12345.cs" },
-        ["get_nuget_packages"] = null,
+        ["get_nuget_packages"] = new() { ["projectFilter"] = "NoSuchProject12345" },
         ["get_project_graph"] = null,
         ["get_public_api"] = new() { ["typeName"] = "NoSuchType12345" },
         ["get_symbol_at"] = new() { ["file"] = "NoSuchFile12345.cs", ["line"] = 1 },

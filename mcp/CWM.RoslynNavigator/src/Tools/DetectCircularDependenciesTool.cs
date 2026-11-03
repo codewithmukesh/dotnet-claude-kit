@@ -26,6 +26,9 @@ public static class DetectCircularDependenciesTool
         if (solution is null)
             return JsonSerializer.Serialize(new CircularDependenciesResult([], 0));
 
+        if (ArgumentChecks.UnknownProject(solution, projectFilter) is { } unknown)
+            return unknown;
+
         var cycles = scope.ToLowerInvariant() == "types"
             ? await DetectTypeCyclesAsync(workspace, solution, projectFilter, ct)
             : DetectProjectCycles(solution);

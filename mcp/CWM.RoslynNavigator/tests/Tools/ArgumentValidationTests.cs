@@ -25,7 +25,34 @@ public sealed class ArgumentValidationTests(TestSolutionFixture fixture)
         { "get_di_registrations", "file", "NoSuchFile12345.cs", ErrorCodes.FileNotFound },
         { "get_endpoint_map", "file", "NoSuchFile12345.cs", ErrorCodes.FileNotFound },
         { "get_test_coverage_map", "projectFilter", "NoSuchProject12345", ErrorCodes.InvalidArgument },
+        { "get_nuget_packages", "projectFilter", "NoSuchProject12345", ErrorCodes.InvalidArgument },
+        { "detect_antipatterns", "projectFilter", "NoSuchProject12345", ErrorCodes.InvalidArgument },
+        { "detect_circular_dependencies", "projectFilter", "NoSuchProject12345", ErrorCodes.InvalidArgument },
     };
+
+    public static TheoryData<string, string, string, string> InvalidScopedPaths => new()
+    {
+        { "find_dead_code", "project", "NoSuchProject12345", ErrorCodes.InvalidArgument },
+        { "find_dead_code", "file", "NoSuchFile12345.cs", ErrorCodes.FileNotFound },
+        { "get_diagnostics", "project", "NoSuchProject12345", ErrorCodes.InvalidArgument },
+    };
+
+    [Theory]
+    [MemberData(nameof(InvalidScopedPaths))]
+    public async Task Invoke_ScopedPathMatchingNothing_ReturnsStructuredError(
+        string tool, string scope, string path, string expectedError)
+    {
+        // Act
+        var json = await ToolCatalog.Get(tool).InvokeAsync(
+            fixture.WorkspaceManager,
+            new Dictionary<string, object?> { ["scope"] = scope, ["path"] = path },
+            TestContext.Current.CancellationToken);
+
+        // Assert
+        var error = JsonSerializer.Deserialize<ErrorResponse>(json)!;
+        Assert.Equal(expectedError, error.Error);
+        Assert.Contains(path, error.Message);
+    }
 
     [Theory]
     [MemberData(nameof(InvalidArguments))]

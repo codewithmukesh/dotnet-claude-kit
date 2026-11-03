@@ -55,13 +55,8 @@ public static class GetTestCoverageMapTool
         // Filter production projects if specified
         if (projectFilter is not null)
         {
-            // An unknown name used to return an empty map that read as "0 types, nothing to
-            // test" — indistinguishable from a real project with no types.
-            if (!solution.Projects.Any(p => p.Name.Equals(projectFilter, StringComparison.OrdinalIgnoreCase)))
-            {
-                return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.InvalidArgument,
-                    $"No project named '{projectFilter}'. Projects: {string.Join(", ", solution.Projects.Select(p => p.Name).Distinct().Order())}."));
-            }
+            if (ArgumentChecks.UnknownProject(solution, projectFilter) is { } unknown)
+                return unknown;
 
             productionProjects = productionProjects
                 .Where(p => p.Name.Equals(projectFilter, StringComparison.OrdinalIgnoreCase))

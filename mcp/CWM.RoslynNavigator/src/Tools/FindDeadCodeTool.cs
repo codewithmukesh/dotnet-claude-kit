@@ -83,6 +83,14 @@ public static class FindDeadCodeTool
         if (solution is null)
             return JsonSerializer.Serialize(new DeadCodeResult([], 0, 0, false, Math.Max(1, maxResults)));
 
+        if (scope == "project" && ArgumentChecks.UnknownProject(solution, path) is { } unknownProject)
+            return unknownProject;
+
+        if (scope == "file" && path is not null
+            && !solution.Projects.SelectMany(p => p.Documents)
+                .Any(d => d.FilePath?.Contains(path, StringComparison.OrdinalIgnoreCase) == true))
+            return ArgumentChecks.FileFilterMatchesNothing(path);
+
         var candidates = new List<(ISymbol Symbol, string File, int Line)>();
         var conventionFiltered = 0;
         var interfaceImplementations = new Dictionary<INamedTypeSymbol, HashSet<ISymbol>>(SymbolEqualityComparer.Default);

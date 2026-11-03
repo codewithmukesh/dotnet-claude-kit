@@ -49,6 +49,9 @@ public static class DetectAntiPatternsTool
             return JsonSerializer.Serialize(new AntiPatternsResult(
                 [], 0, 0, false, Math.Max(1, maxResults)));
 
+        if (ArgumentChecks.UnknownProject(solution, projectFilter) is { } unknown)
+            return unknown;
+
         var minSeverity = severity.Equals("error", StringComparison.OrdinalIgnoreCase)
             ? AntiPatternSeverity.Error
             : AntiPatternSeverity.Warning;

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using CWM.RoslynNavigator.Responses;
+using Microsoft.CodeAnalysis;
 
 namespace CWM.RoslynNavigator.Tools;
 
@@ -27,4 +28,24 @@ internal static class ArgumentChecks
     public static string FileFilterMatchesNothing(string file) =>
         JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.FileNotFound,
             $"No document path in the solution contains '{file}'."));
+
+    /// <summary>
+    /// Null when <paramref name="name"/> is null or some project satisfies
+    /// <paramref name="matches"/> (default: name equality, ignoring case); otherwise a
+    /// serialized InvalidArgument error listing the loaded projects. An unknown project filter
+    /// used to yield an empty answer indistinguishable from a real project with no findings.
+    /// </summary>
+    public static string? UnknownProject(Solution solution, string? name, Func<Project, bool>? matches = null)
+    {
+        if (name is null)
+            return null;
+
+        matches ??= p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase);
+        if (solution.Projects.Any(matches))
+            return null;
+
+        var names = solution.Projects.Select(p => p.Name).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal);
+        return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.InvalidArgument,
+            $"No project named '{name}'. Projects: {string.Join(", ", names)}."));
+    }
 }
