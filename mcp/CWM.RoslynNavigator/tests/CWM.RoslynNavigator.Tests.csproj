@@ -7,6 +7,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <!-- Leaves Category=Scale out of a plain `dotnet test`; see default.runsettings. -->
+    <RunSettingsFilePath>$(MSBuildProjectDirectory)/default.runsettings</RunSettingsFilePath>
   </PropertyGroup>
 
   <ItemGroup>

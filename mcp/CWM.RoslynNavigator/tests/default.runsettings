@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Applied to every `dotnet test` of this project (RunSettingsFilePath in the csproj).
+  Scale tests generate and load 50/200/500-project solutions and take minutes, so the default
+  run leaves them out. A command-line filter is ANDed with this one rather than replacing it,
+  so run the scale tests by swapping the settings file instead: see scale.runsettings.
+-->
+<RunSettings>
+  <RunConfiguration>
+    <TestCaseFilter>Category!=Scale</TestCaseFilter>
+  </RunConfiguration>
+</RunSettings>

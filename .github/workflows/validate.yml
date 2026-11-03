@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Manual runs, chiefly for the large-solution scale tests (scale-mcp job).
+  workflow_dispatch:
 
 env:
   DOTNET_VERSION: '10.0.x'
@@ -458,7 +460,8 @@ jobs:
         run: dotnet restore mcp/CWM.RoslynNavigator/tests/CWM.RoslynNavigator.Tests.csproj
 
       - name: Test
-        run: dotnet test mcp/CWM.RoslynNavigator/tests/CWM.RoslynNavigator.Tests.csproj --no-restore -c Release --logger trx --results-directory TestResults
+        # Category=Scale (synthetic 200/500-project solutions) runs in scale-mcp instead.
+        run: dotnet test mcp/CWM.RoslynNavigator/tests/CWM.RoslynNavigator.Tests.csproj --no-restore -c Release --filter "Category!=Scale" --logger trx --results-directory TestResults
 
       - name: Publish test results
         uses: actions/upload-artifact@v7
@@ -466,6 +469,40 @@ jobs:
         with:
           name: test-results-${{ matrix.os }}
           path: TestResults/*.trx
+
+  scale-mcp:
+    # Large-solution budgets: time relative to a 50-project baseline measured in the same
+    # run, response bytes and managed memory under ceilings. Minutes of MSBuild loading, so
+    # only on main and on demand, never on PRs.
+    name: Scale Tests MCP Server
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    needs: build-mcp
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore mcp/CWM.RoslynNavigator/tests/CWM.RoslynNavigator.Tests.csproj
+
+      - name: Scale tests
+        env:
+          CWM_SCALE_REPORT: ${{ github.workspace }}/ScaleResults/scale-report.txt
+        run: |
+          mkdir -p ScaleResults
+          dotnet test mcp/CWM.RoslynNavigator/tests/CWM.RoslynNavigator.Tests.csproj --no-restore -c Release --settings mcp/CWM.RoslynNavigator/tests/scale.runsettings --logger trx --results-directory ScaleResults
+
+      - name: Publish scale results
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: scale-results
+          path: ScaleResults/
 
   format-check:
     name: Format Check
