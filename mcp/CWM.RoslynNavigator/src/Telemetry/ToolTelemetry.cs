@@ -1,3 +1,4 @@
+using System.Diagnostics.CodeAnalysis;
 using System.Threading.Channels;
 using Microsoft.Extensions.Logging;
 
@@ -6,9 +7,12 @@ namespace CWM.RoslynNavigator.Telemetry;
 /// <summary>
 /// Records one line per tool call, and answers questions about what has been recorded.
 ///
-/// <para>Writes go onto a bounded channel drained by <see cref="TelemetryWriter"/>, so a
-/// tool call never waits on disk. The channel drops the oldest record when full: losing a
-/// measurement is acceptable, making a user's query slower to keep one is not.</para>
+/// <para>The request path only enqueues the raw call — tool name, response payload, timing.
+/// Everything that costs something (parsing the response, a stat per file it names, sizing
+/// the repository, preparing storage) happens when the queue is read, which is
+/// <see cref="TelemetryWriter"/>'s background loop. The channel drops the oldest call when
+/// full: losing a measurement is acceptable, making a user's query slower to keep one is
+/// not.</para>
 ///
 /// <para>When telemetry is off — the default — <see cref="Record"/> returns on its first
 /// branch and nothing else in this class is reached.</para>
@@ -21,11 +25,19 @@ internal sealed class ToolTelemetry
     /// </summary>
     private const int QueueCapacity = 1024;
 
+    /// <summary>
+    /// The reporting tool is excluded from its own numbers. It answers from recorded data
+    /// rather than from source, so it saves nothing, and counting it would inflate both the
+    /// call count and the zero-result rate it reports.
+    /// </summary>
+    private const string ReportingTool = "get_token_savings";
+
     private readonly TelemetryOptions _options;
     private readonly WorkspaceManager _workspace;
     private readonly TelemetryStore _store;
     private readonly ILogger<ToolTelemetry> _logger;
-    private readonly Channel<CallRecord> _queue;
+    private readonly TimeProvider _clock;
+    private readonly Channel<PendingCall> _pending;
     private readonly BaselineCalculator _baseline;
     private readonly Lock _initGate = new();
 
@@ -34,14 +46,19 @@ internal sealed class ToolTelemetry
     private bool _storeReady;
     private volatile bool _scaleRecorded;
 
-    public ToolTelemetry(TelemetryOptions options, WorkspaceManager workspace, ILogger<ToolTelemetry> logger)
+    public ToolTelemetry(
+        TelemetryOptions options,
+        WorkspaceManager workspace,
+        ILogger<ToolTelemetry> logger,
+        TimeProvider? clock = null)
     {
         _options = options;
         _workspace = workspace;
         _logger = logger;
+        _clock = clock ?? TimeProvider.System;
         _store = new TelemetryStore(options, logger);
 
-        _queue = Channel.CreateBounded<CallRecord>(new BoundedChannelOptions(QueueCapacity)
+        _pending = Channel.CreateBounded<PendingCall>(new BoundedChannelOptions(QueueCapacity)
         {
             FullMode = BoundedChannelFullMode.DropOldest,
             SingleReader = true,
@@ -51,34 +68,45 @@ internal sealed class ToolTelemetry
         // Both callbacks are deferred: at construction time the host is still being built
         // and no solution has been discovered yet.
         _baseline = new BaselineCalculator(() => workspace.SolutionDirectory, GetRepoTotalBytes);
+        Queue = new ProcessingReader(this);
     }
 
     public bool Enabled => _options.Enabled;
 
-    public ChannelReader<CallRecord> Queue => _queue.Reader;
+    /// <summary>
+    /// Finished records. Reading turns each queued call into a <see cref="CallRecord"/>, so
+    /// the reader — the writer's background loop — pays for the measurement, not the call.
+    /// </summary>
+    public ChannelReader<CallRecord> Queue { get; }
 
     internal TelemetryStore Store => _store;
 
     /// <summary>
-    /// Records a completed call. Never throws: every failure path here is a measurement we
-    /// lose, and none of them is worth failing a user's query over.
+    /// Records a completed call: one bounded-channel write and nothing else, so it never
+    /// throws and never touches the disk.
     /// </summary>
-    /// <summary>
-    /// The reporting tool is excluded from its own numbers. It answers from recorded data
-    /// rather than from source, so it saves nothing, and counting it would inflate both the
-    /// call count and the zero-result rate it reports.
-    /// </summary>
-    private const string ReportingTool = "get_token_savings";
-
     public void Record(string tool, string? responseJson, bool transportError, long elapsedMs)
     {
         if (!_options.Enabled || tool == ReportingTool) return;
 
+        _pending.Writer.TryWrite(new PendingCall(tool, responseJson, transportError, elapsedMs, _clock.GetUtcNow()));
+    }
+
+    /// <summary>A call as it left the request path, before any measurement work.</summary>
+    private readonly record struct PendingCall(
+        string Tool, string? ResponseJson, bool TransportError, long ElapsedMs, DateTimeOffset Timestamp);
+
+    /// <summary>
+    /// Measures one call. Returns null when it cannot be recorded (storage unavailable, or
+    /// a failure that must not take the writer loop down with it).
+    /// </summary>
+    private CallRecord? Process(PendingCall call)
+    {
         try
         {
-            if (!EnsureInitialized()) return;
+            if (!EnsureInitialized()) return null;
 
-            var facts = ResponseInspector.Inspect(responseJson);
+            var facts = ResponseInspector.Inspect(call.ResponseJson);
 
             // A ready workspace that produced results is the only case where the baseline
             // means anything; the others are recorded so miss rates stay visible.
@@ -86,7 +114,7 @@ internal sealed class ToolTelemetry
             {
                 CallOutcome.NotReady => TelemetryStates.Loading,
                 CallOutcome.Error => TelemetryStates.Error,
-                _ when transportError => TelemetryStates.Error,
+                _ when call.TransportError => TelemetryStates.Error,
                 _ => TelemetryStates.Ok
             };
 
@@ -96,25 +124,25 @@ internal sealed class ToolTelemetry
 
             var record = new CallRecord
             {
-                Timestamp = DateTimeOffset.UtcNow,
-                Tool = tool,
+                Timestamp = call.Timestamp,
+                Tool = call.Tool,
                 Ok = ok,
                 Results = facts.Results,
-                ResponseTokens = TokenEstimator.FromText(responseJson),
+                ResponseTokens = TokenEstimator.FromText(call.ResponseJson),
                 BaselineTokens = baseline.Tokens,
                 Files = baseline.Files,
-                ElapsedMs = elapsedMs,
+                ElapsedMs = call.ElapsedMs,
                 State = state,
                 ErrorCode = facts.ErrorCode
             };
 
-            _queue.Writer.TryWrite(record);
-
             RecordRepoScaleOnce();
+            return record;
         }
         catch (Exception ex)
         {
-            _logger.LogDebug(ex, "Telemetry record for {Tool} failed.", tool);
+            _logger.LogDebug(ex, "Telemetry record for {Tool} failed.", call.Tool);
+            return null;
         }
     }
 
@@ -192,5 +220,34 @@ internal sealed class ToolTelemetry
 
         if (total > 0) Interlocked.Exchange(ref _repoTotalBytes, total);
         return total;
+    }
+
+    /// <summary>
+    /// Presents the queue of raw calls as a queue of finished records, measuring each one as
+    /// it is read. Calls that cannot be recorded are skipped, never surfaced.
+    /// </summary>
+    private sealed class ProcessingReader(ToolTelemetry owner) : ChannelReader<CallRecord>
+    {
+        public override bool TryRead([MaybeNullWhen(false)] out CallRecord item)
+        {
+            while (owner._pending.Reader.TryRead(out var call))
+            {
+                if (owner.Process(call) is { } record)
+                {
+                    item = record;
+                    return true;
+                }
+            }
+
+            item = null;
+            return false;
+        }
+
+        public override ValueTask<bool> WaitToReadAsync(CancellationToken cancellationToken = default) =>
+            owner._pending.Reader.WaitToReadAsync(cancellationToken);
+
+        public override bool CanCount => owner._pending.Reader.CanCount;
+
+        public override int Count => owner._pending.Reader.Count;
     }
 }

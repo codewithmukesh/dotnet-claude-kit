@@ -26,6 +26,12 @@ internal sealed class TelemetryStore(TelemetryOptions options, ILogger logger)
     private const string CallsFileName = "calls.jsonl";
     private const string RepoFileName = "repo.json";
 
+    /// <summary>
+    /// Shared: a JsonSerializerOptions instance caches type metadata on first use, so a new
+    /// one per write rebuilds that cache every time.
+    /// </summary>
+    private static readonly JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
+
     private readonly Lock _writeGate = new();
 
     public string? RepoDirectory { get; private set; }
@@ -71,7 +77,7 @@ internal sealed class TelemetryStore(TelemetryOptions options, ILogger logger)
 
             File.WriteAllText(
                 Path.Combine(dir, RepoFileName),
-                JsonSerializer.Serialize(repo, new JsonSerializerOptions { WriteIndented = true }));
+                JsonSerializer.Serialize(repo, IndentedJson));
 
             return true;
         }
