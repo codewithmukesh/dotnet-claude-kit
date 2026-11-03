@@ -37,7 +37,7 @@ public sealed class NestedBuildFileTests : IDisposable
         await File.WriteAllTextAsync(props, "<Project />", ct);
 
         await _workspace.LoadSolutionAsync(Path.Combine(solutionDirectory, "SampleSolution.sln"), ct);
-        Assert.Equal(3, _workspace.ProjectCount);
+        Assert.Equal(4, _workspace.ProjectCount); // SampleSolution: Domain, Infrastructure, Api, Tests
 
         await TouchAsync(props, "<Project><PropertyGroup><NoWarn>CS0219</NoWarn></PropertyGroup></Project>", ct);
         await RefreshAndSettleAsync(ct);

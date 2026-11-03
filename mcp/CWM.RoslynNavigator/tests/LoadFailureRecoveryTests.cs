@@ -52,7 +52,7 @@ public sealed class LoadFailureRecoveryTests : IDisposable
         Assert.Null(await _workspace.EnsureReadyOrStatusAsync(ct));
         Assert.Equal(WorkspaceState.Ready, _workspace.State);
         Assert.Null(_workspace.ErrorMessage);
-        Assert.Equal(3, _workspace.ProjectCount);
+        Assert.Equal(4, _workspace.ProjectCount); // SampleSolution: Domain, Infrastructure, Api, Tests
         Assert.Equal(1, _workspace.LiveWorkspaceCount);
     }
 

@@ -74,7 +74,7 @@ public sealed class McpServerEndToEndTests(McpServerFixture server)
         Assert.NotEqual(true, result.IsError);
         using var json = JsonDocument.Parse(McpServerFixture.Text(result));
         var error = json.RootElement.GetProperty("Error").GetString();
-        Assert.Contains(error, ErrorCodeValues);
+        Assert.Contains(error!, ErrorCodeValues);
         Assert.False(string.IsNullOrWhiteSpace(json.RootElement.GetProperty("Message").GetString()));
     }
 

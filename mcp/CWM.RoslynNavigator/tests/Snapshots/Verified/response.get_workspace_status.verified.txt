@@ -25,5 +25,6 @@
   "LoadDiagnostics": [],
   "LoadDiagnosticCount": 0,
   "Truncated": false,
-  "Limit": 50
+  "Limit": 50,
+  "Reloading": false
 }

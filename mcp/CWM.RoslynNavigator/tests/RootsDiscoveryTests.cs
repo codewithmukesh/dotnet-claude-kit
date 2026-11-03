@@ -50,7 +50,7 @@ public sealed class RootsDiscoveryTests : IDisposable
         Assert.Null(await _workspace.EnsureReadyOrStatusAsync(ct));
 
         Assert.Equal(["SampleSolution.sln", "SecondSolution.slnx"], _workspace.LoadedSolutions.Select(s => s.Name));
-        Assert.Equal(4, _workspace.ProjectCount);
+        Assert.Equal(5, _workspace.ProjectCount); // Domain, Infrastructure, Api, Tests + ShippingService
         Assert.Equal(Path.GetFullPath(_root), _workspace.SolutionDirectory);
     }
 
@@ -118,7 +118,7 @@ public sealed class RootsDiscoveryTests : IDisposable
 
         Assert.Equal(2, _workspace.LoadCount);
         Assert.Equal(2, _workspace.LoadedSolutions.Count);
-        Assert.Equal(4, _workspace.ProjectCount);
+        Assert.Equal(5, _workspace.ProjectCount); // Domain, Infrastructure, Api, Tests + ShippingService
     }
 
     [Fact]
