@@ -149,6 +149,54 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     internal bool DiscoverAllSolutions { get; set; }
 
     /// <summary>
+    /// How many MSBuild build hosts load the primary solution side by side
+    /// (<c>--load-parallelism</c>). 0 picks automatically (<see cref="EffectiveLoadParallelism"/>);
+    /// 1 is a plain <c>OpenSolutionAsync</c>. Set by Program.cs.
+    /// </summary>
+    internal int LoadParallelism { get; set; }
+
+    /// <summary>
+    /// Build hosts for a solution declaring <paramref name="projectCount"/> projects. Each host
+    /// costs a process start and loads its group's shared references again, which only pays off
+    /// once there are enough projects to keep every host busy.
+    /// </summary>
+    internal int EffectiveLoadParallelism(int projectCount)
+    {
+        if (LoadParallelism > 0)
+            return Math.Min(LoadParallelism, Math.Max(projectCount, 1));
+
+        return projectCount < AutoParallelLoadMinProjects
+            ? 1
+            : Math.Clamp(Environment.ProcessorCount / 4, 1, AutoParallelLoadMaxHosts);
+    }
+
+    /// <summary>
+    /// How to split the primary solution's load, or a single group for a plain
+    /// <c>OpenSolutionAsync</c>. Automatic mode only splits when the reference graph lets the
+    /// busiest build host do clearly less than one host would alone.
+    /// </summary>
+    private ProjectPartitioner.Plan PlanParallelLoad(IReadOnlyList<string> declared)
+    {
+        var groups = EffectiveLoadParallelism(declared.Count);
+        var plan = ProjectPartitioner.CreatePlan(declared, groups);
+        if (plan.Groups.Count > 1)
+        {
+            logger.LogInformation(
+                "Parallel load plan: {Groups} build hosts, busiest loads {Largest} of {Single} projects (estimated speed-up {Speedup:0.00}x).",
+                plan.Groups.Count, plan.LargestGroupLoad, plan.SingleLoad, plan.EstimatedSpeedup);
+        }
+
+        if (LoadParallelism == 0 && plan.EstimatedSpeedup < AutoParallelLoadMinSpeedup)
+            return new ProjectPartitioner.Plan([declared], declared.Count, declared.Count);
+
+        return plan;
+    }
+
+    private const int AutoParallelLoadMinProjects = 12;
+    private const int AutoParallelLoadMaxHosts = 4;
+    private const double AutoParallelLoadMinSpeedup = 1.8;
+
+    /// <summary>
     /// True when solutions were configured at startup (<c>--solution</c> or found in the working
     /// directory). MCP roots are then never consulted, even before that load has started or
     /// after it failed: roots discovery is the fallback for a server started without one.
@@ -226,12 +274,13 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     /// <summary>A workspace opened by a load and not yet swapped in.</summary>
     private sealed record PendingLoad(
         string[] SolutionPaths,
-        MSBuildWorkspace Workspace,
+        Workspace Workspace,
         Solution Solution,
         IReadOnlyList<LoadedSolution> Loaded,
         WorkspaceHealth Health,
         DateTimeOffset StartedUtc,
-        IReadOnlyDictionary<string, DateTime> BuildFileStampsAtStart);
+        IReadOnlyDictionary<string, DateTime> BuildFileStampsAtStart,
+        LoadProfile Profile);
 
     /// <summary>Must hold <see cref="_loadLock"/>.</summary>
     private async Task LoadAndSwapAsync(string[] solutionPaths, CancellationToken ct)
@@ -314,6 +363,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         // Anything on disk before MSBuild evaluates and still not a document afterwards was
         // excluded by the project; files created from here on are genuinely new.
         var startedUtc = clock.GetUtcNow();
+        var profile = new LoadProfile();
         // A build file whose stamp moves between here and the swap changed after MSBuild may
         // have read it; the swap marks it changed so the next refresh reloads again.
         var stampsAtStart = _buildFiles.Keys.ToDictionary(path => path, File.GetLastWriteTimeUtc);
@@ -321,7 +371,12 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         var health = new WorkspaceHealth(clock);
         // Shadow-copying host: analyzers and generators load from temp copies, never from
         // ~/.nuget/packages, so this long-lived process cannot block `dotnet restore` (#25).
-        var workspace = MSBuildWorkspace.Create(ShadowCopyAnalyzerService.HostServices);
+        var declared = await TryReadDeclaredProjectsAsync(solutionPaths[0], ct);
+        var plan = declared is null ? null : PlanParallelLoad(declared);
+        profile.Step("plan");
+        Workspace workspace = plan is { Groups.Count: > 1 }
+            ? new AdhocWorkspace(ShadowCopyAnalyzerService.HostServices, WorkspaceKind.MSBuild)
+            : MSBuildWorkspace.Create(ShadowCopyAnalyzerService.HostServices);
         Interlocked.Increment(ref _liveWorkspaces);
         try
         {
@@ -336,17 +391,35 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
                     logger.LogWarning("Workspace warning: {Message}", args.Diagnostic.Message);
             });
 
-            var primary = await workspace.OpenSolutionAsync(solutionPaths[0], cancellationToken: ct);
-            List<LoadedSolution> loaded = [await DescribePrimaryAsync(solutionPaths[0], primary, logger, ct)];
+            Solution solution;
+            if (workspace is AdhocWorkspace adhoc)
+            {
+                solution = await ParallelSolutionLoader.LoadAsync(adhoc, solutionPaths[0], plan!.Groups, profile, ct);
+                profile.Step($"open ({plan.Groups.Count} build hosts)");
+            }
+            else
+            {
+                solution = await ((MSBuildWorkspace)workspace).OpenSolutionAsync(solutionPaths[0], progress: profile, cancellationToken: ct);
+                profile.Step("open");
+            }
+
+            List<LoadedSolution> loaded = [DescribePrimary(solutionPaths[0], declared, solution)];
 
             foreach (var additional in solutionPaths.Skip(1))
-                loaded.Add(await AddSolutionProjectsAsync(workspace, additional, ct));
+            {
+                var (withAdditional, described) = await AddSolutionProjectsAsync(workspace, solution, additional, profile, ct);
+                solution = withAdditional;
+                loaded.Add(described);
+            }
+            if (solutionPaths.Length > 1)
+                profile.Step("additional solutions");
 
             // A fresh clone's unbuilt in-solution analyzers would make every derived-type search throw.
-            var solution = UnresolvedAnalyzerReferences.Strip(workspace.CurrentSolution, health);
+            solution = UnresolvedAnalyzerReferences.Strip(solution, health);
+            profile.Step("strip analyzers");
 
             return new PendingLoad(
-                solutionPaths, workspace, solution, loaded, health, startedUtc, stampsAtStart);
+                solutionPaths, workspace, solution, loaded, health, startedUtc, stampsAtStart, profile);
         }
         catch
         {
@@ -394,8 +467,11 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
                 logger.LogInformation("{SolutionCount} solutions loaded: {ProjectCount} distinct projects",
                     load.SolutionPaths.Length, load.Solution.ProjectIds.Count);
 
+            load.Profile.Step("swap");
             SnapshotFileTimestamps(load.BuildFileStampsAtStart);
+            load.Profile.Step("file snapshot");
             State = WorkspaceState.Ready;
+            logger.LogInformation("Load profile: {Profile}", load.Profile.Summarize());
             StartWarmUp(load.Solution);
         }
         finally
@@ -406,7 +482,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         retired?.Retire();
     }
 
-    private void DisposeWorkspace(MSBuildWorkspace workspace)
+    private void DisposeWorkspace(Workspace workspace)
     {
         workspace.Dispose();
         Interlocked.Decrement(ref _liveWorkspaces);
@@ -489,27 +565,42 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             : [];
 
     /// <summary>
+    /// The loadable projects a solution file declares, or null when it cannot be parsed (the
+    /// load then falls back to describing the projects it loaded).
+    /// </summary>
+    private async Task<IReadOnlyList<string>?> TryReadDeclaredProjectsAsync(string solutionPath, CancellationToken ct)
+    {
+        try
+        {
+            return await SolutionFileReader.GetProjectPathsAsync(solutionPath, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogDebug(ex, "Could not parse {SolutionPath}; using its loaded projects.", solutionPath);
+            return null;
+        }
+    }
+
+    /// <summary>
     /// Membership for the primary solution. Parsing the file (rather than reading the loaded
     /// projects) keeps referenced-but-undeclared projects out, matching how additional
-    /// solutions are described; the loaded projects are the fallback if parsing fails.
+    /// solutions are described; the loaded projects are the fallback if parsing failed.
     /// </summary>
+    internal static LoadedSolution DescribePrimary(string solutionPath, IReadOnlyList<string>? declared, Solution solution) =>
+        new(solutionPath, declared ?? [.. LoadedProjectPaths(solution)], null);
+
+    /// <summary>Parses <paramref name="solutionPath"/> and describes it, as a load does.</summary>
     internal static async Task<LoadedSolution> DescribePrimaryAsync(
         string solutionPath, Solution solution, ILogger log, CancellationToken ct)
     {
         try
         {
-            return new LoadedSolution(solutionPath, await SolutionFileReader.GetProjectPathsAsync(solutionPath, ct), null);
+            return DescribePrimary(solutionPath, await SolutionFileReader.GetProjectPathsAsync(solutionPath, ct), solution);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             log.LogDebug(ex, "Could not parse {SolutionPath}; using its loaded projects.", solutionPath);
-            var loaded = solution.Projects
-                .Select(p => p.FilePath)
-                .OfType<string>()
-                .Select(SolutionFileReader.NormalizePath)
-                .Distinct(PathComparison.Comparer)
-                .ToList();
-            return new LoadedSolution(solutionPath, loaded, null);
+            return DescribePrimary(solutionPath, null, solution);
         }
     }
 
@@ -520,8 +611,8 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     /// duplicated. One project failing to load is logged and skipped — the same tolerance
     /// <c>OpenSolutionAsync</c> applies — and only an unreadable solution file is an error.
     /// </summary>
-    private async Task<LoadedSolution> AddSolutionProjectsAsync(
-        MSBuildWorkspace workspace, string solutionPath, CancellationToken ct)
+    private async Task<(Solution Solution, LoadedSolution Described)> AddSolutionProjectsAsync(
+        Workspace workspace, Solution solution, string solutionPath, LoadProfile profile, CancellationToken ct)
     {
         IReadOnlyList<string> declared;
         try
@@ -531,11 +622,12 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
             logger.LogError(ex, "Failed to read solution: {SolutionPath}", solutionPath);
-            return new LoadedSolution(solutionPath, [], ex.Message);
+            return (solution, new LoadedSolution(solutionPath, [], ex.Message));
         }
 
         var added = 0;
-        var loaded = LoadedProjectPaths(workspace.CurrentSolution);
+        var loader = new MSBuildProjectLoader(workspace) { SkipUnrecognizedProjects = true };
+        var loaded = LoadedProjectPaths(solution);
         foreach (var projectPath in declared)
         {
             if (loaded.Contains(projectPath))
@@ -549,10 +641,16 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
 
             try
             {
-                await workspace.OpenProjectAsync(projectPath, cancellationToken: ct);
+                // What MSBuildWorkspace.OpenProjectAsync does, against this load's solution:
+                // references to projects already present resolve to them through the map.
+                var infos = await loader.LoadProjectInfoAsync(
+                    projectPath, ProjectMap.Create(solution), profile, cancellationToken: ct);
+                foreach (var info in infos)
+                    solution = solution.AddProject(info);
+                solution = ParallelSolutionLoader.ConvertOutputReferencesToProjectReferences(solution);
                 added++;
                 // The open may also have pulled in this solution's other projects as references.
-                loaded = LoadedProjectPaths(workspace.CurrentSolution);
+                loaded = LoadedProjectPaths(solution);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
@@ -562,7 +660,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
 
         logger.LogInformation("Added {SolutionPath}: {Declared} projects declared, {Added} newly loaded",
             solutionPath, declared.Count, added);
-        return new LoadedSolution(solutionPath, declared, null);
+        return (solution, new LoadedSolution(solutionPath, declared, null));
     }
 
     private static HashSet<string> LoadedProjectPaths(Solution solution) =>
@@ -961,8 +1059,9 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
                     solution.ProjectIds.Count);
                 await CompileAllAsync(solution, token, health);
                 health.WarmUpFinished("completed");
-                logger.LogInformation("All compilations warmed in {Elapsed} ms.",
-                    (long)clock.GetElapsedTime(started).TotalMilliseconds);
+                using var process = System.Diagnostics.Process.GetCurrentProcess();
+                logger.LogInformation("All compilations warmed in {Elapsed} ms (peak working set {PeakMb} MB).",
+                    (long)clock.GetElapsedTime(started).TotalMilliseconds, process.PeakWorkingSet64 / (1024 * 1024));
             }
             catch (OperationCanceledException)
             {
@@ -1017,6 +1116,8 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         _knownDocumentPaths.Clear();
         _defaultGlobByProject.Clear();
         var projectsByDirectory = new Dictionary<string, List<ProjectId>>(PathComparison.Comparer);
+        var projectFiles = new HashSet<string>(PathComparison.Comparer);
+        var documents = new List<(DocumentId Id, string Path, string Directory)>();
 
         foreach (var projectId in _solution.ProjectIds)
         {
@@ -1025,7 +1126,9 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
 
             if (project.FilePath is not null)
             {
-                TrackBuildFile(project.FilePath, stampsAtLoadStart);
+                // Once per file: a multi-targeted project appears once per target framework.
+                if (projectFiles.Add(project.FilePath))
+                    TrackBuildFile(project.FilePath, stampsAtLoadStart);
 
                 if (Path.GetDirectoryName(project.FilePath) is { } projectDir)
                 {
@@ -1037,16 +1140,32 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
 
             foreach (var document in project.Documents)
             {
-                if (document.FilePath is null) continue;
-
-                var writeTime = File.GetLastWriteTimeUtc(document.FilePath);
-                // GetLastWriteTimeUtc returns year 1601 for non-existent files
-                if (writeTime.Year < 1900) continue;
-
-                _knownDocuments[document.Id] = new TrackedDocument(
-                    document.FilePath, Path.GetDirectoryName(document.FilePath) ?? string.Empty, writeTime);
-                _knownDocumentPaths[document.FilePath] = 0;
+                if (document.FilePath is { } path)
+                    documents.Add((document.Id, path, Path.GetDirectoryName(path) ?? string.Empty));
             }
+        }
+
+        // One listing per directory, read in parallel, instead of a stat per document: on a
+        // 15,000-document solution this baseline was 0.7 s of the time before Ready.
+        var directories = documents.Select(d => d.Directory).Distinct(PathComparison.Comparer).ToList();
+        var listings = new Dictionary<string, DateTime>?[directories.Count];
+        Parallel.For(0, directories.Count, new ParallelOptions { MaxDegreeOfParallelism = ScanParallelism },
+            i => listings[i] = ReadDirectoryTimestamps(directories[i]));
+        var byDirectory = new Dictionary<string, Dictionary<string, DateTime>?>(PathComparison.Comparer);
+        for (var i = 0; i < directories.Count; i++)
+            byDirectory[directories[i]] = listings[i];
+
+        foreach (var (id, path, directory) in documents)
+        {
+            // A path the listing spells differently (or an unreadable directory) falls back to a stat.
+            var writeTime = byDirectory[directory] is { } listing && listing.TryGetValue(path, out var listed)
+                ? listed
+                : File.GetLastWriteTimeUtc(path);
+            // GetLastWriteTimeUtc returns year 1601 for non-existent files
+            if (writeTime.Year < 1900) continue;
+
+            _knownDocuments[id] = new TrackedDocument(path, directory, writeTime);
+            _knownDocumentPaths[path] = 0;
         }
 
         // The solution files themselves: adding or removing a project changes what loads.

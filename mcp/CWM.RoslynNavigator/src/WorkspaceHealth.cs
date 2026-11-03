@@ -33,6 +33,7 @@ internal sealed record WarmUpProgress(string State, int Compiled, int Total, lon
 internal sealed class WorkspaceHealth(TimeProvider clock)
 {
     private readonly ConcurrentQueue<LoadDiagnostic> _diagnostics = new();
+    private readonly ConcurrentDictionary<(string Kind, string Message), byte> _seenDiagnostics = new();
     private readonly ConcurrentDictionary<ProjectId, string> _compileProblems = new();
     private readonly ConcurrentDictionary<ProjectId, IReadOnlyList<string>> _removedAnalyzers = new();
     private readonly Lock _gate = new();
@@ -47,10 +48,17 @@ internal sealed class WorkspaceHealth(TimeProvider clock)
     /// <summary>Bumped on every recorded fact; part of the problem-list cache key.</summary>
     public int Revision => Volatile.Read(ref _revision);
 
+    /// <summary>
+    /// Records a load diagnostic once. A parallel load (<see cref="ParallelSolutionLoader"/>)
+    /// can evaluate a shared project in several build hosts, each reporting the same message.
+    /// </summary>
     public void RecordDiagnostic(WorkspaceDiagnosticKind kind, string message)
     {
-        _diagnostics.Enqueue(new LoadDiagnostic(
-            kind == WorkspaceDiagnosticKind.Failure ? "failure" : "warning", message, null));
+        var kindName = kind == WorkspaceDiagnosticKind.Failure ? "failure" : "warning";
+        if (!_seenDiagnostics.TryAdd((kindName, message), 0))
+            return;
+
+        _diagnostics.Enqueue(new LoadDiagnostic(kindName, message, null));
         Interlocked.Increment(ref _revision);
     }
 
