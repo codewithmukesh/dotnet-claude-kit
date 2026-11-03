@@ -1608,6 +1608,43 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         var solution = _solution;
         if (solution is null) return found;
 
+        var projectDirectories = solution.Projects
+            .Select(p => Path.GetDirectoryName(p.FilePath))
+            .OfType<string>()
+            .ToHashSet(PathComparison.Comparer);
+
+        // One walk per directory, however many target frameworks load the project.
+        foreach (var projectDir in projectDirectories)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (!Directory.Exists(projectDir)) continue;
+
+            foreach (var file in EnumerateProjectSourceFiles(projectDir, projectDirectories))
+            {
+                ct.ThrowIfCancellationRequested();
+                if (IsUntrackedSourceFile(file))
+                    found.Add(file);
+            }
+        }
+
+        return found;
+    }
+
+    /// <summary>
+    /// The .cs files the SDK default glob could compile for the project in
+    /// <paramref name="projectDir"/>, found without descending where that glob never looks or
+    /// where descending is unsafe on a large repo:
+    /// <list type="bullet">
+    /// <item>the project's own bin/ and obj/ (often the largest folders in the tree);</item>
+    /// <item>dot-folders (<c>**/.*/**</c> is a default exclude) and node_modules;</item>
+    /// <item>another project's folder — that project gets its own walk, so a project at the
+    /// repo root no longer re-walks every project beneath it;</item>
+    /// <item>symbolic links and junctions, which can point back up the tree and turn the
+    /// walk into an endless loop.</item>
+    /// </list>
+    /// </summary>
+    internal static IEnumerable<string> EnumerateProjectSourceFiles(string projectDir, IReadOnlySet<string> projectDirectories)
+    {
         var options = new EnumerationOptions
         {
             RecurseSubdirectories = true,
@@ -1615,34 +1652,26 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             AttributesToSkip = FileAttributes.Hidden | FileAttributes.System
         };
 
-        var walked = new HashSet<string>(PathComparison.Comparer);
-        foreach (var project in solution.Projects)
+        return new FileSystemEnumerable<string>(projectDir, (ref FileSystemEntry entry) => entry.ToFullPath(), options)
         {
-            ct.ThrowIfCancellationRequested();
-
-            var projectDir = Path.GetDirectoryName(project.FilePath);
-            // One walk per directory, however many target frameworks load the project.
-            if (projectDir is null || !walked.Add(projectDir) || !Directory.Exists(projectDir)) continue;
-
-            // Pre-compute bin/obj prefixes to avoid per-file Path.GetRelativePath allocation
-            var sep = Path.DirectorySeparatorChar;
-            var binPrefix = $"{projectDir}{sep}bin{sep}";
-            var objPrefix = $"{projectDir}{sep}obj{sep}";
-
-            foreach (var file in Directory.EnumerateFiles(projectDir, "*.cs", options))
+            ShouldIncludePredicate = (ref FileSystemEntry entry) =>
+                !entry.IsDirectory && entry.FileName.EndsWith(".cs", StringComparison.OrdinalIgnoreCase),
+            ShouldRecursePredicate = (ref FileSystemEntry entry) =>
             {
-                ct.ThrowIfCancellationRequested();
+                if ((entry.Attributes & FileAttributes.ReparsePoint) != 0) return false;
 
-                if (file.StartsWith(binPrefix, PathComparison.Comparison) ||
-                    file.StartsWith(objPrefix, PathComparison.Comparison))
-                    continue;
+                var name = entry.FileName;
+                if (name.StartsWith('.') || name.Equals("node_modules", StringComparison.OrdinalIgnoreCase))
+                    return false;
 
-                if (IsUntrackedSourceFile(file))
-                    found.Add(file);
+                var atProjectRoot = Path.TrimEndingDirectorySeparator(entry.Directory)
+                    .Equals(Path.TrimEndingDirectorySeparator(projectDir.AsSpan()), PathComparison.Comparison);
+                if (atProjectRoot && (name.Equals("bin", PathComparison.Comparison) || name.Equals("obj", PathComparison.Comparison)))
+                    return false;
+
+                return !projectDirectories.Contains(entry.ToFullPath());
             }
-        }
-
-        return found;
+        };
     }
 
     public void Dispose()

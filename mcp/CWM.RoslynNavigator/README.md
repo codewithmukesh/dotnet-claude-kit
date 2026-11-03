@@ -582,7 +582,9 @@ One strategy for every solution size:
 - **Changes are found cheaply.** At most every 5 s, a tool call lists each directory that
   holds documents (one listing instead of one `stat` per file): edited files are re-read,
   deleted files are removed, and new `.cs` files beside existing ones are picked up. New files
-  in new folders are found by a background walk every 60 s.
+  in new folders are found by a background walk every 60 s, which never descends into a
+  project's `bin/`/`obj/`, dot-folders, `node_modules`, another project's folder, or a symlink or
+  junction (a link pointing back up the tree would otherwise loop).
 - **New files skip the reload.** A new file is added in place to the project whose folder
   is its deepest ancestor, when that project compiles through the SDK default glob — no
   `<Compile Include/Remove>`, default items left on, no unfollowed imports in the project or
