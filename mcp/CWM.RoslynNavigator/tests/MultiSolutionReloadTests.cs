@@ -1,6 +1,4 @@
 using CWM.RoslynNavigator.Tests.Fixtures;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CWM.RoslynNavigator.Tests;
 
@@ -19,12 +17,12 @@ public sealed class MultiSolutionReloadTests : IDisposable
         TestSolutionFixture.RegisterMSBuild();
 
         _root = Path.Combine(Path.GetTempPath(), "cwm-rn-multi-" + Guid.NewGuid().ToString("N"));
-        BuildFileChangeDetectionTests.CopyDirectory(
+        TestDataCopy.CopyDirectory(
             Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, Path.Combine(_root, "SampleSolution"));
-        BuildFileChangeDetectionTests.CopyDirectory(
+        TestDataCopy.CopyDirectory(
             Path.GetDirectoryName(TestSolutionFixture.SecondSolutionPath)!, Path.Combine(_root, "SecondSolution"));
 
-        _workspace = new WorkspaceManager(NullLoggerFactory.Instance.CreateLogger<WorkspaceManager>(), _clock);
+        _workspace = TestWorkspace.Create(_clock);
     }
 
     private string[] SolutionPaths =>
@@ -54,7 +52,7 @@ public sealed class MultiSolutionReloadTests : IDisposable
 
         Assert.Equal(loadsAfterInitial + 1, _workspace.LoadCount);
         Assert.Equal(WorkspaceState.Ready, _workspace.State);
-        Assert.Equal(4, _workspace.ProjectCount);
+        Assert.Equal(5, _workspace.ProjectCount);
         Assert.Contains(_workspace.GetSolution()!.Projects, p => p.Name == "ShippingService");
         Assert.Equal(2, _workspace.LoadedSolutions.Count);
     }
@@ -69,7 +67,7 @@ public sealed class MultiSolutionReloadTests : IDisposable
         await _workspace.LoadSolutionsAsync([SolutionPaths[0], broken], ct);
 
         Assert.Equal(WorkspaceState.Ready, _workspace.State);
-        Assert.Equal(3, _workspace.ProjectCount);
+        Assert.Equal(4, _workspace.ProjectCount);
         Assert.NotNull(_workspace.LoadedSolutions.Single(s => s.Name == "Broken.slnx").Error);
     }
 

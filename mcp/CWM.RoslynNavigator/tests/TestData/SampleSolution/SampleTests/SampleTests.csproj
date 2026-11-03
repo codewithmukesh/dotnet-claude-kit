@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    A test project for get_test_coverage_map and test-source classification. TestData is never
+    restored, so xUnit and Microsoft.AspNetCore.Mvc.Testing are not package references: the
+    attributes and WebApplicationFactory<T> the tests use are source stubs (TestFrameworkStubs.cs)
+    with the real namespaces and names. Classification is by project name (*Tests) and by test
+    attributes, both of which the stubs satisfy.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>14</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <IsTestProject>true</IsTestProject>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SampleApi\SampleApi.csproj" />
+    <ProjectReference Include="..\SampleDomain\SampleDomain.csproj" />
+  </ItemGroup>
+
+</Project>

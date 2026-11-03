@@ -27,7 +27,7 @@ public static class GetEndpointMapTool
     [McpServerTool(Name = "get_endpoint_map"), Description("Inventory of ASP.NET Core endpoints: Minimal API Map{Get,Post,Put,Delete,Patch} calls (MapGroup prefixes composed when statically resolvable) and controller actions with Http* attributes. Reports auth posture per endpoint: 'authorized' ([Authorize]/RequireAuthorization), 'anonymous' ([AllowAnonymous]/AllowAnonymous()), or 'unmarked'. Best-effort static analysis: only string-literal routes resolve (dynamic routes show '?'), group variables are tracked per file only, and conventions applied elsewhere (global filters, UseEndpoints conventions) are not seen.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Optional: filter to endpoints in files whose path contains this value")] string? file = null,
+        [Description("Optional: filter to endpoints in files whose path contains this value. A value matching no file returns a FileNotFound error.")] string? file = null,
         [Description("Maximum endpoints to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 100,
         CancellationToken ct = default)
     {
@@ -44,6 +44,10 @@ public static class GetEndpointMapTool
             .Where(d => d.FilePath is not null && seenFiles.Add(d.FilePath))
             .Where(d => file is null || d.FilePath!.Contains(file, StringComparison.OrdinalIgnoreCase))
             .ToArray();
+
+        // A filter naming no file is a mistake to report, not "this file has no endpoints".
+        if (file is not null && documents.Length == 0)
+            return ArgumentChecks.FileFilterMatchesNothing(file);
 
         // Files are analysed in parallel into per-document slots and flattened in document
         // order, so the result and its truncation match a sequential pass.

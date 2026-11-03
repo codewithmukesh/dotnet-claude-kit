@@ -14,7 +14,7 @@ public sealed class PathComparisonTests
         Assert.Equal(expected, PathComparison.IsCaseInsensitive(isWindows, isMacOS));
 
     [Fact]
-    public void IgnoreCase_MatchesCurrentOperatingSystem()
+    public void IgnoreCase_CurrentOperatingSystem_MatchesItsFileSystemRule()
     {
         var expected = OperatingSystem.IsWindows() || OperatingSystem.IsMacOS();
 
@@ -39,7 +39,7 @@ public sealed class PathComparisonTests
     [InlineData("/repo/Src/Orders", "/repo/src", true, true)]
     [InlineData("/repo/Src/Orders", "/repo/src", false, false)]
     [InlineData("/repo/src2", "/repo/src", true, false)]
-    public void IsSameOrUnder_RespectsCaseRule(string path, string root, bool ignoreCase, bool expected)
+    public void IsSameOrUnder_PathAndRootUnderCaseRule_RespectsThatRule(string path, string root, bool ignoreCase, bool expected)
     {
         var sep = Path.DirectorySeparatorChar;
         Assert.Equal(expected, WorkspaceManager.IsSameOrUnder(

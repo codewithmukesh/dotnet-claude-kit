@@ -71,7 +71,7 @@ public class FindReferencesTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task FindReferences_ReturnsSolutionRelativePaths()
+    public async Task FindReferences_AnySymbol_ReturnsSolutionRelativePaths()
     {
         var json = await FindReferencesTool.ExecuteAsync(fixture.WorkspaceManager, "Order", ct: TestContext.Current.CancellationToken);
         var result = JsonSerializer.Deserialize<ReferencesResult>(json)!;

@@ -141,7 +141,7 @@ public sealed class TelemetryIntegrationTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task Store_RoundTripsRecordsThroughDisk()
+    public async Task Store_AppendThenReadAll_RoundTripsRecords()
     {
         var telemetry = CreateTelemetry();
 

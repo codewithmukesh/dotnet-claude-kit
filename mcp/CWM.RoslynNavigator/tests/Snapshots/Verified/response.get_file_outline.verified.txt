@@ -1,0 +1,44 @@
+{
+  "File": "SampleApi/OrderService.cs",
+  "Namespace": "SampleApi",
+  "UsingCount": 1,
+  "Types": [
+    {
+      "Name": "OrderService",
+      "Kind": "class",
+      "Line": 8,
+      "Members": [
+        {
+          "Kind": "constructor",
+          "Signature": "public OrderService(IOrderRepository repository)",
+          "Line": 12
+        },
+        {
+          "Kind": "field",
+          "Signature": "private readonly IOrderRepository _repository",
+          "Line": 10
+        },
+        {
+          "Kind": "method",
+          "Signature": "public async Task CancelOrderAsync(Guid id, CancellationToken ct = default)",
+          "Line": 29
+        },
+        {
+          "Kind": "method",
+          "Signature": "public async Task<Order?> GetOrderAsync(Guid id, CancellationToken ct = default)",
+          "Line": 17
+        },
+        {
+          "Kind": "method",
+          "Signature": "public async Task<Order> CreateOrderAsync(string customerId, List<OrderItem> items, CancellationToken ct = default)",
+          "Line": 22
+        }
+      ],
+      "NestedTypes": []
+    }
+  ],
+  "Count": 5,
+  "TotalFound": 5,
+  "Truncated": false,
+  "Limit": 200
+}

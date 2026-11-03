@@ -1,7 +1,5 @@
 using CWM.RoslynNavigator.Tests.Fixtures;
 using Microsoft.CodeAnalysis;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CWM.RoslynNavigator.Tests;
 
@@ -20,9 +18,9 @@ public sealed class DependentProjectRefreshTests : IDisposable
         TestSolutionFixture.RegisterMSBuild();
 
         _root = Path.Combine(Path.GetTempPath(), "cwm-rn-dep-" + Guid.NewGuid().ToString("N"));
-        BuildFileChangeDetectionTests.CopyDirectory(Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, _root);
+        TestDataCopy.CopyDirectory(Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, _root);
 
-        _workspace = new WorkspaceManager(NullLoggerFactory.Instance.CreateLogger<WorkspaceManager>(), _clock);
+        _workspace = TestWorkspace.Create(_clock);
     }
 
     private string OrderPath => Path.Combine(_root, "SampleDomain", "Order.cs");

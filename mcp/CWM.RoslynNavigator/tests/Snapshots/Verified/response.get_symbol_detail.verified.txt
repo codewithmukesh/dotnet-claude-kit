@@ -1,0 +1,28 @@
+{
+  "Name": "CreateOrderAsync",
+  "Kind": "method",
+  "Signature": "SampleApi.OrderService.CreateOrderAsync(string, System.Collections.Generic.List<SampleDomain.OrderItem>, System.Threading.CancellationToken)",
+  "ReturnType": "System.Threading.Tasks.Task<SampleDomain.Order>",
+  "Accessibility": "public",
+  "Namespace": "SampleApi",
+  "Parameters": [
+    {
+      "Name": "ct",
+      "Type": "System.Threading.CancellationToken",
+      "DefaultValue": null
+    },
+    {
+      "Name": "customerId",
+      "Type": "string",
+      "DefaultValue": null
+    },
+    {
+      "Name": "items",
+      "Type": "System.Collections.Generic.List<SampleDomain.OrderItem>",
+      "DefaultValue": null
+    }
+  ],
+  "XmlDoc": null,
+  "File": "SampleApi/OrderService.cs",
+  "Line": 22
+}

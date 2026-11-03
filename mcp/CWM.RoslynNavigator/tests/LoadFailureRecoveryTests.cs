@@ -21,14 +21,14 @@ public sealed class LoadFailureRecoveryTests : IDisposable
     public LoadFailureRecoveryTests()
     {
         TestSolutionFixture.RegisterMSBuild();
-        _workspace = new WorkspaceManager(NullLoggerFactory.Instance.CreateLogger<WorkspaceManager>(), _clock);
+        _workspace = TestWorkspace.Create(_clock);
     }
 
     [Fact]
     public async Task CorruptPrimarySolution_ReportsError_ThenRecoversAfterFixAndCooldown()
     {
         var ct = TestContext.Current.CancellationToken;
-        BuildFileChangeDetectionTests.CopyDirectory(Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, _root);
+        TestDataCopy.CopyDirectory(Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, _root);
         var solution = Path.Combine(_root, "SampleSolution.sln");
         var good = await File.ReadAllTextAsync(solution, ct);
         await File.WriteAllTextAsync(solution, "this is not a solution file", ct);
@@ -52,7 +52,7 @@ public sealed class LoadFailureRecoveryTests : IDisposable
         Assert.Null(await _workspace.EnsureReadyOrStatusAsync(ct));
         Assert.Equal(WorkspaceState.Ready, _workspace.State);
         Assert.Null(_workspace.ErrorMessage);
-        Assert.Equal(3, _workspace.ProjectCount);
+        Assert.Equal(4, _workspace.ProjectCount); // SampleSolution: Domain, Infrastructure, Api, Tests
         Assert.Equal(1, _workspace.LiveWorkspaceCount);
     }
 
@@ -83,7 +83,7 @@ public sealed class LoadFailureRecoveryTests : IDisposable
     public async Task RetryAfterError_Cancelled_KeepsTheOriginalError()
     {
         var ct = TestContext.Current.CancellationToken;
-        BuildFileChangeDetectionTests.CopyDirectory(Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, _root);
+        TestDataCopy.CopyDirectory(Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, _root);
         var solution = Path.Combine(_root, "SampleSolution.sln");
         var good = await File.ReadAllTextAsync(solution, ct);
         await File.WriteAllTextAsync(solution, "this is not a solution file", ct);

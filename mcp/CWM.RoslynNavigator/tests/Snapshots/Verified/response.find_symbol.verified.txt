@@ -1,0 +1,17 @@
+{
+  "Symbols": [
+    {
+      "Name": "OrderService",
+      "Kind": "class",
+      "File": "SampleApi/OrderService.cs",
+      "Line": 8,
+      "Namespace": "SampleApi",
+      "IsGenerated": false,
+      "SymbolId": "T:SampleApi.OrderService"
+    }
+  ],
+  "Count": 1,
+  "TotalFound": 1,
+  "Truncated": false,
+  "Limit": 50
+}

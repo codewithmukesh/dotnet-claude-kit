@@ -1,0 +1,3 @@
+<!-- Guard: without this file the samples inherit the navigator's Directory.Packages.props
+     and load with central package management ON. Intentionally empty: CPM stays off. -->
+<Project />

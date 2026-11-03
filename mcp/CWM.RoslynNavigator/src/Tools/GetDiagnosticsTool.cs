@@ -21,6 +21,10 @@ public static class GetDiagnosticsTool
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
         if (notReady is not null) return notReady;
 
+        var invalid = ArgumentChecks.Choice("scope", scope, "file", "project", "solution")
+            ?? ArgumentChecks.Choice("severityFilter", severityFilter, "error", "warning", "all");
+        if (invalid is not null) return invalid;
+
         var solution = workspace.GetSolution();
         if (solution is null)
             return JsonSerializer.Serialize(new DiagnosticsResult(
@@ -37,6 +41,12 @@ public static class GetDiagnosticsTool
 
             fileScopePaths = documents.Select(d => d.FilePath!).ToHashSet(StringComparer.OrdinalIgnoreCase);
         }
+
+        if (scope.Equals("project", StringComparison.OrdinalIgnoreCase)
+            && ArgumentChecks.UnknownProject(solution, path, p =>
+                p.Name.Equals(path, StringComparison.OrdinalIgnoreCase)
+                || p.FilePath?.EndsWith(path!, StringComparison.OrdinalIgnoreCase) == true) is { } unknownProject)
+            return unknownProject;
 
         var matched = new List<(Diagnostic Diagnostic, DiagnosticInfo Info)>();
 

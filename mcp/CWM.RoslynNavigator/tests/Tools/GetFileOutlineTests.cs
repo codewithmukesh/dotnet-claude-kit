@@ -9,7 +9,7 @@ namespace CWM.RoslynNavigator.Tests.Tools;
 public class GetFileOutlineTests(TestSolutionFixture fixture)
 {
     [Fact]
-    public async Task GetFileOutline_ReturnsNamespaceUsingsAndTypeSkeleton()
+    public async Task GetFileOutline_SourceFile_ReturnsNamespaceUsingsAndTypeSkeleton()
     {
         var json = await GetFileOutlineTool.ExecuteAsync(
             fixture.WorkspaceManager, "OrderService.cs", ct: TestContext.Current.CancellationToken);

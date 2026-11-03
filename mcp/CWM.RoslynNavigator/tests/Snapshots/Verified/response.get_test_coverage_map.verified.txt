@@ -1,0 +1,47 @@
+{
+  "Coverage": [
+    {
+      "Type": "AuditableProduct",
+      "File": "SampleDomain/BaseEntity.cs",
+      "HasTests": false,
+      "TestFile": null
+    },
+    {
+      "Type": "BaseEntity",
+      "File": "SampleDomain/BaseEntity.cs",
+      "HasTests": false,
+      "TestFile": null
+    },
+    {
+      "Type": "Order",
+      "File": "SampleDomain/Order.cs",
+      "HasTests": true,
+      "TestFile": "SampleTests/OrderTests.cs"
+    },
+    {
+      "Type": "OrderItem",
+      "File": "SampleDomain/OrderItem.cs",
+      "HasTests": false,
+      "TestFile": null
+    },
+    {
+      "Type": "Product",
+      "File": "SampleDomain/Product.cs",
+      "HasTests": false,
+      "TestFile": null
+    },
+    {
+      "Type": "UnusedHelper",
+      "File": "SampleDomain/UnusedHelper.cs",
+      "HasTests": false,
+      "TestFile": null
+    }
+  ],
+  "TotalTypes": 6,
+  "TestedTypes": 1,
+  "Percentage": 16,
+  "Applicable": false,
+  "NotApplicableReason": "Behaviour-driven suite (4 test methods across 6 production types) where only 16% of type names have a matching *Tests class. Tests appear to be organised by feature rather than by type, so this metric understates real coverage.",
+  "TestMethodCount": 4,
+  "TestClassCount": 7
+}

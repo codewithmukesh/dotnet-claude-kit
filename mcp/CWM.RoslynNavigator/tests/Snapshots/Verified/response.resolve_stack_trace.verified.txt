@@ -1,0 +1,21 @@
+{
+  "ExceptionType": "System.InvalidOperationException",
+  "Message": "Order 42 not found",
+  "Frames": [
+    {
+      "Index": 0,
+      "Method": "SampleApi.OrderService.CancelOrderAsync",
+      "InSolution": true,
+      "File": "SampleApi/OrderService.cs",
+      "Line": 29,
+      "DeclarationLine": 29,
+      "Snippet": "public async Task CancelOrderAsync(Guid id, CancellationToken ct = default)"
+    }
+  ],
+  "Count": 1,
+  "TotalFound": 1,
+  "Truncated": false,
+  "Limit": 50,
+  "SolutionFrames": 1,
+  "FirstSolutionFrame": 0
+}

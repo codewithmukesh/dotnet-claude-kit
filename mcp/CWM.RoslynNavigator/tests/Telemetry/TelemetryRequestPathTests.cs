@@ -23,7 +23,7 @@ public sealed class TelemetryRequestPathTests(TestSolutionFixture fixture)
             clock);
 
     [Fact]
-    public async Task Record_DoesNoMeasurementWorkUntilTheQueueIsRead()
+    public async Task Record_BeforeQueueIsRead_DoesNoMeasurementWork()
     {
         var telemetry = CreateTelemetry();
         var json = await FindSymbolTool.ExecuteAsync(
@@ -41,7 +41,7 @@ public sealed class TelemetryRequestPathTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public void Record_UsesTheInjectedClockForTheCallTimestamp()
+    public void Record_InjectedClock_StampsCallTimestamp()
     {
         var at = new DateTimeOffset(2026, 3, 4, 5, 6, 7, TimeSpan.Zero);
         var telemetry = CreateTelemetry(new TestClock(at));

@@ -1,6 +1,4 @@
 using CWM.RoslynNavigator.Tests.Fixtures;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CWM.RoslynNavigator.Tests;
 
@@ -22,10 +20,9 @@ public sealed class BuildFileChangeDetectionTests : IDisposable
         TestSolutionFixture.RegisterMSBuild();
 
         _root = Path.Combine(Path.GetTempPath(), "cwm-rn-" + Guid.NewGuid().ToString("N"));
-        CopyDirectory(Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, _root);
+        TestDataCopy.CopyDirectory(Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, _root);
 
-        _workspace = new WorkspaceManager(
-            NullLoggerFactory.Instance.CreateLogger<WorkspaceManager>(), _clock);
+        _workspace = TestWorkspace.Create(_clock);
     }
 
     private string SolutionPath => Path.Combine(_root, "SampleSolution.sln");
@@ -169,34 +166,5 @@ public sealed class BuildFileChangeDetectionTests : IDisposable
         {
             // A locked file in a temp copy is not worth failing a test over.
         }
-    }
-
-    internal static void CopyDirectory(string source, string destination)
-    {
-        Directory.CreateDirectory(destination);
-
-        // Filter on the path relative to the source root. The source itself sits under the
-        // test output directory, so an absolute-path check for "bin" matches everything.
-        foreach (var file in Directory.GetFiles(source, "*", SearchOption.AllDirectories))
-        {
-            var relative = Path.GetRelativePath(source, file);
-            if (IsBuildOutput(relative)) continue;
-
-            var target = Path.Combine(destination, relative);
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            File.Copy(file, target, overwrite: true);
-        }
-    }
-
-    private static bool IsBuildOutput(string relativePath)
-    {
-        foreach (var segment in relativePath.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar))
-        {
-            if (segment.Equals("bin", StringComparison.OrdinalIgnoreCase)
-                || segment.Equals("obj", StringComparison.OrdinalIgnoreCase))
-                return true;
-        }
-
-        return false;
     }
 }

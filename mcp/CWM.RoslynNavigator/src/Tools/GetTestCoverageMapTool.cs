@@ -27,7 +27,7 @@ public static class GetTestCoverageMapTool
     [McpServerTool(Name = "get_test_coverage_map"), Description("Heuristic test coverage map: identifies which production types have corresponding test classes. Matches by naming convention (e.g., OrderService → OrderServiceTests). Not runtime coverage — structural analysis only. IMPORTANT: this metric is only valid for suites written one test class per production type. For integration- or feature-driven suites it returns applicable=false with the real test-method count; in that case the percentage is meaningless and must not be graded or reported as coverage.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Optional: production project name to check coverage for")] string? projectFilter = null,
+        [Description("Optional: production project name to check coverage for. An unknown name returns an InvalidArgument error.")] string? projectFilter = null,
         [Description("Maximum results to return")] int maxResults = 50,
         CancellationToken ct = default)
     {
@@ -55,6 +55,9 @@ public static class GetTestCoverageMapTool
         // Filter production projects if specified
         if (projectFilter is not null)
         {
+            if (ArgumentChecks.UnknownProject(solution, projectFilter) is { } unknown)
+                return unknown;
+
             productionProjects = productionProjects
                 .Where(p => p.Name.Equals(projectFilter, StringComparison.OrdinalIgnoreCase))
                 .ToList();

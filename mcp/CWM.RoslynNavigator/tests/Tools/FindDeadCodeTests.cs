@@ -134,7 +134,7 @@ public class FindDeadCodeTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task FindDeadCode_SkipsPublicApi()
+    public async Task FindDeadCode_PublicApiTypes_AreNotReported()
     {
         var json = await FindDeadCodeTool.ExecuteAsync(
             fixture.WorkspaceManager, scope: "solution",
@@ -148,7 +148,7 @@ public class FindDeadCodeTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task FindDeadCode_SkipsInterfaceImplementations()
+    public async Task FindDeadCode_InterfaceImplementation_IsNotReported()
     {
         var json = await FindDeadCodeTool.ExecuteAsync(
             fixture.WorkspaceManager, scope: "solution", kind: "method",

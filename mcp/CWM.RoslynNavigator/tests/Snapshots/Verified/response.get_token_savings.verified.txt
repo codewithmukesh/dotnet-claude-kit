@@ -1,0 +1,15 @@
+{
+  "Enabled": false,
+  "Message": "Telemetry is off. Set CWM_ROSLYN_TELEMETRY=on and restart the server to collect. Nothing is ever transmitted — records are written to this machine only.",
+  "TotalCalls": 0,
+  "SavedTokens": 0,
+  "ResponseTokens": 0,
+  "BaselineTokens": 0,
+  "FilesCounted": 0,
+  "RepoTokens": 0,
+  "ZeroResultCalls": 0,
+  "NotReadyCalls": 0,
+  "ErrorCalls": 0,
+  "ByTool": [],
+  "Method": null
+}

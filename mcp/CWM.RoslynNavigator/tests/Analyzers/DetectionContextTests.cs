@@ -13,7 +13,7 @@ public class DetectionContextTests
     }
 
     [Fact]
-    public void InlineIgnore_SuppressesOnSameLine()
+    public void InlineIgnore_MarkerOnSameLine_SuppressesThatLine()
     {
         var context = Parse("""
             class C
@@ -30,7 +30,7 @@ public class DetectionContextTests
     }
 
     [Fact]
-    public void InlineIgnore_SuppressesLineBelow()
+    public void InlineIgnore_MarkerOnPrecedingLine_SuppressesLineBelow()
     {
         var context = Parse("""
             class C
@@ -47,7 +47,7 @@ public class DetectionContextTests
     }
 
     [Fact]
-    public void InlineIgnore_AcceptsMultipleIds()
+    public void InlineIgnore_SeveralIdsInOneMarker_SuppressesEach()
     {
         var context = Parse("""
             class C
@@ -66,7 +66,7 @@ public class DetectionContextTests
     }
 
     [Fact]
-    public void InlineIgnore_DoesNotLeakToDistantLines()
+    public void InlineIgnore_MarkerAboveOneLine_DoesNotSuppressDistantLines()
     {
         var context = Parse("""
             class C
@@ -85,7 +85,7 @@ public class DetectionContextTests
     }
 
     [Fact]
-    public void SuppressMessageAttribute_CoversWholeDeclaration()
+    public void SuppressMessageAttribute_OnMethod_CoversWholeDeclaration()
     {
         var context = Parse("""
             class C
@@ -103,7 +103,7 @@ public class DetectionContextTests
     }
 
     [Fact]
-    public void SuppressMessageAttribute_AcceptsPrefixedCheckId()
+    public void SuppressMessageAttribute_PrefixedCheckId_Suppresses()
     {
         var context = Parse("""
             class C
@@ -117,7 +117,7 @@ public class DetectionContextTests
     }
 
     [Fact]
-    public void UnrelatedComment_SuppressesNothing()
+    public void IsSuppressedAt_NoMarker_ReturnsFalse()
     {
         var context = Parse("""
             class C

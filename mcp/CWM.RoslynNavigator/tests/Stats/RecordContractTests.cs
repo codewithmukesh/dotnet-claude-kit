@@ -51,7 +51,7 @@ public class RecordContractTests
     }
 
     [Fact]
-    public void MirrorUnderstandsEveryNameTheServerWrites()
+    public void StatsRecord_EveryServerPropertyName_IsMirrored()
     {
         // The contract is one-directional: the mirror only ever reads. A renamed property
         // would deserialize as a default rather than throw, so names are compared directly
@@ -78,7 +78,7 @@ public class RecordContractTests
     }
 
     [Fact]
-    public void ErrorCode_SurvivesTheRoundTrip()
+    public void Deserialize_ServerRecordWithErrorCode_KeepsErrorCode()
     {
         var record = Sample() with { Ok = false, State = "error", ErrorCode = "SymbolNotFound" };
         var json = JsonSerializer.Serialize(record, ServerContext.Default.CallRecord);

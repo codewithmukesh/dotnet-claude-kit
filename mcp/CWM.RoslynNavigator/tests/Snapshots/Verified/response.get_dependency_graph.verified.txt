@@ -1,0 +1,28 @@
+{
+  "RootSymbol": "Task OrderService.CancelOrderAsync(Guid id, CancellationToken ct = default(CancellationToken))",
+  "Dependencies": [
+    {
+      "Symbol": "Cancel",
+      "ContainingType": "Order",
+      "File": "SampleDomain/Order.cs",
+      "Line": 30,
+      "Depth": 1
+    },
+    {
+      "Symbol": "GetByIdAsync",
+      "ContainingType": "IOrderRepository",
+      "File": "SampleDomain/IOrderRepository.cs",
+      "Line": 8,
+      "Depth": 1
+    },
+    {
+      "Symbol": "UpdateAsync",
+      "ContainingType": "IOrderRepository",
+      "File": "SampleDomain/IOrderRepository.cs",
+      "Line": 11,
+      "Depth": 1
+    }
+  ],
+  "TotalNodes": 3,
+  "Truncated": false
+}

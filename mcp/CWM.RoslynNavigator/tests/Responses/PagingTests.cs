@@ -60,7 +60,7 @@ public class PagingTests
     }
 
     [Fact]
-    public void Empty_ReportsNoResultsAtRequestedLimit()
+    public void Empty_RequestedLimit_ReportsNoResultsAtThatLimit()
     {
         var page = Paging.Empty<int>(25);
 

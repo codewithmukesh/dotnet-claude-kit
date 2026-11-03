@@ -20,7 +20,7 @@ public sealed class ShadowCopyReloadTests : IDisposable
     public ShadowCopyReloadTests()
     {
         TestSolutionFixture.RegisterMSBuild();
-        _workspace = new WorkspaceManager(NullLoggerFactory.Instance.CreateLogger<WorkspaceManager>(), _clock);
+        _workspace = TestWorkspace.Create(_clock);
     }
 
     private string GeneratorPath => Path.Combine(_root, "analyzers", "Microsoft.Extensions.Logging.Generators.dll");

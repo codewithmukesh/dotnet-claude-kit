@@ -50,7 +50,7 @@ public class TokenEstimatorTests
     [InlineData(3500, 1000)]
     [InlineData(35, 10)]
     [InlineData(1, 0)]
-    public void FromBytes_AppliesDivisor(long bytes, int expected)
+    public void FromBytes_ByteCount_AppliesDivisor(long bytes, int expected)
     {
         Assert.Equal(expected, TokenEstimator.FromBytes(bytes));
     }
@@ -62,7 +62,7 @@ public class TokenEstimatorTests
     }
 
     [Fact]
-    public void FromText_UsesUtf8ByteLength()
+    public void FromText_MultiByteCharacters_UsesUtf8ByteLength()
     {
         // A multi-byte identifier must not be undercounted by measuring characters.
         var text = new string('é', 350); // 700 UTF-8 bytes
@@ -71,7 +71,7 @@ public class TokenEstimatorTests
     }
 
     [Fact]
-    public void Divisor_IsMarkedUncalibrated()
+    public void IsCalibrated_DefaultDivisor_IsFalse()
     {
         // Guards the honesty of the public claim: if someone calibrates the divisor they
         // must flip this flag, and if they flip it without calibrating this test is where

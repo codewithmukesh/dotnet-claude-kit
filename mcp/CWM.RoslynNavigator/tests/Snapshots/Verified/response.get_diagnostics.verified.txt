@@ -1,0 +1,10 @@
+{
+  "Diagnostics": [],
+  "Count": 0,
+  "TotalFound": 0,
+  "Errors": 0,
+  "Warnings": 0,
+  "Info": 0,
+  "Truncated": false,
+  "Limit": 100
+}

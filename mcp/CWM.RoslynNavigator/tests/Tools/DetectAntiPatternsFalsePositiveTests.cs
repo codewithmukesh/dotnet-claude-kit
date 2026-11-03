@@ -32,7 +32,7 @@ public class DetectAntiPatternsFalsePositiveTests(TestSolutionFixture fixture)
     // ---- Source classification -------------------------------------------------------
 
     [Fact]
-    public async Task TestClassifiedFile_ProducesNoProductionFindings()
+    public async Task DetectAntiPatterns_TestClassifiedFile_ProducesNoProductionFindings()
     {
         var result = await RunAsync(file: "CustomerWorkflowTests.cs");
 
@@ -40,7 +40,7 @@ public class DetectAntiPatternsFalsePositiveTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task MigrationFolder_ProducesNoProductionFindings()
+    public async Task DetectAntiPatterns_MigrationFile_ProducesNoProductionFindings()
     {
         var result = await RunAsync(file: "20240101000000_InitialCreate.cs");
 
@@ -48,7 +48,7 @@ public class DetectAntiPatternsFalsePositiveTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task GeneratedCode_IsNeverReported()
+    public async Task DetectAntiPatterns_ScopeAll_NeverReportsGeneratedCode()
     {
         var result = await RunAsync(scope: "all");
 
@@ -58,7 +58,7 @@ public class DetectAntiPatternsFalsePositiveTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task ScopeAll_SurfacesFindingsThatApplyToTestCode()
+    public async Task DetectAntiPatterns_ScopeAllOnTestFile_SurfacesFindingsThatApplyToTests()
     {
         var production = await RunAsync(file: "CustomerWorkflowTests.cs");
         var all = await RunAsync(file: "CustomerWorkflowTests.cs", scope: "all");
@@ -72,7 +72,7 @@ public class DetectAntiPatternsFalsePositiveTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task ScopeAll_StillExcludesDetectorsThatAreMeaninglessInTests()
+    public async Task DetectAntiPatterns_ScopeAllOnTestFile_ExcludesDetectorsMeaninglessInTests()
     {
         var all = await RunAsync(file: "CustomerWorkflowTests.cs", scope: "all");
 
@@ -141,7 +141,7 @@ public class DetectAntiPatternsFalsePositiveTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task HighConfidenceFilter_ExcludesResilienceWrappers()
+    public async Task DetectAntiPatterns_HighConfidence_ExcludesResilienceWrappers()
     {
         var result = await RunAsync(file: "FalsePositiveExamples.cs", confidence: "high");
 
@@ -296,7 +296,7 @@ public class DetectAntiPatternsFalsePositiveTests(TestSolutionFixture fixture)
     // ---- Suppression ---------------------------------------------------------------------
 
     [Fact]
-    public async Task InlineIgnoreMarker_RemovesFindingButCountsIt()
+    public async Task DetectAntiPatterns_InlineIgnoreMarker_RemovesFindingButCountsIt()
     {
         var result = await RunAsync(file: "FalsePositiveExamples.cs");
 
@@ -311,7 +311,7 @@ public class DetectAntiPatternsFalsePositiveTests(TestSolutionFixture fixture)
     // ---- Summary -----------------------------------------------------------------------
 
     [Fact]
-    public async Task Summary_IsCompleteEvenWhenTruncated()
+    public async Task DetectAntiPatterns_Truncated_SummaryStaysComplete()
     {
         var full = await RunAsync();
         var truncated = await RunAsync(maxResults: 1);
@@ -328,7 +328,7 @@ public class DetectAntiPatternsFalsePositiveTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task Summary_CountsGeneratedFilesSeparately()
+    public async Task DetectAntiPatterns_ScopeAll_SummaryCountsGeneratedFilesSeparately()
     {
         var result = await RunAsync(scope: "all");
 
@@ -339,7 +339,7 @@ public class DetectAntiPatternsFalsePositiveTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task Violations_CarryEnclosingMember()
+    public async Task DetectAntiPatterns_AnyViolation_CarriesEnclosingMember()
     {
         var result = await RunAsync(file: "AntiPatternExamples.cs");
 

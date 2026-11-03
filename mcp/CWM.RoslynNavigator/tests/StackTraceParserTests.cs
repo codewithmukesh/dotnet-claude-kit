@@ -33,7 +33,7 @@ public class StackTraceParserTests
     }
 
     [Fact]
-    public void ParseFrames_ExtractsFileAndLineWhenPdbPresent()
+    public void ParseFrames_FrameWithFileAndLine_ExtractsBoth()
     {
         const string trace = """
             System.InvalidOperationException: Order 42 not found
@@ -54,7 +54,7 @@ public class StackTraceParserTests
     }
 
     [Fact]
-    public void ParseFrames_IgnoresRethrowSeparators()
+    public void ParseFrames_RethrowSeparators_AreIgnored()
     {
         const string trace = """
                at MyApp.A.One()
@@ -68,7 +68,7 @@ public class StackTraceParserTests
     }
 
     [Fact]
-    public void ParseHeader_ReadsExceptionTypeAndMessage()
+    public void ParseHeader_ExceptionLine_ReadsTypeAndMessage()
     {
         const string trace = """
             System.InvalidOperationException: Order 42 not found

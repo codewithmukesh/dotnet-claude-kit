@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # Manual runs, chiefly for the large-solution scale tests (scale-mcp job).
+  workflow_dispatch:
 
 env:
   DOTNET_VERSION: '10.0.x'
@@ -458,7 +460,13 @@ jobs:
         run: dotnet restore mcp/CWM.RoslynNavigator/tests/CWM.RoslynNavigator.Tests.csproj
 
       - name: Test
-        run: dotnet test mcp/CWM.RoslynNavigator/tests/CWM.RoslynNavigator.Tests.csproj --no-restore -c Release --logger trx --results-directory TestResults
+        # Category=Scale (synthetic 200/500-project solutions) runs in scale-mcp instead.
+        # Coverage is collected on ubuntu only: one OS is enough for a regression floor, and
+        # instrumentation slows the run.
+        run: >-
+          dotnet test mcp/CWM.RoslynNavigator/tests/CWM.RoslynNavigator.Tests.csproj --no-restore -c Release
+          --filter "Category!=Scale" --logger trx --results-directory TestResults
+          ${{ matrix.os == 'ubuntu-latest' && '--collect "XPlat Code Coverage"' || '' }}
 
       - name: Publish test results
         uses: actions/upload-artifact@v7
@@ -466,6 +474,73 @@ jobs:
         with:
           name: test-results-${{ matrix.os }}
           path: TestResults/*.trx
+
+      - name: Enforce line-coverage floor
+        # Floor sits just under the measured value (81.6% lines when added) so coverage cannot
+        # silently regress. Raise it when coverage rises; never lower it to make a PR pass.
+        if: matrix.os == 'ubuntu-latest'
+        env:
+          COVERAGE_FLOOR: '0.80'
+        run: |
+          python3 - << 'PYEOF'
+          import glob, os, sys
+          import xml.etree.ElementTree as ET
+
+          reports = glob.glob("TestResults/**/coverage.cobertura.xml", recursive=True)
+          if not reports:
+              print("ERROR: no coverage.cobertura.xml produced")
+              sys.exit(1)
+          root = ET.parse(reports[0]).getroot()
+          rate = float(root.get("line-rate"))
+          floor = float(os.environ["COVERAGE_FLOOR"])
+          for package in root.iter("package"):
+              print(f"{package.get('name')}: {float(package.get('line-rate')):.2%} lines")
+          print(f"Total: {rate:.2%} lines (floor {floor:.0%})")
+          if rate < floor:
+              print(f"ERROR: line coverage {rate:.2%} is below the {floor:.0%} floor")
+              sys.exit(1)
+          PYEOF
+
+      - name: Publish coverage
+        uses: actions/upload-artifact@v7
+        if: always() && matrix.os == 'ubuntu-latest'
+        with:
+          name: coverage-cobertura
+          path: TestResults/**/coverage.cobertura.xml
+
+  scale-mcp:
+    # Large-solution budgets: time relative to a 50-project baseline measured in the same
+    # run, response bytes and managed memory under ceilings. Minutes of MSBuild loading, so
+    # only on main and on demand, never on PRs.
+    name: Scale Tests MCP Server
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    needs: build-mcp
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore
+        run: dotnet restore mcp/CWM.RoslynNavigator/tests/CWM.RoslynNavigator.Tests.csproj
+
+      - name: Scale tests
+        env:
+          CWM_SCALE_REPORT: ${{ github.workspace }}/ScaleResults/scale-report.txt
+        run: |
+          mkdir -p ScaleResults
+          dotnet test mcp/CWM.RoslynNavigator/tests/CWM.RoslynNavigator.Tests.csproj --no-restore -c Release --settings mcp/CWM.RoslynNavigator/tests/scale.runsettings --logger trx --results-directory ScaleResults
+
+      - name: Publish scale results
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: scale-results
+          path: ScaleResults/
 
   format-check:
     name: Format Check

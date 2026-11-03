@@ -14,13 +14,13 @@ public class WorkspaceManagerTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public void ProjectCount_ShouldBeThree()
+    public void ProjectCount_SampleSolution_IsFour()
     {
-        Assert.Equal(3, fixture.WorkspaceManager.ProjectCount);
+        Assert.Equal(4, fixture.WorkspaceManager.ProjectCount);
     }
 
     [Fact]
-    public void GetSolution_ShouldReturnNonNull()
+    public void GetSolution_LoadedSample_ReturnsSolution()
     {
         var solution = fixture.WorkspaceManager.GetSolution();
         Assert.NotNull(solution);
@@ -38,15 +38,15 @@ public class WorkspaceManagerTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task GetAllCompilationsAsync_ShouldReturnAll()
+    public async Task GetAllCompilationsAsync_LoadedSample_ReturnsOnePerProject()
     {
         var compilations = await fixture.WorkspaceManager.GetAllCompilationsAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(3, compilations.Count);
+        Assert.Equal(4, compilations.Count);
     }
 
     [Fact]
-    public void GetStatusMessage_ShouldReturnReady()
+    public void GetStatusMessage_LoadedSample_ReportsReady()
     {
         var message = fixture.WorkspaceManager.GetStatusMessage();
 

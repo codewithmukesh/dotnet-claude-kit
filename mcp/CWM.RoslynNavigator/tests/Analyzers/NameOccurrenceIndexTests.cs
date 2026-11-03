@@ -32,7 +32,7 @@ public class NameOccurrenceIndexTests
         Sources.Select(s => CSharpSyntaxTree.ParseText(s, cancellationToken: TestContext.Current.CancellationToken)).ToList();
 
     [Fact]
-    public void AppearsOutside_MatchesFullTextScanForEveryNameAndDeclaringTree()
+    public void AppearsOutside_EveryNameAndDeclaringTree_MatchesFullTextScan()
     {
         var trees = Parse();
         var index = new NameOccurrenceIndex(Names);

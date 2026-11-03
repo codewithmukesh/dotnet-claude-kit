@@ -1,0 +1,47 @@
+{
+  "Symbol": "SampleDomain.IOrderRepository.GetByIdAsync",
+  "Kind": "method",
+  "Accessibility": "public",
+  "CrossesAssemblyBoundary": true,
+  "DirectReferences": 3,
+  "AffectedProjects": 2,
+  "AffectedFiles": 2,
+  "TestReferences": 0,
+  "ImplementationsToUpdate": 2,
+  "OverridesToUpdate": 0,
+  "Projects": [
+    {
+      "Name": "SampleApi",
+      "References": 2,
+      "IsTest": false
+    },
+    {
+      "Name": "SampleInfrastructure",
+      "References": 1,
+      "IsTest": false
+    }
+  ],
+  "Files": [
+    {
+      "File": "SampleApi/OrderService.cs",
+      "References": 2,
+      "IsTest": false
+    },
+    {
+      "File": "SampleInfrastructure/CachedOrderRepository.cs",
+      "References": 1,
+      "IsTest": false
+    }
+  ],
+  "TransitiveCallers": [
+    "SampleApi.OrderService.CancelOrderAsync",
+    "SampleApi.OrderService.GetOrderAsync",
+    "SampleInfrastructure.CachedOrderRepository.GetByIdAsync"
+  ],
+  "TransitiveCallerCount": 3,
+  "Truncated": false,
+  "Limit": 50,
+  "Risk": "high",
+  "Rationale": "2 implementation(s) must change with the signature; referenced from 2 projects; public surface — consumers outside this solution may break",
+  "IndirectCallers": 0
+}

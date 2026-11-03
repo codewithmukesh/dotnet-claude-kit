@@ -12,7 +12,7 @@ public class GlobMatcherTests
     [InlineData("src/**/*Seeder.cs", "src/Api/Data/DemoSeeder.cs")]
     [InlineData("src/Api/Program.cs", "src/Api/Program.cs")]
     [InlineData("src\\Api\\**", "src/Api/Thing.cs")]
-    public void Matches(string pattern, string path) =>
+    public void IsMatch_MatchingPattern_ReturnsTrue(string pattern, string path) =>
         Assert.True(GlobMatcher.IsMatch(pattern, path), $"'{pattern}' should match '{path}'");
 
     [Theory]
@@ -20,7 +20,7 @@ public class GlobMatcherTests
     [InlineData("src/*/Program.cs", "src/Api/Nested/Program.cs")]
     [InlineData("src/**/*Seeder.cs", "src/Api/Data/SeederFactory.cs")]
     [InlineData("src/Api", "src/Api/Thing.cs")]
-    public void DoesNotMatch(string pattern, string path) =>
+    public void IsMatch_NonMatchingPattern_ReturnsFalse(string pattern, string path) =>
         Assert.False(GlobMatcher.IsMatch(pattern, path), $"'{pattern}' should not match '{path}'");
 }
 
@@ -44,7 +44,7 @@ public sealed class SuppressionSetTests : IDisposable
     }
 
     [Fact]
-    public void NoConfig_ReturnsEmpty()
+    public void Load_NoConfig_HasNoRules()
     {
         var set = SuppressionSet.Load(_directory);
 
@@ -53,7 +53,7 @@ public sealed class SuppressionSetTests : IDisposable
     }
 
     [Fact]
-    public void DisabledDetector_IsReported()
+    public void Load_DisabledDetector_IsReportedDisabled()
     {
         var set = Load("""{ "antipatterns": { "disable": ["AP008"] } }""");
 
@@ -63,7 +63,7 @@ public sealed class SuppressionSetTests : IDisposable
     }
 
     [Fact]
-    public void PathRule_SuppressesMatchingPathsOnly()
+    public void PathSuppressionReason_PathRule_SuppressesMatchingPathsOnly()
     {
         var set = Load("""
             { "antipatterns": { "suppress": [
@@ -77,7 +77,7 @@ public sealed class SuppressionSetTests : IDisposable
     }
 
     [Fact]
-    public void WildcardId_SuppressesEveryDetectorUnderPath()
+    public void PathSuppressionReason_WildcardId_SuppressesEveryDetectorUnderPath()
     {
         var set = Load("""
             { "antipatterns": { "suppress": [
@@ -90,7 +90,7 @@ public sealed class SuppressionSetTests : IDisposable
     }
 
     [Fact]
-    public void MalformedConfig_DegradesToNoSuppression()
+    public void Load_MalformedConfig_HasNoRules()
     {
         var set = Load("{ this is not json");
 
@@ -98,7 +98,7 @@ public sealed class SuppressionSetTests : IDisposable
     }
 
     [Fact]
-    public void ConfigIsFoundByWalkingUp()
+    public void Load_ConfigInAncestorDirectory_IsFound()
     {
         File.WriteAllText(
             Path.Combine(_directory, SuppressionSet.ConfigFileName),

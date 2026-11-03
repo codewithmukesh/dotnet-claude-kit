@@ -74,9 +74,22 @@ public static class FindDeadCodeTool
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
         if (notReady is not null) return notReady;
 
+        var invalid = ArgumentChecks.Choice("scope", scope, "file", "project", "solution")
+            ?? ArgumentChecks.Choice("kind", kind, "type", "method", "property", "all");
+        if (invalid is not null) return invalid;
+        scope = scope.ToLowerInvariant();
+
         var solution = workspace.GetSolution();
         if (solution is null)
             return JsonSerializer.Serialize(new DeadCodeResult([], 0, 0, false, Math.Max(1, maxResults)));
+
+        if (scope == "project" && ArgumentChecks.UnknownProject(solution, path) is { } unknownProject)
+            return unknownProject;
+
+        if (scope == "file" && path is not null
+            && !solution.Projects.SelectMany(p => p.Documents)
+                .Any(d => d.FilePath?.Contains(path, StringComparison.OrdinalIgnoreCase) == true))
+            return ArgumentChecks.FileFilterMatchesNothing(path);
 
         var candidates = new List<(ISymbol Symbol, string File, int Line)>();
         var conventionFiltered = 0;

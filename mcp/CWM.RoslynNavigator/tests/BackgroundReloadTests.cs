@@ -3,8 +3,6 @@ using CWM.RoslynNavigator.Responses;
 using CWM.RoslynNavigator.Tests.Fixtures;
 using CWM.RoslynNavigator.Tools;
 using Microsoft.CodeAnalysis;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using ModelContextProtocol.Protocol;
 
 namespace CWM.RoslynNavigator.Tests;
@@ -26,8 +24,8 @@ public sealed class BackgroundReloadTests : IDisposable
     {
         TestSolutionFixture.RegisterMSBuild();
         _root = Path.Combine(Path.GetTempPath(), "cwm-rn-bg-" + Guid.NewGuid().ToString("N"));
-        BuildFileChangeDetectionTests.CopyDirectory(Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, _root);
-        _workspace = new WorkspaceManager(NullLoggerFactory.Instance.CreateLogger<WorkspaceManager>(), _clock);
+        TestDataCopy.CopyDirectory(Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, _root);
+        _workspace = TestWorkspace.Create(_clock);
     }
 
     private string SolutionPath => Path.Combine(_root, "SampleSolution.sln");
@@ -195,7 +193,7 @@ public sealed class BackgroundReloadTests : IDisposable
     }
 
     [Fact]
-    public async Task BuildFileEditedDuringReload_IsPickedUpByTheNextReload()
+    public async Task Refresh_BuildFileEditedDuringReload_IsPickedUpByTheNextReload()
     {
         var ct = TestContext.Current.CancellationToken;
         await _workspace.LoadSolutionAsync(SolutionPath, ct);

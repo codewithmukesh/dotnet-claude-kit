@@ -14,7 +14,7 @@ public class SymbolResolverTests(TestSolutionFixture fixture)
     [InlineData("IRepository`1.GetByIdAsync", "IRepository.GetByIdAsync")]
     [InlineData("Outer<T>.Inner<TKey, TValue>.Run(int x)", "Outer.Inner.Run")]
     [InlineData("", "")]
-    public void NormalizeRequestedName_StripsNoiseButKeepsSegments(string input, string expected)
+    public void NormalizeRequestedName_DecoratedName_StripsNoiseButKeepsSegments(string input, string expected)
     {
         Assert.Equal(expected, SymbolResolver.NormalizeRequestedName(input));
     }
@@ -23,7 +23,7 @@ public class SymbolResolverTests(TestSolutionFixture fixture)
     [InlineData("GetByIdAsync", "GetByIdAsync")]
     [InlineData("OrderService.GetOrderAsync", "GetOrderAsync")]
     [InlineData("SampleApi.OrderService.GetOrderAsync", "GetOrderAsync")]
-    public void GetSimpleName_ReturnsFinalSegment(string input, string expected)
+    public void GetSimpleName_QualifiedName_ReturnsFinalSegment(string input, string expected)
     {
         Assert.Equal(expected, SymbolResolver.GetSimpleName(input));
     }

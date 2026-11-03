@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Runs only the large-solution scale tests. Pass it explicitly; it replaces default.runsettings
+  (a command-line filter would be ANDed with the default Category!=Scale and match nothing):
+    dotnet test mcp/CWM.RoslynNavigator/tests/CWM.RoslynNavigator.Tests.csproj -settings mcp/CWM.RoslynNavigator/tests/scale.runsettings
+  (double the dash before "settings"; XML comments cannot contain two dashes in a row.)
+-->
+<RunSettings>
+  <RunConfiguration>
+    <TestCaseFilter>Category=Scale</TestCaseFilter>
+  </RunConfiguration>
+</RunSettings>

@@ -1,6 +1,4 @@
 using CWM.RoslynNavigator.Tests.Fixtures;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CWM.RoslynNavigator.Tests;
 
@@ -21,9 +19,9 @@ public sealed class DocumentDeletionTests : IDisposable
         TestSolutionFixture.RegisterMSBuild();
 
         _root = Path.Combine(Path.GetTempPath(), "cwm-rn-del-" + Guid.NewGuid().ToString("N"));
-        BuildFileChangeDetectionTests.CopyDirectory(Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, _root);
+        TestDataCopy.CopyDirectory(Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, _root);
 
-        _workspace = new WorkspaceManager(NullLoggerFactory.Instance.CreateLogger<WorkspaceManager>(), _clock);
+        _workspace = TestWorkspace.Create(_clock);
     }
 
     [Fact]

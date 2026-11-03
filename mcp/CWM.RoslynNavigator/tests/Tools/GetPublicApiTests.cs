@@ -34,7 +34,7 @@ public class GetPublicApiTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task GetPublicApi_ExcludesPrivateMembers()
+    public async Task GetPublicApi_TypeWithPrivateConstructor_ExcludesPrivateMembers()
     {
         var json = await GetPublicApiTool.ExecuteAsync(fixture.WorkspaceManager, "Order", ct: TestContext.Current.CancellationToken);
         var result = JsonSerializer.Deserialize<PublicApiResult>(json)!;

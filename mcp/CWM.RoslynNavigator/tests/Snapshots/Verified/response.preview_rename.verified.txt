@@ -1,0 +1,23 @@
+{
+  "Symbol": "SampleDomain.Order.Ship",
+  "Kind": "method",
+  "SymbolId": "M:SampleDomain.Order.Ship",
+  "OldName": "Ship",
+  "NewName": "Dispatch",
+  "Changes": [
+    {
+      "File": "SampleDomain/Order.cs",
+      "Line": 37,
+      "Old": "public void Ship()",
+      "New": "public void Dispatch()"
+    }
+  ],
+  "Count": 1,
+  "TotalFound": 1,
+  "Files": 1,
+  "Truncated": false,
+  "Limit": 100,
+  "Conflicts": [],
+  "ConflictCount": 0,
+  "Note": "Preview only — nothing was written to disk or to the workspace."
+}
