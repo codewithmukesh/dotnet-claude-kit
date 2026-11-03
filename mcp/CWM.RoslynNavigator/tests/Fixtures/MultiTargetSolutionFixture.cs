@@ -6,7 +6,8 @@ namespace CWM.RoslynNavigator.Tests.Fixtures;
 /// A throwaway solution with one project multi-targeting net10.0 and net8.0, so the workspace
 /// loads it twice ("Lib(net10.0)", "Lib(net8.0)") and every search sees each source location
 /// once per framework — the duplication the tools must merge. One type is compiled only for
-/// net8.0 (<c>#if NET8_0</c>) to pin the TargetFrameworks subset reporting.
+/// net8.0 (<c>#if NET8_0</c>) to pin the TargetFrameworks subset reporting. Loaded with
+/// <c>AllTargetFrameworks</c>, because the default load would keep only net10.0.
 /// </summary>
 public sealed class MultiTargetSolutionFixture : IAsyncLifetime
 {
@@ -75,7 +76,12 @@ public sealed class MultiTargetSolutionFixture : IAsyncLifetime
             </Solution>
             """);
 
-        WorkspaceManager = new WorkspaceManager(NullLogger<WorkspaceManager>.Instance, TimeProvider.System);
+        // The default load keeps one framework per project, which would hide the duplication
+        // these tests exist to cover, so load every framework as --all-target-frameworks does.
+        WorkspaceManager = new WorkspaceManager(NullLogger<WorkspaceManager>.Instance, TimeProvider.System)
+        {
+            AllTargetFrameworks = true
+        };
         await WorkspaceManager.LoadSolutionAsync(solutionPath);
         await WorkspaceManager.WaitForWarmUpAsync();
     }

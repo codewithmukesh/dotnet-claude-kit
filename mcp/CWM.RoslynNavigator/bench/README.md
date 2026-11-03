@@ -225,11 +225,16 @@ between 25 s and 130 s per corpus.
 These were found during the committed run. The server source was left unchanged, because
 the bench is black-box.
 
-Since then, items 2, 3, and 5 below and the `find_dead_code` and `detect_antipatterns`
-costs were addressed; the follow-up run against the same targets (current build only, with
-the 2026-11-04 current run copied in as the "before" build) is in
-[`results/2026-11-04-tools-round2/`](results/2026-11-04-tools-round2/report.md). The
-`find_callers` warm figure in item 6 did not reproduce out of process (77-93 ms on abp).
+The list below is kept as found. Status on main since then:
+
+- **Fixed:** 1 (unresolved analyzer references are dropped after load), 2 (results merged by
+  location, and multi-targeted projects load one framework by default), 3 (`get_project_graph`
+  is one paged entry per csproj with relative paths: 173k → 7.8k tokens on abp), 4 (hints match
+  on directory boundaries with normalized separators), 5 (54 s → 1.2 s cold on orchardcore).
+- **Item 6:** file-scope `get_diagnostics` now uses the file's own semantic model (abp 855 → 113 ms
+  cold). The `find_callers` warm figure did not reproduce out of process (77–93 ms on abp).
+- Runs after the fixes: [`results/2026-11-04-workspace-round2/`](results/2026-11-04-workspace-round2/report.md)
+  and [`results/2026-11-04-tools-round2/`](results/2026-11-04-tools-round2/report.md).
 
 1. **Unbuilt in-solution analyzers make `find_implementations` throw.** Corpora: jellyfin and
    orchardcore, restored but not built. Call: `find_implementations {"interfaceName":"IFileSystem","maxResults":1}`.
