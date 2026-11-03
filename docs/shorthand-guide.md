@@ -31,11 +31,11 @@ Instinct operations (status, export, import) are modes of the `instinct-system` 
 
 ---
 
-## Skills (47 total)
+## Skills (52 total)
 
-16 are the workflow skills listed under Slash Commands above; the remaining 31 are knowledge skills:
+17 are the workflow skills listed under Slash Commands above; the remaining 35 are knowledge skills:
 
-### .NET Domain (28)
+### .NET Domain (32)
 
 | Category | Skills |
 |----------|--------|
@@ -47,6 +47,7 @@ Instinct operations (status, export, import) are modes of the `instinct-system` 
 | Resilience & Performance | caching, resilience, httpclient-factory |
 | Messaging | messaging |
 | Language | modern-csharp |
+| Console & Desktop | console-cli, desktop-mvvm, avalonia, native-aot |
 | Project | project-setup, testing |
 
 ### Workflow & Learning (3)
@@ -59,7 +60,7 @@ Instinct operations (status, export, import) are modes of the `instinct-system` 
 
 ---
 
-## Agents (10)
+## Agents (11)
 
 | Agent | Triggers | Primary Skills |
 |-------|----------|---------------|
@@ -73,6 +74,7 @@ Instinct operations (status, export, import) are modes of the `instinct-system` 
 | code-reviewer | "review this code", "PR review", "code quality", "conventions" | code-review, convention-learner |
 | build-error-resolver | Build failures, compilation errors | modern-csharp, build-fix |
 | refactor-cleaner | "clean up", "dead code", "refactor", "remove unused" | modern-csharp |
+| app-engineer | "CLI", "console app", "dotnet tool", "desktop", "WPF", "Avalonia", "MVVM", "Native AOT" | console-cli, desktop-mvvm, avalonia, native-aot |
 
 ---
 

@@ -16,6 +16,7 @@
 | code-reviewer | `agents/code-reviewer.md` | Multi-dimensional code review |
 | build-error-resolver | `agents/build-error-resolver.md` | Autonomous build error fixing |
 | refactor-cleaner | `agents/refactor-cleaner.md` | Systematic dead code removal and cleanup |
+| app-engineer | `agents/app-engineer.md` | Console/CLI tools, desktop MVVM, Avalonia, Native AOT |
 
 ## Routing Table
 
@@ -47,6 +48,9 @@ Match user intent to agent. When multiple agents could handle a query, the first
 | "refactor" | code-reviewer | dotnet-architect |
 | "build errors", "fix build", "won't compile" | build-error-resolver | — |
 | "clean up", "dead code", "unused code", "de-sloppify" | refactor-cleaner | — |
+| "console app", "CLI", "command line", "System.CommandLine", "dotnet tool", "exit code" | app-engineer | — |
+| "desktop", "WPF", "WinForms", "Avalonia", "MAUI", "MVVM", "ViewModel", "XAML" | app-engineer | test-engineer |
+| "Native AOT", "trimming", "single-file", "trim warning" | app-engineer | performance-analyst |
 
 ## Skill Loading Order
 
@@ -70,6 +74,7 @@ Agents load skills in dependency order. Core skills load first.
 | code-reviewer | modern-csharp, code-review, convention-learner + contextual (loads relevant skills incl. clean-architecture, ddd based on files under review) |
 | build-error-resolver | modern-csharp, build-fix + contextual: ef-core, dependency-injection |
 | refactor-cleaner | modern-csharp, de-sloppify + contextual: testing, ef-core |
+| app-engineer | modern-csharp + contextual: console-cli, desktop-mvvm, avalonia, native-aot, dependency-injection, configuration |
 
 ## MCP Tool Preferences
 
@@ -131,7 +136,7 @@ Each workflow skill registers its own slash command and carries its methodology 
 
 | Command | Supporting Skills | Primary Agent | Purpose |
 |---------|------------------|---------------|---------|
-| `/dotnet-init` | project-setup | dotnet-architect | Interactive project initialization |
+| `/dotnet-init` | project-setup | dotnet-architect (app-engineer for console/desktop) | Interactive project initialization |
 | `/spec` | — | — | Relentless questioning → agreed spec in `docs/specs/` |
 | `/plan` | architecture-advisor | dotnet-architect | Architecture-aware planning (consumes approved specs) |
 | `/verify` | — | — | 7-phase verification pipeline |

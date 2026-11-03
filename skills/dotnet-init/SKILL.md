@@ -1,8 +1,9 @@
 ---
 name: dotnet-init
 description: >
-  Interactive project initialization. Detects project type, asks architecture
-  questions, and generates a customized CLAUDE.md — no manual template copying.
+  Interactive project initialization. Detects project type (web API, Blazor,
+  worker, console, CLI tool, desktop, library), asks the right questions, and
+  generates a customized CLAUDE.md — no manual template copying.
   Use when: "init project", "setup project", "initialize", "new project setup",
   "generate CLAUDE.md", "configure for dotnet-claude-kit", or starting Claude
   Code on a fresh or existing .NET codebase.
@@ -29,32 +30,30 @@ Interactively initializes a .NET project for use with dotnet-claude-kit. Detects
 Analyze the current directory to determine if this is an existing or greenfield project:
 
 ```
-→ Look for .slnx / .sln files
-→ If found, scan .csproj files for SDK type:
+→ Look for .slnx / .sln files, then classify each .csproj:
   - Microsoft.NET.Sdk.Web → web-api or blazor-app
   - Microsoft.NET.Sdk.Worker → worker-service
-  - Microsoft.NET.Sdk → class-library
+  - UseWPF / UseWindowsForms / UseMaui = true, or Avalonia package → desktop-app
+  - Microsoft.NET.Sdk + OutputType Exe → console-cli
+    (PackAsTool or System.CommandLine reference → CLI tool; else console utility)
+  - Microsoft.NET.Sdk without OutputType Exe → class-library
   - Multiple projects with inter-module references → modular-monolith
   - If ambiguous, ask the user
 
-→ If NO solution/project found (greenfield):
-  - Ask: "What are you building?"
-    - REST API / microservice → web-api
-    - Blazor application → blazor-app
-    - Background worker / queue processor → worker-service
-    - NuGet package / shared library → class-library
-    - Multi-module system → modular-monolith
-  - Ask: "Project name?"
-  - Scaffold the solution structure:
-    - dotnet new sln -n ProjectName --format slnx   (modern XML solution format)
-    - dotnet new webapi / worker / classlib as appropriate
-    - Set up Directory.Build.props with .NET 10 defaults
-    - Create src/ and tests/ folder structure
+→ If NO solution/project found (greenfield), ask "What are you building?":
+    - REST API / microservice → web-api       - Blazor application → blazor-app
+    - Background worker → worker-service       - Multi-module system → modular-monolith
+    - Console app / CLI tool → console-cli     - NuGet package / library → class-library
+    - Desktop app → desktop-app (then ask: Avalonia, WPF, WinForms, or MAUI?)
+  - Ask "Project name?", then scaffold: dotnet new sln -n ProjectName --format slnx, then the matching
+    template (webapi / worker / console / classlib / wpf / winforms / maui;
+    Avalonia: dotnet new install Avalonia.Templates → avalonia.mvvm),
+    Directory.Build.props with .NET 10 defaults, src/ and tests/ folders
 ```
 
-### Step 2: Architecture Questionnaire
+### Step 2: Questionnaire (by Project Type)
 
-Load the `architecture-advisor` skill and ask targeted questions:
+**Web API / Blazor / Worker / Modular Monolith** — load `architecture-advisor`:
 
 1. **Domain complexity** — CRUD-heavy, moderate business rules, or rich domain?
 2. **Team size** — Solo, small team, or large team?
@@ -63,25 +62,30 @@ Load the `architecture-advisor` skill and ask targeted questions:
 
 → Recommend: VSA, Clean Architecture, DDD, or Modular Monolith with rationale.
 
+**Console / CLI tool** — skip web architecture questions; load `console-cli`:
+- Run-to-completion tool or long-running daemon? (daemon → worker-service instead)
+- Distribution: dotnet tool (`PackAsTool`), Native AOT binary per OS (`native-aot`), or file-based script?
+- Needs DI/config/HTTP? → Generic Host inside the command action
+
+**Desktop** — skip web architecture questions; load `desktop-mvvm` (+ `avalonia` for Avalonia):
+- Target OSes? (Windows-only → WPF is fine; macOS/Linux → Avalonia)
+- Native AOT / trimming wanted? (Avalonia only — WPF/WinForms don't support trimming)
+
+**Library** — public API surface, target frameworks, AOT compatibility (`IsAotCompatible`).
+
 ### Step 3: Tech Stack Selection
 
-Ask about specific technology choices:
-
 - **Database**: PostgreSQL, SQL Server, SQLite, or none yet
-- **Auth**: JWT, OIDC, Cookie, or none yet
-- **Caching**: HybridCache, Redis, or none yet
-- **Messaging**: Wolverine, MassTransit, or none yet
-- **Testing**: Confirm xUnit + Testcontainers defaults
+- **Auth / Caching / Messaging** (web + worker only): JWT/OIDC, HybridCache, Wolverine/MassTransit, or none yet
+- **Testing**: Confirm xUnit defaults (+ Testcontainers when a database is involved)
 
 ### Step 4: Generate CLAUDE.md
 
 Load the appropriate template from `templates/` as a base, then customize:
 
-- Replace `[ProjectName]` with the actual project/solution name
-- Set the chosen architecture
-- Configure the tech stack section
-- For existing projects: add project-specific conventions detected in Step 2
-- For greenfield: add recommended conventions based on architecture choice
+- Replace `[ProjectName]`, set the chosen architecture (or app type), configure the tech stack
+- Existing projects: add conventions detected in Step 2; greenfield: recommended conventions
+- Templates: `web-api`, `blazor-app`, `worker-service`, `modular-monolith`, `class-library`, `console-cli`, `desktop-app`
 
 **Before writing, check for an existing `CLAUDE.md`. Never overwrite it silently.**
 
@@ -96,8 +100,7 @@ Load the appropriate template from `templates/` as a base, then customize:
     - Merge (recommended) → keep the user's custom sections, add or refresh the
       kit's architecture, tech-stack, and convention sections in place
     - Overwrite → replace it entirely with the freshly generated file
-    - Keep → leave the file untouched and print the generated content so the
-      user can copy what they want by hand
+    - Keep → leave it untouched; print the generated content for manual copying
   - For Merge and Overwrite: back the original up to ./CLAUDE.md.bak first.
     Never discard user content without a .bak backup.
 ```
@@ -113,10 +116,11 @@ Load the appropriate template from `templates/` as a base, then customize:
 → For greenfield projects:
   - Verify dotnet build succeeds on the scaffolded solution
   - Report: "Project created. Run /scaffold to add your first feature."
+    (console/desktop: "Add your first command / view model.")
 ```
 
-**Skills invoked:** `project-setup`, `architecture-advisor`, `convention-learner`
-**Agent:** `dotnet-architect`
+**Skills invoked:** `project-setup`, `architecture-advisor`, `convention-learner`; console/desktop: `console-cli`, `desktop-mvvm`, `avalonia`, `native-aot`
+**Agent:** `dotnet-architect` (web, worker, library) · `app-engineer` (console, CLI, desktop)
 
 ## Example — Existing Project
 
@@ -147,7 +151,7 @@ User: /dotnet-init
 
 Claude: No .sln or .csproj found. Let's set up a new project.
 
-  1. What are you building? [REST API / Blazor / Worker / Library / Modular Monolith]
+  1. What are you building? [REST API / Blazor / Worker / Console-CLI / Desktop / Library / Modular Monolith]
   > REST API
 
   2. Project name?

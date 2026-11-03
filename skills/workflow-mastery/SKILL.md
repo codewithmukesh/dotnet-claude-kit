@@ -168,10 +168,10 @@ I want to verify the migration before applying it."
 
 ### Subagent Patterns for .NET
 
-The kit ships 10 specialist agents — route to them before writing your own:
+The kit ships 11 specialist agents — route to them before writing your own:
 `dotnet-architect`, `code-reviewer`, `refactor-cleaner`, `test-engineer`,
 `security-auditor`, `build-error-resolver`, `ef-core-specialist`,
-`api-designer`, `performance-analyst`, `devops-engineer`. Each carries
+`api-designer`, `performance-analyst`, `devops-engineer`, `app-engineer`. Each carries
 pre-loaded skills and domain context a generalist session lacks.
 
 **Use them:**
