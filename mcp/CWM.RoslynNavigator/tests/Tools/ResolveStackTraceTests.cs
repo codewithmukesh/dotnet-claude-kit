@@ -5,7 +5,8 @@ using CWM.RoslynNavigator.Tools;
 
 namespace CWM.RoslynNavigator.Tests.Tools;
 
-public class ResolveStackTraceTests(TestSolutionFixture fixture) : IClassFixture<TestSolutionFixture>
+[Collection(SampleSolutionCollection.Name)]
+public class ResolveStackTraceTests(TestSolutionFixture fixture)
 {
     /// <summary>
     /// Mirrors what OrderService.CancelOrderAsync actually throws, framed the way the

@@ -13,8 +13,9 @@ namespace CWM.RoslynNavigator.Tests.Telemetry;
 /// Drives real tool responses through the telemetry path against the sample solution, so
 /// the measurement is exercised end to end rather than against hand-written JSON.
 /// </summary>
+[Collection(SampleSolutionCollection.Name)]
 public sealed class TelemetryIntegrationTests(TestSolutionFixture fixture)
-    : IClassFixture<TestSolutionFixture>, IDisposable
+    : IDisposable
 {
     private readonly string _root =
         Path.Combine(Path.GetTempPath(), "cwm-tel-" + Guid.NewGuid().ToString("N"));

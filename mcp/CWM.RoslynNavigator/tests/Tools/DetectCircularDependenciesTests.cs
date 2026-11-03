@@ -5,7 +5,8 @@ using CWM.RoslynNavigator.Tools;
 
 namespace CWM.RoslynNavigator.Tests.Tools;
 
-public class DetectCircularDependenciesTests(TestSolutionFixture fixture) : IClassFixture<TestSolutionFixture>
+[Collection(SampleSolutionCollection.Name)]
+public class DetectCircularDependenciesTests(TestSolutionFixture fixture)
 {
     [Fact]
     public async Task DetectCircularDependencies_Projects_NoCircularDeps()

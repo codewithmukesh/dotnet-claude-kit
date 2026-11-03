@@ -5,7 +5,8 @@ using CWM.RoslynNavigator.Tools;
 
 namespace CWM.RoslynNavigator.Tests.Tools;
 
-public class FindDeadCodeTests(TestSolutionFixture fixture) : IClassFixture<TestSolutionFixture>
+[Collection(SampleSolutionCollection.Name)]
+public class FindDeadCodeTests(TestSolutionFixture fixture)
 {
     [Fact]
     public async Task FindDeadCode_Solution_FindsUnusedTypes()

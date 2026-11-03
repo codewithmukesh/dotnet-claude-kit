@@ -5,7 +5,8 @@ using CWM.RoslynNavigator.Tools;
 
 namespace CWM.RoslynNavigator.Tests.Tools;
 
-public class FindSymbolTests(TestSolutionFixture fixture) : IClassFixture<TestSolutionFixture>
+[Collection(SampleSolutionCollection.Name)]
+public class FindSymbolTests(TestSolutionFixture fixture)
 {
     [Fact]
     public async Task FindSymbol_Class_ReturnsCorrectLocation()

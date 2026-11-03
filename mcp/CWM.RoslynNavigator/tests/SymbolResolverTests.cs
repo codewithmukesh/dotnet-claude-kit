@@ -2,7 +2,8 @@ using CWM.RoslynNavigator.Tests.Fixtures;
 
 namespace CWM.RoslynNavigator.Tests;
 
-public class SymbolResolverTests(TestSolutionFixture fixture) : IClassFixture<TestSolutionFixture>
+[Collection(SampleSolutionCollection.Name)]
+public class SymbolResolverTests(TestSolutionFixture fixture)
 {
     [Theory]
     [InlineData("GetByIdAsync", "GetByIdAsync")]

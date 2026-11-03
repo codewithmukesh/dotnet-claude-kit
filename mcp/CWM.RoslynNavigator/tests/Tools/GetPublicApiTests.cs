@@ -5,7 +5,8 @@ using CWM.RoslynNavigator.Tools;
 
 namespace CWM.RoslynNavigator.Tests.Tools;
 
-public class GetPublicApiTests(TestSolutionFixture fixture) : IClassFixture<TestSolutionFixture>
+[Collection(SampleSolutionCollection.Name)]
+public class GetPublicApiTests(TestSolutionFixture fixture)
 {
     [Fact]
     public async Task GetPublicApi_Interface_ReturnsAllMembers()

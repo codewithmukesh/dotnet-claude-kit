@@ -5,7 +5,8 @@ using CWM.RoslynNavigator.Tools;
 
 namespace CWM.RoslynNavigator.Tests.Tools;
 
-public class AnalyzeChangeImpactTests(TestSolutionFixture fixture) : IClassFixture<TestSolutionFixture>
+[Collection(SampleSolutionCollection.Name)]
+public class AnalyzeChangeImpactTests(TestSolutionFixture fixture)
 {
     [Fact]
     public async Task AnalyzeChangeImpact_Interface_CountsImplementationsThatMustChange()

@@ -5,7 +5,8 @@ using CWM.RoslynNavigator.Tools;
 
 namespace CWM.RoslynNavigator.Tests.Tools;
 
-public class FindOverridesTests(TestSolutionFixture fixture) : IClassFixture<TestSolutionFixture>
+[Collection(SampleSolutionCollection.Name)]
+public class FindOverridesTests(TestSolutionFixture fixture)
 {
     [Fact]
     public async Task FindOverrides_NonVirtualMethod_ReturnsEmpty()
