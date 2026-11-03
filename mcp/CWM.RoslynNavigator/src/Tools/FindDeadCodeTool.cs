@@ -91,7 +91,7 @@ public static class FindDeadCodeTool
             var compilation = await workspace.GetCompilationAsync(project.Id, ct);
             if (compilation is null) continue;
 
-            var isTestProject = SourceClassifier.IsTestProject(project, compilation);
+            var isTestProject = SourceClassifier.IsTestProject(project);
 
             var trees = scope == "file" && path is not null
                 ? compilation.SyntaxTrees.Where(t => t.FilePath?.Contains(path, StringComparison.OrdinalIgnoreCase) == true)

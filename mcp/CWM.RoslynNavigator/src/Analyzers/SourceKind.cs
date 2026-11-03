@@ -56,8 +56,10 @@ internal static class SourceClassifier
 
     /// <summary>
     /// Whether a project is a test project, by name convention or test framework reference.
+    /// Reads the project's metadata references rather than its compilation, so classifying a
+    /// project never forces it to compile.
     /// </summary>
-    public static bool IsTestProject(Project project, Compilation? compilation)
+    public static bool IsTestProject(Project project)
     {
         if (project.Name.EndsWith("Tests", StringComparison.OrdinalIgnoreCase)
             || project.Name.EndsWith("Test", StringComparison.OrdinalIgnoreCase)
@@ -65,14 +67,17 @@ internal static class SourceClassifier
             || project.Name.Contains(".Test.", StringComparison.OrdinalIgnoreCase))
             return true;
 
-        if (compilation is null)
-            return false;
-
-        foreach (var reference in compilation.ReferencedAssemblyNames)
+        // Package references reach the project as metadata references whose file name is the
+        // assembly name, so no compilation is needed to see them.
+        foreach (var reference in project.MetadataReferences.OfType<PortableExecutableReference>())
         {
+            var fileName = Path.GetFileNameWithoutExtension(reference.FilePath);
+            if (fileName is null)
+                continue;
+
             foreach (var testAssembly in TestFrameworkAssemblies)
             {
-                if (reference.Name.Equals(testAssembly, StringComparison.OrdinalIgnoreCase))
+                if (fileName.Equals(testAssembly, StringComparison.OrdinalIgnoreCase))
                     return true;
             }
         }

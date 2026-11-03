@@ -66,7 +66,7 @@ public static class DetectAntiPatternsTool
             if (compilation is null)
                 continue;
 
-            var isTestProject = SourceClassifier.IsTestProject(project, compilation);
+            var isTestProject = SourceClassifier.IsTestProject(project);
             var trees = GetFilteredTrees(compilation, file);
 
             foreach (var tree in trees)

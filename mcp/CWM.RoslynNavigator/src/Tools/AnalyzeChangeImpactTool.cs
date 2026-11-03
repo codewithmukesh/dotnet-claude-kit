@@ -37,7 +37,7 @@ public static class AnalyzeChangeImpactTool
         var symbol = resolved.Symbol;
         depth = Math.Clamp(depth, 1, MaxDepth);
 
-        var testProjects = await BuildTestProjectSetAsync(workspace, solution, ct);
+        var testProjects = BuildTestProjectSet(solution, ct);
 
         // Direct references, grouped two ways: by project (how far the change reaches) and
         // by file (where the edits land).
@@ -207,8 +207,7 @@ public static class AnalyzeChangeImpactTool
         return ordered;
     }
 
-    private static async Task<HashSet<ProjectId>> BuildTestProjectSetAsync(
-        WorkspaceManager workspace,
+    private static HashSet<ProjectId> BuildTestProjectSet(
         Solution solution,
         CancellationToken ct)
     {
@@ -216,10 +215,10 @@ public static class AnalyzeChangeImpactTool
 
         foreach (var project in solution.Projects)
         {
-            var compilation = await workspace.GetCompilationAsync(project.Id, ct);
-            if (compilation is null) continue;
+            ct.ThrowIfCancellationRequested();
 
-            if (SourceClassifier.IsTestProject(project, compilation))
+            // Metadata references only — classifying must not force every project to compile.
+            if (SourceClassifier.IsTestProject(project))
                 testProjects.Add(project.Id);
         }
 

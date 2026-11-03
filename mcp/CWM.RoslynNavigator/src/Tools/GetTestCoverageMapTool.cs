@@ -43,19 +43,13 @@ public static class GetTestCoverageMapTool
         var productionProjects = new List<Project>();
         var usesIntegrationHarness = false;
 
+        // Classification reads metadata references only, so it never forces a compilation.
         foreach (var project in solution.Projects)
         {
-            var compilation = await workspace.GetCompilationAsync(project.Id, ct);
-
-            if (SourceClassifier.IsTestProject(project, compilation))
-            {
+            if (SourceClassifier.IsTestProject(project))
                 testProjects.Add(project);
-                usesIntegrationHarness |= ReferencesIntegrationHarness(compilation);
-            }
             else
-            {
                 productionProjects.Add(project);
-            }
         }
 
         // Filter production projects if specified
@@ -78,6 +72,8 @@ public static class GetTestCoverageMapTool
 
             var compilation = await workspace.GetCompilationAsync(testProject.Id, ct);
             if (compilation is null) continue;
+
+            usesIntegrationHarness |= ReferencesIntegrationHarness(compilation);
 
             foreach (var tree in compilation.SyntaxTrees)
             {
