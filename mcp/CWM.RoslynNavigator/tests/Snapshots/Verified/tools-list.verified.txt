@@ -1,0 +1,750 @@
+[
+  {
+    "name": "analyze_change_impact",
+    "description": "Answer 'what breaks if I change this?' for one symbol. Reports direct references grouped by project and file, how many are tests, implementations and overrides that must change alongside a signature, transitive callers up to a depth (including calls made through an interface or base member, counted in IndirectCallers), whether the change crosses an assembly boundary, and an overall risk rating with its rationale. Use before renaming, changing a signature, or deleting — it replaces stitching together find_references, find_implementations, find_overrides, and the project graph.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "symbolName": {
+          "description": "Symbol to analyze. Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).",
+          "type": "string"
+        },
+        "file": {
+          "description": "Optional: file path to disambiguate",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "line": {
+          "description": "Optional: line number to disambiguate",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "default": null
+        },
+        "depth": {
+          "description": "How many call levels to walk for transitive callers (1-5)",
+          "type": "integer",
+          "default": 2
+        },
+        "maxResults": {
+          "description": "Maximum entries per list in the response",
+          "type": "integer",
+          "default": 50
+        }
+      },
+      "required": [
+        "symbolName"
+      ]
+    }
+  },
+  {
+    "name": "detect_antipatterns",
+    "description": "Detect .NET anti-patterns in source code using Roslyn analysis. Finds async void, sync-over-async, new HttpClient(), DateTime.Now, broad catch, logging interpolation, missing pragma restore, missing CancellationToken, and EF Core queries without AsNoTracking. Generated code is never reported; test and migration code is excluded by default. Each finding carries a confidence level — grade on 'high' only, treat 'medium' as review items. The 'summary' field gives complete per-detector counts even when the violation list is truncated, so there is no need to sample. Suppression rules can be declared in .cwm-navigator.json or inline with '// cwm:ignore APXXX — reason'.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "description": "Filter to file (partial match on file path)",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "projectFilter": {
+          "description": "Filter to project name",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "severity": {
+          "description": "Minimum severity: 'warning' (default) or 'error'",
+          "type": "string",
+          "default": "warning"
+        },
+        "maxResults": {
+          "description": "Maximum results to return",
+          "type": "integer",
+          "default": 100
+        },
+        "scope": {
+          "description": "Source scope: 'production' (default), or 'all' to include test and migration code",
+          "type": "string",
+          "default": "production"
+        },
+        "confidence": {
+          "description": "Minimum confidence: 'medium' (default, returns all) or 'high' for graded findings only",
+          "type": "string",
+          "default": "medium"
+        }
+      }
+    }
+  },
+  {
+    "name": "detect_circular_dependencies",
+    "description": "Detect circular dependencies at the project or type level. Finds cycles in project references or type dependencies within a project.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "description": "Scope: 'projects' for project-level cycles, 'types' for type-level cycles",
+          "type": "string",
+          "default": "projects"
+        },
+        "projectFilter": {
+          "description": "Optional: project name filter (required for 'types' scope)",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      }
+    }
+  },
+  {
+    "name": "find_callers",
+    "description": "Find all methods that call a specific method. Useful for impact analysis and understanding dependencies. Includes callers that reach it through dispatch: Via is 'direct', 'interface' (called through an interface member it implements — the usual DI case), 'base' (through a base member it overrides), or 'implementation' (through an implementation/override of it), with ViaSymbol naming the member actually called. Each caller carries IsGenerated so generated call sites can be skipped.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "methodName": {
+          "description": "Method to find callers for. Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified. Qualify when the name is reused across types. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).",
+          "type": "string"
+        },
+        "className": {
+          "description": "Optional: containing class name to disambiguate",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "maxResults": {
+          "description": "Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.",
+          "type": "integer",
+          "default": 50
+        }
+      },
+      "required": [
+        "methodName"
+      ]
+    }
+  },
+  {
+    "name": "find_dead_code",
+    "description": "Find unused types, methods, and properties across the solution. Identifies symbols with zero references that are not public API entry points, interface implementations, or overrides. Symbols discovered by convention (EF entity configurations, hosted services, migrations, extension-method hosts) are filtered out because a reference search cannot see assembly scanning or DI registration; the count removed is reported as conventionFiltered. Findings are graded: 'low' when the name appears in a string literal (likely reflection-bound), 'medium' when it matches a convention suffix, 'high' otherwise — delete only high-confidence hits without checking. AssemblyScanningDetected reports whether the solution registers types by scanning at all, which softens every result. Uses a fast identifier-match pre-filter: symbols whose exact name appears as an identifier token in another file are assumed referenced without a full reference search, so occasional false negatives are possible for heavily-reused names.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "description": "Scope: 'file', 'project', or 'solution'",
+          "type": "string",
+          "default": "solution"
+        },
+        "path": {
+          "description": "Optional: file path or project name depending on scope",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "kind": {
+          "description": "Kind filter: 'type', 'method', 'property', or 'all'",
+          "type": "string",
+          "default": "all"
+        },
+        "maxResults": {
+          "description": "Maximum results to return",
+          "type": "integer",
+          "default": 50
+        }
+      }
+    }
+  },
+  {
+    "name": "find_implementations",
+    "description": "Find all types that implement an interface or derive from a base class. Each result carries IsGenerated so generated implementations can be skipped.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "interfaceName": {
+          "description": "The interface or base class name to find implementations for. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).",
+          "type": "string"
+        },
+        "maxResults": {
+          "description": "Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.",
+          "type": "integer",
+          "default": 50
+        }
+      },
+      "required": [
+        "interfaceName"
+      ]
+    }
+  },
+  {
+    "name": "find_overrides",
+    "description": "Find all overrides of a virtual or abstract method across the solution. Useful for understanding polymorphic behavior. Each result carries IsGenerated so generated overrides can be skipped.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "methodName": {
+          "description": "The virtual or abstract method name to find overrides for. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).",
+          "type": "string"
+        },
+        "className": {
+          "description": "Optional: containing class name to disambiguate",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "maxResults": {
+          "description": "Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.",
+          "type": "integer",
+          "default": 50
+        }
+      },
+      "required": [
+        "methodName"
+      ]
+    }
+  },
+  {
+    "name": "find_references",
+    "description": "Find all usages of a symbol across the solution. Returns file, line, snippet, and reference kind (usage, inheritance, invocation, instantiation, parameter, type-argument, assignment, implementation). Each result carries IsGenerated so generated call sites can be skipped.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "symbolName": {
+          "description": "Symbol to find references for. Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified. Qualify when the name is reused across types. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).",
+          "type": "string"
+        },
+        "file": {
+          "description": "Optional: file path to disambiguate (e.g., 'IOrderRepository.cs')",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "line": {
+          "description": "Optional: line number to disambiguate",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "default": null
+        },
+        "maxResults": {
+          "description": "Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.",
+          "type": "integer",
+          "default": 50
+        }
+      },
+      "required": [
+        "symbolName"
+      ]
+    }
+  },
+  {
+    "name": "find_symbol",
+    "description": "Find where a type, method, or property is defined in the solution. Returns file path, line number, namespace, containing type, an IsGenerated flag marking source-generator or tooling output, and a SymbolId to pass as the name to other tools so they target exactly that symbol. Exact name by default; set match to 'prefix', 'camelhump' ('GBIA' or 'GetByAsync' finds GetByIdAsync), or 'substring' when you only know part of the name — fuzzy results are ranked exact > prefix > camelhump > substring, types before members, and each carries its Match tier.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "description": "Symbol name. Bare ('CreateAsync'), type-qualified ('OrderService.CreateAsync'), or fully qualified ('MyApp.Orders.OrderService.CreateAsync'), or a SymbolId (exact mode). Qualifying narrows results when a name is reused across types; with a fuzzy match the qualifier still matches exactly and only the last segment is fuzzy.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Filter by kind: 'type', 'class', 'interface', 'struct', 'enum', 'record', 'method', 'property', 'field', or 'any'",
+          "type": "string",
+          "default": "any"
+        },
+        "maxResults": {
+          "description": "Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.",
+          "type": "integer",
+          "default": 50
+        },
+        "match": {
+          "description": "Name matching: 'exact' (default, case-sensitive), 'prefix', 'camelhump', or 'substring' (case-insensitive). Each looser mode includes the tighter ones.",
+          "type": "string",
+          "default": "exact"
+        }
+      },
+      "required": [
+        "name"
+      ]
+    }
+  },
+  {
+    "name": "get_dependency_graph",
+    "description": "Get the call dependency graph for a method, showing all methods it calls recursively up to a specified depth. Useful for impact analysis and understanding code flow.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "symbolName": {
+          "description": "Method to analyze. Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).",
+          "type": "string"
+        },
+        "file": {
+          "description": "Optional: file path to disambiguate",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "line": {
+          "description": "Optional: line number to disambiguate",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "default": null
+        },
+        "depth": {
+          "description": "Maximum recursion depth (1-5)",
+          "type": "integer",
+          "default": 3
+        },
+        "maxResults": {
+          "description": "Maximum nodes to return. The response's Truncated flag reports whether the walk was cut short; re-query with a higher value or lower depth for a complete graph.",
+          "type": "integer",
+          "default": 100
+        }
+      },
+      "required": [
+        "symbolName"
+      ]
+    }
+  },
+  {
+    "name": "get_di_registrations",
+    "description": "Map of dependency-injection registrations: service, implementation, lifetime, and file:line. Supported containers: Microsoft.Extensions.DependencyInjection (Add{Singleton,Scoped,Transient}/AddKeyed*/TryAdd*), Prism IContainerRegistry (Register/RegisterSingleton/RegisterScoped/RegisterInstance/RegisterMany, matched by receiver type), and Autofac ContainerBuilder (RegisterType/Register/RegisterInstance with As<>/SingleInstance/InstancePerLifetimeScope chains). Flags duplicate registrations of the same service (which may be intentional multi-registration) and captive-dependency risks — a singleton implementation whose constructor takes a service registered as scoped. Best-effort static analysis: factory-lambda registrations report '(factory)' and instances '(instance)' as the implementation, matching is by type name, and registrations built via reflection, Scrutor/assembly scanning, or extension-method indirection are not seen. When calls against other containers (DryIoc, Unity, Castle Windsor, SimpleInjector, Ninject, ...) are seen but not mapped, the response carries a Note with the counts — so Count 0 with a Note does not mean no DI.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "description": "Optional: filter to registrations in files whose path contains this value. A value matching no file returns a FileNotFound error.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "maxResults": {
+          "description": "Maximum registrations to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count. Duplicates and captive risks are always computed from the full set.",
+          "type": "integer",
+          "default": 100
+        }
+      }
+    }
+  },
+  {
+    "name": "get_diagnostics",
+    "description": "Get compiler diagnostics (errors, warnings) scoped to a file, project, or the entire solution. File scope takes a suffix path ('./' prefixes and backslashes accepted): a path matching no document returns a FileNotFound error rather than an empty result, and a path matching several files returns diagnostics for all of them, each tagged with its File. Does not run NuGet analyzers. Results are ordered errors-first; per-severity totals are always reported.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "scope": {
+          "description": "Scope: 'file', 'project', or 'solution'",
+          "type": "string",
+          "default": "solution"
+        },
+        "path": {
+          "description": "File or project path (required for 'file' and 'project' scopes)",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "severityFilter": {
+          "description": "Severity filter: 'error', 'warning', or 'all' (info and above; hidden diagnostics are always excluded)",
+          "type": "string",
+          "default": "all"
+        },
+        "maxResults": {
+          "description": "Maximum diagnostics to return. TotalFound and the per-severity counts in the response report the full picture; re-query with a higher value if it exceeds Count.",
+          "type": "integer",
+          "default": 100
+        }
+      }
+    }
+  },
+  {
+    "name": "get_endpoint_map",
+    "description": "Inventory of ASP.NET Core endpoints: Minimal API Map{Get,Post,Put,Delete,Patch} calls (MapGroup prefixes composed when statically resolvable) and controller actions with Http* attributes. Reports auth posture per endpoint: 'authorized' ([Authorize]/RequireAuthorization), 'anonymous' ([AllowAnonymous]/AllowAnonymous()), or 'unmarked'. Best-effort static analysis: only string-literal routes resolve (dynamic routes show '?'), group variables are tracked per file only, and conventions applied elsewhere (global filters, UseEndpoints conventions) are not seen.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "description": "Optional: filter to endpoints in files whose path contains this value. A value matching no file returns a FileNotFound error.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "maxResults": {
+          "description": "Maximum endpoints to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.",
+          "type": "integer",
+          "default": 100
+        }
+      }
+    }
+  },
+  {
+    "name": "get_file_outline",
+    "description": "Get a token-cheap skeleton of one source file: namespace, types, and member signatures with line numbers — no bodies, no usings. Use before reading a file to decide which lines are worth reading. Nested types are included up to 3 levels deep.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "filePath": {
+          "description": "File path (suffix match on directory boundaries, e.g. 'OrderService.cs' or 'Services/OrderService.cs'; './' prefixes and backslashes are accepted). Returns AmbiguousMatch with candidates if several files match.",
+          "type": "string"
+        },
+        "maxResults": {
+          "description": "Maximum members to return across all types. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.",
+          "type": "integer",
+          "default": 200
+        }
+      },
+      "required": [
+        "filePath"
+      ]
+    }
+  },
+  {
+    "name": "get_nuget_packages",
+    "description": "List the NuGet PackageReference inventory per project: package id, version (resolved from the csproj or Directory.Packages.props when central package management is used), and target framework. Reports what is referenced on disk — no network calls, no latest-version lookups.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "projectFilter": {
+          "description": "Optional: project name filter",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "maxResults": {
+          "description": "Maximum package entries to return across all projects. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.",
+          "type": "integer",
+          "default": 100
+        }
+      }
+    }
+  },
+  {
+    "name": "get_project_graph",
+    "description": "Get the solution project dependency tree with names, paths, target frameworks, and project references. When several solutions are loaded, also lists them (Solutions) and which solution(s) each project belongs to.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "get_public_api",
+    "description": "Get the public members of a type without reading the full source file. Returns method signatures, properties, events.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "typeName": {
+          "description": "Type name. Bare ('OrderService') or namespace-qualified ('MyApp.Orders.OrderService'). Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).",
+          "type": "string"
+        },
+        "maxResults": {
+          "description": "Maximum members to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.",
+          "type": "integer",
+          "default": 50
+        }
+      },
+      "required": [
+        "typeName"
+      ]
+    }
+  },
+  {
+    "name": "get_symbol_at",
+    "description": "Resolve the symbol at a position in a file: what an identifier on a given line actually binds to. Pass the identifier's text instead of a column — counting columns is error-prone — or a 1-based column; with neither, the first identifier on the line that binds to a symbol is used. Returns kind, full signature, containing type, a stable SymbolId (pass it as the name to find_references, find_callers, get_symbol_detail, etc. to target exactly this symbol, overload included), the definition location, and for locals, parameters and expressions the declared type and nullability plus the compiler's expression type and null-state.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "description": "File path; a suffix such as 'Orders/OrderService.cs' is enough ('./' and backslashes accepted)",
+          "type": "string"
+        },
+        "line": {
+          "description": "1-based line number",
+          "type": "integer"
+        },
+        "text": {
+          "description": "Identifier text on that line to resolve, e.g. 'GetByIdAsync' (preferred over column)",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "column": {
+          "description": "1-based column, used when text is not given",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "default": null
+        },
+        "occurrence": {
+          "description": "Which occurrence of text on the line, when it appears more than once (1-based)",
+          "type": "integer",
+          "default": 1
+        }
+      },
+      "required": [
+        "file",
+        "line"
+      ]
+    }
+  },
+  {
+    "name": "get_symbol_detail",
+    "description": "Get detailed information about a symbol including full signature, parameters, return type, modifiers, and XML documentation. Perfect for understanding APIs without reading the whole file.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "symbolName": {
+          "description": "Symbol name (type, method, property). Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).",
+          "type": "string"
+        },
+        "containingType": {
+          "description": "Optional: containing type name for methods/properties",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "symbolName"
+      ]
+    }
+  },
+  {
+    "name": "get_symbol_source",
+    "description": "Get the exact source of ONE symbol without reading the whole file. Members (methods, properties) return their full source including doc comment and attributes. Types return a signatures-only skeleton unless includeBodies is set. Output is capped by maxChars with a Truncated flag. Accepts dotted names like 'OrderService.GetOrderAsync'.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "symbolName": {
+          "description": "The symbol name. Dotted form 'ContainingType.Member' disambiguates members. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).",
+          "type": "string"
+        },
+        "containingType": {
+          "description": "Optional: containing type name for methods/properties",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "file": {
+          "description": "Optional: file path to disambiguate",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "line": {
+          "description": "Optional: line number to disambiguate",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "default": null
+        },
+        "includeBodies": {
+          "description": "For types only: include full member bodies instead of the signatures-only skeleton",
+          "type": "boolean",
+          "default": false
+        },
+        "maxChars": {
+          "description": "Maximum characters of source to return (200-20000)",
+          "type": "integer",
+          "default": 8000
+        }
+      },
+      "required": [
+        "symbolName"
+      ]
+    }
+  },
+  {
+    "name": "get_test_coverage_map",
+    "description": "Heuristic test coverage map: identifies which production types have corresponding test classes. Matches by naming convention (e.g., OrderService → OrderServiceTests). Not runtime coverage — structural analysis only. IMPORTANT: this metric is only valid for suites written one test class per production type. For integration- or feature-driven suites it returns applicable=false with the real test-method count; in that case the percentage is meaningless and must not be graded or reported as coverage.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "projectFilter": {
+          "description": "Optional: production project name to check coverage for. An unknown name returns an InvalidArgument error.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "maxResults": {
+          "description": "Maximum results to return",
+          "type": "integer",
+          "default": 50
+        }
+      }
+    }
+  },
+  {
+    "name": "get_token_savings",
+    "description": "Report how many tokens this server's tools have saved in this repository, against a defensible baseline: the on-disk size of the source files each answer was derived from. Includes a per-tool leaderboard and separate zero-result, not-ready, and error counts. Telemetry is opt-in (CWM_ROSLYN_TELEMETRY=on) and never leaves the machine; when off, the tool says so and reports nothing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "maxResults": {
+          "description": "Maximum tools to list in the leaderboard",
+          "type": "integer",
+          "default": 25
+        }
+      }
+    }
+  },
+  {
+    "name": "get_type_hierarchy",
+    "description": "Get the full inheritance chain, interfaces, and derived types for a type. For interfaces, derived types include both derived interfaces and implementing types.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "typeName": {
+          "description": "Type name. Bare ('OrderService') or namespace-qualified ('MyApp.Orders.OrderService'). Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).",
+          "type": "string"
+        },
+        "maxResults": {
+          "description": "Maximum derived types to return. TotalDerived in the response reports the full count; re-query with a higher value if it exceeds the list length.",
+          "type": "integer",
+          "default": 50
+        }
+      },
+      "required": [
+        "typeName"
+      ]
+    }
+  },
+  {
+    "name": "get_workspace_status",
+    "description": "Report what the server has loaded and how completely: workspace state, loaded solutions, project and document counts, background compilation warm-up progress (Compiled of Total), snapshot version, and every project that loaded or compiled incompletely (load failures, no documents, unresolved core library, compilation errors thrown, missing analyzers/generators) plus raw workspace load diagnostics. Healthy=false means answers from other tools may be missing results. Call it when a result looks suspiciously empty, or before trusting dead-code or reference counts on an unfamiliar solution. Works while loading.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "maxResults": {
+          "description": "Maximum entries in each of IncompleteProjects and LoadDiagnostics",
+          "type": "integer",
+          "default": 50
+        }
+      }
+    }
+  },
+  {
+    "name": "preview_rename",
+    "description": "Preview a semantic rename WITHOUT applying it: never writes to disk and never changes the loaded workspace. Runs Roslyn's renamer on an immutable copy of the solution and returns every line it would change (file, line, old text, new text) — including interface implementations, overrides, and call sites through them — plus Conflicts: compiler errors the rename would introduce (duplicate members, clashes) in the changed documents and their projects' declarations. Use it to check a rename's reach and safety before editing; apply the edits yourself.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "symbolName": {
+          "description": "Symbol to rename. Bare, type-qualified ('OrderService.CreateAsync'), fully qualified, or a SymbolId from find_symbol/get_symbol_at.",
+          "type": "string"
+        },
+        "newName": {
+          "description": "The new name — a valid C# identifier ('@' prefix allowed for keywords)",
+          "type": "string"
+        },
+        "file": {
+          "description": "Optional: file path to disambiguate",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "line": {
+          "description": "Optional: line number to disambiguate",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "default": null
+        },
+        "renameOverloads": {
+          "description": "Also rename overloads of a method",
+          "type": "boolean",
+          "default": false
+        },
+        "renameInStrings": {
+          "description": "Also rename the name inside string literals",
+          "type": "boolean",
+          "default": false
+        },
+        "renameInComments": {
+          "description": "Also rename the name inside comments",
+          "type": "boolean",
+          "default": false
+        },
+        "maxResults": {
+          "description": "Maximum changed lines to return. TotalFound reports the full count.",
+          "type": "integer",
+          "default": 100
+        }
+      },
+      "required": [
+        "symbolName",
+        "newName"
+      ]
+    }
+  },
+  {
+    "name": "resolve_stack_trace",
+    "description": "Map a .NET exception stack trace onto the solution. Undoes compiler rewrites for async methods, lambdas, and local functions, then resolves each frame to a file and line. Frames are marked InSolution so framework noise can be skipped, and FirstSolutionFrame points at the topmost frame in your own code — usually where the investigation starts. Paste the trace verbatim; the exception header is parsed too.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "stackTrace": {
+          "description": "The raw stack trace, including the exception header line if available",
+          "type": "string"
+        },
+        "solutionOnly": {
+          "description": "Only return frames that resolve to solution source, dropping framework frames",
+          "type": "boolean",
+          "default": false
+        },
+        "maxResults": {
+          "description": "Maximum frames to return. TotalFound reports the full count.",
+          "type": "integer",
+          "default": 50
+        }
+      },
+      "required": [
+        "stackTrace"
+      ]
+    }
+  }
+]

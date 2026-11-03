@@ -1,0 +1,47 @@
+{
+  "Coverage": [
+    {
+      "Type": "AuditableProduct",
+      "File": "SampleDomain/BaseEntity.cs",
+      "HasTests": false,
+      "TestFile": null
+    },
+    {
+      "Type": "BaseEntity",
+      "File": "SampleDomain/BaseEntity.cs",
+      "HasTests": false,
+      "TestFile": null
+    },
+    {
+      "Type": "Order",
+      "File": "SampleDomain/Order.cs",
+      "HasTests": false,
+      "TestFile": null
+    },
+    {
+      "Type": "OrderItem",
+      "File": "SampleDomain/OrderItem.cs",
+      "HasTests": false,
+      "TestFile": null
+    },
+    {
+      "Type": "Product",
+      "File": "SampleDomain/Product.cs",
+      "HasTests": false,
+      "TestFile": null
+    },
+    {
+      "Type": "UnusedHelper",
+      "File": "SampleDomain/UnusedHelper.cs",
+      "HasTests": false,
+      "TestFile": null
+    }
+  ],
+  "TotalTypes": 6,
+  "TestedTypes": 0,
+  "Percentage": 0,
+  "Applicable": true,
+  "NotApplicableReason": null,
+  "TestMethodCount": 0,
+  "TestClassCount": 0
+}

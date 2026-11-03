@@ -1,0 +1,28 @@
+{
+  "Solution": "SampleSolution.sln",
+  "Projects": [
+    {
+      "Name": "SampleApi",
+      "Path": "{SampleSolution}/SampleApi/SampleApi.csproj",
+      "TargetFramework": "net10.0",
+      "References": [
+        "SampleDomain",
+        "SampleInfrastructure"
+      ]
+    },
+    {
+      "Name": "SampleDomain",
+      "Path": "{SampleSolution}/SampleDomain/SampleDomain.csproj",
+      "TargetFramework": "net10.0",
+      "References": []
+    },
+    {
+      "Name": "SampleInfrastructure",
+      "Path": "{SampleSolution}/SampleInfrastructure/SampleInfrastructure.csproj",
+      "TargetFramework": "net10.0",
+      "References": [
+        "SampleDomain"
+      ]
+    }
+  ]
+}

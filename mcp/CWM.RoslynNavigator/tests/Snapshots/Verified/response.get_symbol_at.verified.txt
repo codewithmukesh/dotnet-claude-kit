@@ -1,0 +1,14 @@
+{
+  "Token": "OrderService",
+  "Line": 8,
+  "Column": 14,
+  "Name": "OrderService",
+  "Kind": "class",
+  "Signature": "SampleApi.OrderService",
+  "Namespace": "SampleApi",
+  "SymbolId": "T:SampleApi.OrderService",
+  "IsDeclaration": true,
+  "DefinitionFile": "SampleApi/OrderService.cs",
+  "DefinitionLine": 8,
+  "IsGenerated": false
+}

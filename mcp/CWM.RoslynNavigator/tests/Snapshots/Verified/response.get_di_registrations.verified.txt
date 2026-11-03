@@ -1,0 +1,10 @@
+{
+  "Registrations": [],
+  "Duplicates": [],
+  "CaptiveRisks": [],
+  "Count": 0,
+  "TotalFound": 0,
+  "Truncated": false,
+  "Limit": 100,
+  "Note": null
+}

@@ -1,0 +1,20 @@
+{
+  "Implementations": [
+    {
+      "Type": "CachedOrderRepository",
+      "File": "SampleInfrastructure/CachedOrderRepository.cs",
+      "Line": 8,
+      "IsGenerated": false
+    },
+    {
+      "Type": "InMemoryOrderRepository",
+      "File": "SampleInfrastructure/InMemoryOrderRepository.cs",
+      "Line": 8,
+      "IsGenerated": false
+    }
+  ],
+  "Count": 2,
+  "TotalFound": 2,
+  "Truncated": false,
+  "Limit": 50
+}

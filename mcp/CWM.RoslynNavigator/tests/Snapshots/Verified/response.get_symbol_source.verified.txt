@@ -1,0 +1,9 @@
+{
+  "Name": "Cancel",
+  "Kind": "method",
+  "File": "SampleDomain/Order.cs",
+  "StartLine": 30,
+  "EndLine": 35,
+  "Source": "    public void Cancel()\n    {\n        if (Status == OrderStatus.Shipped)\n            throw new InvalidOperationException(\"Cannot cancel a shipped order.\");\n        Status = OrderStatus.Cancelled;\n    }",
+  "Truncated": false
+}

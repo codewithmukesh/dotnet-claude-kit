@@ -1,0 +1,29 @@
+{
+  "State": "Ready",
+  "Message": "Workspace is ready.",
+  "Healthy": true,
+  "SnapshotVersion": 1,
+  "LoadCount": 1,
+  "Solutions": [
+    {
+      "Name": "SampleSolution.sln",
+      "Path": "SampleSolution.sln",
+      "ProjectCount": 3
+    }
+  ],
+  "ProjectCount": 3,
+  "DocumentCount": 30,
+  "WarmUp": {
+    "State": "completed",
+    "Compiled": 3,
+    "Total": 3,
+    "ElapsedMs": 0
+  },
+  "IncompleteProjects": [],
+  "Count": 0,
+  "TotalFound": 0,
+  "LoadDiagnostics": [],
+  "LoadDiagnosticCount": 0,
+  "Truncated": false,
+  "Limit": 50
+}

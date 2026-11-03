@@ -1,0 +1,56 @@
+{
+  "Type": "class",
+  "Members": [
+    {
+      "Kind": "method",
+      "Signature": "Order Order.Create(string customerId, List<OrderItem> items, DateTime createdAt)",
+      "Accessibility": "public"
+    },
+    {
+      "Kind": "method",
+      "Signature": "void Order.Cancel()",
+      "Accessibility": "public"
+    },
+    {
+      "Kind": "method",
+      "Signature": "void Order.Ship()",
+      "Accessibility": "public"
+    },
+    {
+      "Kind": "property",
+      "Signature": "DateTime Order.CreatedAt",
+      "Accessibility": "public"
+    },
+    {
+      "Kind": "property",
+      "Signature": "Guid Order.Id",
+      "Accessibility": "public"
+    },
+    {
+      "Kind": "property",
+      "Signature": "List<OrderItem> Order.Items",
+      "Accessibility": "public"
+    },
+    {
+      "Kind": "property",
+      "Signature": "OrderStatus Order.Status",
+      "Accessibility": "public"
+    },
+    {
+      "Kind": "property",
+      "Signature": "decimal Order.Total",
+      "Accessibility": "public"
+    },
+    {
+      "Kind": "property",
+      "Signature": "string Order.CustomerId",
+      "Accessibility": "public"
+    }
+  ],
+  "Count": 9,
+  "TotalFound": 9,
+  "Truncated": false,
+  "Limit": 50,
+  "File": "SampleDomain/Order.cs",
+  "Line": 6
+}

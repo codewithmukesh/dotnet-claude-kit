@@ -1,0 +1,12 @@
+{
+  "BaseTypes": [],
+  "Interfaces": [],
+  "DerivedTypes": [
+    "AuditableProduct"
+  ],
+  "TotalDerived": 1,
+  "Truncated": false,
+  "Limit": 50,
+  "File": "SampleDomain/BaseEntity.cs",
+  "Line": 6
+}
