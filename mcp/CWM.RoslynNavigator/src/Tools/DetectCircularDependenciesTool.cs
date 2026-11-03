@@ -73,7 +73,7 @@ public static class DetectCircularDependenciesTool
                 var semanticModel = compilation.GetSemanticModel(tree);
                 var root = await tree.GetRootAsync(ct);
 
-                foreach (var node in root.DescendantNodes())
+                foreach (var node in DeclarationNodes.Types(root))
                 {
                     var symbol = semanticModel.GetDeclaredSymbol(node, ct);
                     if (symbol is not INamedTypeSymbol typeSymbol) continue;

@@ -84,7 +84,7 @@ public static class GetTestCoverageMapTool
                 var semanticModel = compilation.GetSemanticModel(tree);
                 var root = await tree.GetRootAsync(ct);
 
-                foreach (var node in root.DescendantNodes())
+                foreach (var node in DeclarationNodes.Members(root))
                 {
                     // Count actual tests, which is the number the structural metric hides.
                     if (node is MethodDeclarationSyntax method
@@ -130,7 +130,7 @@ public static class GetTestCoverageMapTool
                 var semanticModel = compilation.GetSemanticModel(tree);
                 var root = await tree.GetRootAsync(ct);
 
-                foreach (var node in root.DescendantNodes())
+                foreach (var node in DeclarationNodes.Types(root))
                 {
                     var symbol = semanticModel.GetDeclaredSymbol(node, ct);
                     if (symbol is not INamedTypeSymbol typeSymbol) continue;

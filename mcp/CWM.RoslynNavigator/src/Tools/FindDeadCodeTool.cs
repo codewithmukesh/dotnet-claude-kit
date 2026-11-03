@@ -109,7 +109,7 @@ public static class FindDeadCodeTool
                 var semanticModel = compilation.GetSemanticModel(tree);
                 var root = await tree.GetRootAsync(ct);
 
-                foreach (var node in root.DescendantNodes())
+                foreach (var node in DeclarationNodes.Members(root))
                 {
                     var symbol = semanticModel.GetDeclaredSymbol(node, ct);
                     if (symbol is null) continue;

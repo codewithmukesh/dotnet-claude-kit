@@ -19,6 +19,30 @@ public class GetTestCoverageMapTests(TestSolutionFixture fixture) : IClassFixtur
     }
 
     [Fact]
+    public async Task GetTestCoverageMap_Solution_ListsEveryProductionTypeInDeclarationOrder()
+    {
+        // Pins the full result so declaration-walk optimisations cannot drift it.
+        var json = await GetTestCoverageMapTool.ExecuteAsync(
+            fixture.WorkspaceManager, maxResults: 1000,
+            ct: TestContext.Current.CancellationToken);
+        var result = JsonSerializer.Deserialize<TestCoverageMapResult>(json)!;
+
+        Assert.Equal(
+            [
+                "BaseEntity", "AuditableProduct", "Order", "OrderItem", "Product", "UnusedHelper",
+                "CachedOrderRepository", "InMemoryOrderRepository", "InMemoryProductRepository",
+                "LegacyPricingPlugin", "TrulyUnusedCalculator", "PluginLoader", "AntiPatternExamples",
+                "CustomerWorkflowTests", "DbSet", "FakeDbContext", "FakeDatabaseFacade", "FakeChangeTracker",
+                "Customer", "CustomerNote", "FalsePositiveExamples", "AuditMiddleware", "DomainOutcome",
+                "HttpContext", "FakeHostLifetime", "OrderService", "OrderServiceTests", "ProductService",
+            ],
+            result.Coverage.Select(e => e.Type));
+        Assert.Equal(28, result.TotalTypes);
+        Assert.Equal(0, result.TestClassCount);
+        Assert.Equal(0, result.TestMethodCount);
+    }
+
+    [Fact]
     public async Task GetTestCoverageMap_NoTestProjects_AllTypesUntested()
     {
         // SampleSolution has no dedicated test projects (no xUnit/NUnit references,
