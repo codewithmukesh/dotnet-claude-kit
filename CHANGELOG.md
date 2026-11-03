@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`.github/scripts/test-hooks.sh` reported false passes where `timeout` is absent** — the watchdog fallback backgrounds the hook, and bash gives an asynchronous command `/dev/null` for stdin unless it carries its own redirection. The hook under test read an empty payload, blocked nothing, and every case "passed". On macOS and minimal Linux images the whole pre-bash-guard suite was vacuous
 
 ### Added
+- **General .NET apps are first-class** (#34) — the kit was web-API shaped; console tools, CLIs, and desktop apps now get the same depth. Every code example was compile-checked against the current packages
+  - **4 new skills (48 → 52):** `console-cli` (System.CommandLine 2.0 stable, Generic Host in console apps, exit codes, stdout/stderr discipline, Ctrl+C, dotnet tools, `dotnet run app.cs`), `desktop-mvvm` (CommunityToolkit.Mvvm 8.4 partial properties and async commands across WPF, Avalonia, WinForms, MAUI), `avalonia` (Avalonia 12: compiled bindings on by default, ControlThemes, trim-safe view location, AOT), `native-aot` (PublishAot, source generators, fixing IL2xxx/IL3xxx warnings, when not to use AOT)
+  - **`app-engineer` agent (10 → 11)** for console, CLI, and desktop work
+  - **2 new templates (5 → 7):** `console-cli` and `desktop-app`
+  - **`/dotnet-init` detects Console, CLI tool, Desktop, and Library projects** and asks questions that fit them instead of web-API architecture questions
 - **ADR-007** — why the Bash guard parses commands instead of matching text, the alternatives rejected, and the two-directional test every new rule needs
 - 42 hook behavior tests covering both directions of each guard rule: the destructive command blocked, and a benign command that merely mentions it allowed
 - **`hooks/pre-bash-guard.sh` guards resources shared across the machine**, not just the working tree — on a developer box running several agents, or any shared build host, these reach past the current project:
