@@ -4,7 +4,9 @@ using Microsoft.Extensions.Logging;
 namespace CWM.RoslynNavigator.Telemetry;
 
 /// <summary>
-/// Drains the telemetry queue to disk in the background.
+/// Drains the telemetry queue to disk in the background. Reading the queue is also where
+/// each call is measured (response parse, file sizes, repo scale), keeping that work off the
+/// request path.
 ///
 /// <para>Records are batched: a burst of calls becomes one append rather than one per call.
 /// The drain loop is the only writer, which is why the channel is configured
