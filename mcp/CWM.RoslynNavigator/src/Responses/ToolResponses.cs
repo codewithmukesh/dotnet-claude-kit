@@ -118,7 +118,19 @@ internal sealed record DiagnosticsResult(
 
 internal sealed record StatusResponse(string State, string Message);
 
-internal sealed record CallerInfo(string Method, string ContainingType, string File, int Line, bool IsGenerated);
+/// <summary>
+/// <see cref="Via"/> is "direct" when the call binds to the requested method itself, or
+/// "interface" / "base" / "implementation" when it binds to a related member that dispatches
+/// to it — <see cref="ViaSymbol"/> then names that member ("IOrderRepository.GetByIdAsync").
+/// </summary>
+internal sealed record CallerInfo(
+    string Method,
+    string ContainingType,
+    string File,
+    int Line,
+    bool IsGenerated,
+    string Via = "direct",
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ViaSymbol = null);
 
 internal sealed record CallersResult(List<CallerInfo> Callers, int Count, int TotalFound, bool Truncated, int Limit);
 
@@ -294,7 +306,9 @@ internal sealed record ChangeImpactResult(
     bool Truncated,
     int Limit,
     string Risk,
-    string Rationale);
+    string Rationale,
+    // Of TransitiveCallerCount, how many reach the symbol only through an interface or base member.
+    int IndirectCallers = 0);
 
 // Stack trace resolution
 internal sealed record StackFrameInfo(

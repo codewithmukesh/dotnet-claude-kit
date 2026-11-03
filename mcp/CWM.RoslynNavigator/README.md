@@ -20,7 +20,7 @@ CWM.RoslynNavigator is a Model Context Protocol (MCP) server that provides Claud
 | `find_symbol` | Find where a type, method, or property is defined |
 | `find_references` | All usages of a symbol across the solution |
 | `find_implementations` | Types that implement an interface or derive from a base class |
-| `find_callers` | All methods that call a specific method |
+| `find_callers` | All methods that call a specific method, including calls through an interface or base member (`Via`: direct / interface / base / implementation, plus `ViaSymbol`) |
 | `find_overrides` | Overrides of a virtual or abstract method |
 | `find_dead_code` | Unused types, methods, and properties |
 | `get_type_hierarchy` | Inheritance chain, interfaces, and derived types |
@@ -38,7 +38,7 @@ CWM.RoslynNavigator is a Model Context Protocol (MCP) server that provides Claud
 | `get_endpoint_map` | ASP.NET Core route inventory: Minimal APIs (MapGroup-composed) + controllers, with auth posture per endpoint |
 | `get_di_registrations` | DI registration map with duplicate detection and captive-dependency (singleton→scoped) risk flags |
 | `resolve_stack_trace` | Map an exception stack trace onto the solution — undoes async/lambda/local-function rewrites, marks which frames are yours |
-| `analyze_change_impact` | Blast radius of changing one symbol: references by project and file, implementations and overrides that must move with it, transitive callers, risk rating |
+| `analyze_change_impact` | Blast radius of changing one symbol: references by project and file, implementations and overrides that must move with it, transitive callers (interface/base dispatch included, counted in `IndirectCallers`), risk rating |
 | `get_token_savings` | Tokens this server has saved in this repository, with a per-tool leaderboard. Opt-in — see [Token savings](#token-savings) |
 
 ### Symbol names

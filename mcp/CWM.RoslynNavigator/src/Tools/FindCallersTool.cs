@@ -10,7 +10,7 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class FindCallersTool
 {
-    [McpServerTool(Name = "find_callers"), Description("Find all methods that call a specific method. Useful for impact analysis and understanding dependencies. Each caller carries IsGenerated so generated call sites can be skipped.")]
+    [McpServerTool(Name = "find_callers"), Description("Find all methods that call a specific method. Useful for impact analysis and understanding dependencies. Includes callers that reach it through dispatch: Via is 'direct', 'interface' (called through an interface member it implements — the usual DI case), 'base' (through a base member it overrides), or 'implementation' (through an implementation/override of it), with ViaSymbol naming the member actually called. Each caller carries IsGenerated so generated call sites can be skipped.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
         [Description("Method to find callers for. Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified. Qualify when the name is reused across types.")] string methodName,
@@ -40,9 +40,16 @@ public static class FindCallersTool
         var generated = new GeneratedCodeIndex(workspace);
         var all = new List<CallerInfo>();
 
-        foreach (var caller in callers)
+        // Indirect callers bind to a related member (the interface method this one implements,
+        // the base method it overrides, ...) — in DI code that is most of them. Keep them,
+        // labelled, and list direct calls first. One entry per caller and route.
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var caller in callers.OrderBy(c => c.IsDirect ? 0 : 1))
         {
-            if (!caller.IsDirect) continue;
+            var (via, viaSymbol) = CallerDispatch.Classify(symbol, caller);
+            var key = $"{caller.CallingSymbol.ToDisplayString()}|{via}|{viaSymbol}";
+            if (!seen.Add(key)) continue;
 
             var location = SymbolResolver.GetLocation(caller.CallingSymbol);
             if (location.HasValue)
@@ -52,7 +59,9 @@ public static class FindCallersTool
                     ContainingType: caller.CallingSymbol.ContainingType?.Name ?? "unknown",
                     File: workspace.ToRelativePath(location.Value.File),
                     Line: location.Value.Line,
-                    IsGenerated: generated.IsGenerated(caller.CallingSymbol, ct)));
+                    IsGenerated: generated.IsGenerated(caller.CallingSymbol, ct),
+                    Via: via,
+                    ViaSymbol: viaSymbol));
             }
         }
 

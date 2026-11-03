@@ -61,6 +61,36 @@ public class FindCallersTests(TestSolutionFixture fixture)
     }
 
     [Fact]
+    public async Task FindCallers_ConcreteImplementation_IncludesCallersThroughInterface()
+    {
+        // OrderService only ever calls _repository.GetByIdAsync on IOrderRepository. Roslyn
+        // reports those calls as indirect for the concrete method — they are still its callers.
+        var json = await FindCallersTool.ExecuteAsync(
+            fixture.WorkspaceManager, "InMemoryOrderRepository.GetByIdAsync",
+            ct: TestContext.Current.CancellationToken);
+        var result = JsonSerializer.Deserialize<CallersResult>(json)!;
+
+        var viaInterface = Assert.Single(result.Callers,
+            c => c.ContainingType == "OrderService" && c.Method == "GetOrderAsync");
+        Assert.Equal("interface", viaInterface.Via);
+        Assert.Equal("IOrderRepository.GetByIdAsync", viaInterface.ViaSymbol);
+    }
+
+    [Fact]
+    public async Task FindCallers_InterfaceMethod_LabelsDirectCallers()
+    {
+        var json = await FindCallersTool.ExecuteAsync(
+            fixture.WorkspaceManager, "IOrderRepository.GetByIdAsync",
+            ct: TestContext.Current.CancellationToken);
+        var result = JsonSerializer.Deserialize<CallersResult>(json)!;
+
+        var direct = Assert.Single(result.Callers,
+            c => c.ContainingType == "OrderService" && c.Method == "GetOrderAsync");
+        Assert.Equal("direct", direct.Via);
+        Assert.Null(direct.ViaSymbol);
+    }
+
+    [Fact]
     public async Task FindCallers_FactoryMethod_ReturnsCallers()
     {
         var json = await FindCallersTool.ExecuteAsync(

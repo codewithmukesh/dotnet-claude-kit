@@ -13,7 +13,7 @@ public static class AnalyzeChangeImpactTool
 {
     private const int MaxDepth = 5;
 
-    [McpServerTool(Name = "analyze_change_impact"), Description("Answer 'what breaks if I change this?' for one symbol. Reports direct references grouped by project and file, how many are tests, implementations and overrides that must change alongside a signature, transitive callers up to a depth, whether the change crosses an assembly boundary, and an overall risk rating with its rationale. Use before renaming, changing a signature, or deleting — it replaces stitching together find_references, find_implementations, find_overrides, and the project graph.")]
+    [McpServerTool(Name = "analyze_change_impact"), Description("Answer 'what breaks if I change this?' for one symbol. Reports direct references grouped by project and file, how many are tests, implementations and overrides that must change alongside a signature, transitive callers up to a depth (including calls made through an interface or base member, counted in IndirectCallers), whether the change crosses an assembly boundary, and an overall risk rating with its rationale. Use before renaming, changing a signature, or deleting — it replaces stitching together find_references, find_implementations, find_overrides, and the project graph.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
         [Description("Symbol to analyze. Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified.")] string symbolName,
@@ -72,9 +72,9 @@ public static class AnalyzeChangeImpactTool
 
         var (implementations, overrides) = await CountDependentDeclarationsAsync(symbol, solution, ct);
 
-        var transitive = symbol is IMethodSymbol method
+        var (transitive, indirectCallers) = symbol is IMethodSymbol method
             ? await CollectTransitiveCallersAsync(method, solution, depth, ct)
-            : [];
+            : ([], 0);
 
         var projectPage = Paging.Apply(
             perProject
@@ -121,7 +121,8 @@ public static class AnalyzeChangeImpactTool
             Truncated: projectPage.Truncated || filePage.Truncated || callerPage.Truncated,
             Limit: Math.Max(1, maxResults),
             Risk: risk,
-            Rationale: rationale));
+            Rationale: rationale,
+            IndirectCallers: indirectCallers));
     }
 
     /// <summary>
@@ -169,9 +170,12 @@ public static class AnalyzeChangeImpactTool
 
     /// <summary>
     /// Breadth-first walk up the call graph. Visited symbols are tracked across levels so
-    /// a recursive or mutually-recursive call chain terminates.
+    /// a recursive or mutually-recursive call chain terminates. Callers that reach a method
+    /// through the interface member it implements (or a base member it overrides) are
+    /// included — Roslyn reports them as indirect, and in DI code they are most callers —
+    /// and counted separately.
     /// </summary>
-    private static async Task<List<string>> CollectTransitiveCallersAsync(
+    private static async Task<(List<string> Callers, int Indirect)> CollectTransitiveCallersAsync(
         IMethodSymbol root,
         Solution solution,
         int depth,
@@ -180,6 +184,7 @@ public static class AnalyzeChangeImpactTool
         var visited = new HashSet<ISymbol>(SymbolEqualityComparer.Default) { root };
         var ordered = new List<string>();
         var frontier = new List<ISymbol> { root };
+        var indirect = 0;
 
         for (var level = 0; level < depth && frontier.Count > 0; level++)
         {
@@ -191,11 +196,12 @@ public static class AnalyzeChangeImpactTool
 
                 var callers = await SymbolFinder.FindCallersAsync(current, solution, ct);
 
-                foreach (var caller in callers)
+                // Direct calls first, so a caller reached both ways counts as direct.
+                foreach (var caller in callers.OrderBy(c => c.IsDirect ? 0 : 1))
                 {
-                    if (!caller.IsDirect) continue;
                     if (!visited.Add(caller.CallingSymbol)) continue;
 
+                    if (!caller.IsDirect) indirect++;
                     ordered.Add(SymbolResolver.BuildQualifiedName(caller.CallingSymbol));
                     next.Add(caller.CallingSymbol);
                 }
@@ -204,7 +210,7 @@ public static class AnalyzeChangeImpactTool
             frontier = next;
         }
 
-        return ordered;
+        return (ordered, indirect);
     }
 
     private static HashSet<ProjectId> BuildTestProjectSet(
