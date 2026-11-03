@@ -100,8 +100,10 @@ public sealed class BuildFileChangeDetectionTests : IDisposable
         await _workspace.LoadSolutionAsync(SolutionPath, ct);
         var loadsAfterInitial = _workspace.LoadCount;
 
+        // In a folder no document lives in yet, so only the background walk can find it.
+        Directory.CreateDirectory(Path.Combine(_root, "SampleApi", "Features"));
         await File.WriteAllTextAsync(
-            Path.Combine(_root, "SampleApi", "BrandNewType.cs"),
+            Path.Combine(_root, "SampleApi", "Features", "BrandNewType.cs"),
             "namespace SampleApi;\n\ninternal sealed class BrandNewType;\n",
             ct);
 
@@ -113,11 +115,12 @@ public sealed class BuildFileChangeDetectionTests : IDisposable
 
         await _workspace.WaitForStructuralScanAsync();
 
-        // The next refresh acts on what the completed scan found.
+        // The next refresh acts on what the completed scan found: SampleApi compiles through
+        // the SDK default glob, so the file is added in place rather than by a reload.
         _clock.Advance(PastCooldown);
         await _workspace.RefreshChangedDocumentsAsync(ct);
 
-        Assert.Equal(loadsAfterInitial + 1, _workspace.LoadCount);
+        Assert.Equal(loadsAfterInitial, _workspace.LoadCount);
         Assert.Contains(
             _workspace.GetSolution()!.Projects.SelectMany(p => p.Documents),
             d => d.Name == "BrandNewType.cs");

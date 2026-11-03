@@ -450,8 +450,10 @@ returns callers from every service.
   can be passed straight back to file-addressed tools.
 - **Failures** — a solution file that cannot be read is reported in `Solutions[].Error`; the
   others still load. A project that fails to load is logged and skipped, as within one solution.
-- **Reloads** — a changed `.csproj`, `Directory.*` file (checked next to each solution), or
-  new source file reloads **all** configured solutions.
+- **Reloads** — a changed `.csproj` or `Directory.*` file (checked next to each solution)
+  reloads **all** configured solutions. A new source file is added in place to the project
+  that owns it, in whichever solution; it causes a reload only when that project customizes
+  its compile items (see [Scaling](#scaling)).
 - **Limits** — names must still be unique enough to resolve: if two services both define
   `OrderService`, qualify it (`Orders.Api.OrderService`), as you would within one solution.
   `.cwm-navigator.json` is discovered from the common root upward.
@@ -465,6 +467,7 @@ project count.
 ```
 Program.cs              → MSBuildLocator → Host → MCP stdio transport
 WorkspaceManager.cs     → MSBuildWorkspace lifecycle, compilation warm-up, on-demand refresh
+DefaultCompileGlob.cs   → Decides when a new .cs file can be added without a reload
 WorkspaceInitializer.cs → BackgroundService triggers workspace load on startup
 SolutionDiscovery.cs    → Auto-detect .sln/.slnx from args or working directory
 SolutionFileReader.cs   → List a solution's projects (multi-solution dedupe and membership)
@@ -495,6 +498,19 @@ One strategy for every solution size:
   in flight — Roslyn builds one compilation per project per snapshot.
 - **Edits are incremental.** The Roslyn solution snapshot holds every compilation and forks
   them on a document edit, including those of projects that reference the edited one.
+- **Changes are found cheaply.** At most every 5 s, a tool call lists each directory that
+  holds documents (one listing instead of one `stat` per file): edited files are re-read,
+  deleted files are removed, and new `.cs` files beside existing ones are picked up. New files
+  in new folders are found by a background walk every 60 s.
+- **New files skip the reload.** A new file is added in place to the project whose folder
+  is its deepest ancestor, when that project compiles through the SDK default glob — no
+  `<Compile Include/Remove>`, default items left on, no unfollowed imports in the project or
+  its `Directory.Build.*` files. Otherwise the solution reloads so MSBuild can decide. Files
+  under `bin/`, `obj/`, or dot-folders are ignored, and a file the project excluded is
+  remembered so it never triggers a second reload.
+- **Build-file changes still reload in-band.** A changed `.csproj` or `Directory.*` file
+  reloads every solution on the next call; that call waits for the open (not the
+  compilation, which warms in the background).
 
 ## Troubleshooting
 

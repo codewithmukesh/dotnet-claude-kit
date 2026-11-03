@@ -21,13 +21,20 @@ namespace CWM.RoslynNavigator;
 public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvider clock) : IDisposable
 {
     private readonly SemaphoreSlim _writeLock = new(1, 1);
-    private readonly ConcurrentDictionary<DocumentId, DocumentInfo> _knownDocuments = new();
+    private readonly ConcurrentDictionary<DocumentId, TrackedDocument> _knownDocuments = new();
     private readonly ConcurrentDictionary<string, BuildFileInfo> _buildFiles = new();
     private readonly ConcurrentDictionary<string, byte> _knownDocumentPaths = new(StringComparer.OrdinalIgnoreCase);
     private int _loadCount;
     private readonly CancellationTokenSource _backgroundCts = new();
     private int _structuralScanRunning;
-    private int _newSourceFilesPending;
+    // New-file tracking: candidates found by the background walk, files known not to be
+    // compiled (kept across reloads so they are never re-classified), and per-project answers
+    // to "does the SDK default glob alone decide what this project compiles?".
+    private readonly ConcurrentDictionary<string, byte> _pendingNewFiles = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, byte> _excludedSourceFiles = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, bool> _defaultGlobByProject = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, ProjectId[]> _projectsByDirectory = new(StringComparer.OrdinalIgnoreCase);
+    private DateTimeOffset _lastLoadStartedUtc;
     private Task _structuralScan = Task.CompletedTask;
     private CancellationTokenSource? _warmUpCts;
     private Task _warmUp = Task.CompletedTask;
@@ -104,6 +111,11 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             _errorMessage = null;
 
             logger.LogInformation("Loading solution: {SolutionPath}", string.Join(", ", solutionPaths));
+
+            // Anything on disk before MSBuild evaluates and still not a document afterwards was
+            // excluded by the project; files created from here on are genuinely new.
+            _lastLoadStartedUtc = clock.GetUtcNow();
+            _pendingNewFiles.Clear();
 
             // Dispose previous workspace to avoid leaking Roslyn Solution snapshots
             _workspace?.Dispose();
@@ -591,6 +603,8 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         _knownDocuments.Clear();
         _buildFiles.Clear();
         _knownDocumentPaths.Clear();
+        _defaultGlobByProject.Clear();
+        var projectsByDirectory = new Dictionary<string, List<ProjectId>>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var projectId in _solution.ProjectIds)
         {
@@ -598,7 +612,16 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             if (project is null) continue;
 
             if (project.FilePath is not null)
+            {
                 TrackBuildFile(project.FilePath);
+
+                if (Path.GetDirectoryName(project.FilePath) is { } projectDir)
+                {
+                    if (!projectsByDirectory.TryGetValue(projectDir, out var ids))
+                        projectsByDirectory[projectDir] = ids = [];
+                    ids.Add(projectId);
+                }
+            }
 
             foreach (var document in project.Documents)
             {
@@ -608,7 +631,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
                 // GetLastWriteTimeUtc returns year 1601 for non-existent files
                 if (writeTime.Year < 1900) continue;
 
-                _knownDocuments[document.Id] = new DocumentInfo(
+                _knownDocuments[document.Id] = new TrackedDocument(
                     document.FilePath, Path.GetDirectoryName(document.FilePath) ?? string.Empty, writeTime);
                 _knownDocumentPaths[document.FilePath] = 0;
             }
@@ -616,6 +639,16 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
 
         foreach (var sharedFile in EnumerateSharedBuildFiles())
             TrackBuildFile(sharedFile);
+
+        _projectsByDirectory = projectsByDirectory.ToDictionary(
+            pair => pair.Key, pair => pair.Value.ToArray(), StringComparer.OrdinalIgnoreCase);
+
+        // A file a csproj edit has since pulled in is a document now, not an exclusion.
+        foreach (var path in _excludedSourceFiles.Keys)
+        {
+            if (_knownDocumentPaths.ContainsKey(path))
+                _excludedSourceFiles.TryRemove(path, out _);
+        }
 
         logger.LogInformation("Captured timestamps for {Count} documents across {BuildFileCount} build files",
             _knownDocuments.Count, _buildFiles.Count);
@@ -687,7 +720,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     }
 
     /// <summary>A tracked document: its path, the directory holding it, and its last-seen write time.</summary>
-    private readonly record struct DocumentInfo(string FilePath, string Directory, DateTime LastWriteUtc);
+    private readonly record struct TrackedDocument(string FilePath, string Directory, DateTime LastWriteUtc);
 
     /// <summary>A csproj or Directory.* file, tracked by both timestamp and content.</summary>
     private readonly record struct BuildFileInfo(DateTime LastWriteUtc, string? Hash);
@@ -695,7 +728,8 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     /// <summary>
     /// Refreshes the workspace to reflect on-disk changes. Uses tiered cooldowns to
     /// keep per-call overhead low: build files plus one listing per document directory
-    /// (edits and deletions) every 5s, full recursive walk for new files every 60s.
+    /// (edits, deletions, and new files beside existing ones) every 5s, and a full recursive
+    /// walk for new files in new folders every 60s, in the background.
     /// </summary>
     public async Task RefreshChangedDocumentsAsync(CancellationToken ct = default)
     {
@@ -719,18 +753,8 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             return;
         }
 
-        // Phase 2: act on whatever the last background scan found. The scan itself walks
-        // every project directory, so it never runs in-band — a tool call pays an
-        // interlocked read here, and the reload only once the scan has already found
-        // something. The finding is at most one cooldown stale, which is the same
-        // staleness the in-band version had.
-        if (Interlocked.Exchange(ref _newSourceFilesPending, 0) == 1)
-        {
-            logger.LogInformation("New source files detected. Reloading solution.");
-            await LoadSolutionsAsync(_solutionPaths, ct);
-            return;
-        }
-
+        // Phase 2: the recursive walk for files in folders no document lives in yet never
+        // runs in-band; it reports into _pendingNewFiles for a later call to act on.
         var lastStructural = Interlocked.Read(ref _lastStructuralScanTicks);
         if (now - lastStructural >= StructuralScanCooldownTicks)
         {
@@ -738,17 +762,34 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             StartStructuralScan();
         }
 
-        // Phase 3: collect changed and deleted documents without holding the lock (the
+        // Phase 3: collect changed, deleted, and new documents without holding the lock (the
         // directory reads are the expensive part — keeping them lock-free avoids blocking
         // concurrent tool calls).
         var scan = ScanKnownDocuments(ct);
-        if (scan.Changed.Count == 0 && scan.Deleted.Count == 0) return;
+        foreach (var path in _pendingNewFiles.Keys)
+        {
+            _pendingNewFiles.TryRemove(path, out _);
+            scan.NewFiles.Add(path);
+        }
+
+        var additions = ClassifyNewFiles(scan.NewFiles, out var needReload);
+        if (needReload.Count > 0)
+        {
+            logger.LogInformation(
+                "New source files in projects with custom compile items ({Files}). Reloading solution.",
+                string.Join(", ", needReload.Select(Path.GetFileName)));
+
+            await LoadSolutionsAsync(_solutionPaths, ct);
+            return;
+        }
+
+        if (scan.Changed.Count == 0 && scan.Deleted.Count == 0 && additions.Count == 0) return;
 
         // Apply mutations under lock.
         await _writeLock.WaitAsync(ct);
         try
         {
-            await ApplyDocumentChangesAsync(scan, ct);
+            await ApplyDocumentChangesAsync(scan, additions, ct);
         }
         finally
         {
@@ -757,19 +798,24 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     }
 
     private sealed record DocumentScan(
-        List<(DocumentId Id, DocumentInfo Info)> Changed,
-        List<(DocumentId Id, DocumentInfo Info)> Deleted);
+        List<(DocumentId Id, TrackedDocument Info)> Changed,
+        List<(DocumentId Id, TrackedDocument Info)> Deleted,
+        HashSet<string> NewFiles);
+
+    /// <summary>A new source file and every project instance (one per target framework) that compiles it.</summary>
+    private sealed record NewDocument(string FilePath, string ProjectDirectory, ProjectId[] Projects);
 
     /// <summary>
     /// Compares every tracked document against its directory listing. One enumeration per
     /// directory returns the timestamps of all its files, which is far cheaper than a stat
     /// per document (measured on 3,750 documents: 118 ms of stats per call, 57 ms of
     /// sequential enumeration), and the directories are read in parallel. A document whose
-    /// directory no longer lists it has been deleted.
+    /// directory no longer lists it has been deleted; a .cs file the listing has that no
+    /// document or exclusion accounts for is a candidate new document.
     /// </summary>
     private DocumentScan ScanKnownDocuments(CancellationToken ct)
     {
-        var byDirectory = new Dictionary<string, List<KeyValuePair<DocumentId, DocumentInfo>>>(
+        var byDirectory = new Dictionary<string, List<KeyValuePair<DocumentId, TrackedDocument>>>(
             StringComparer.OrdinalIgnoreCase);
         foreach (var entry in _knownDocuments)
         {
@@ -778,8 +824,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             documents.Add(entry);
         }
 
-        var changed = new List<(DocumentId, DocumentInfo)>();
-        var deleted = new List<(DocumentId, DocumentInfo)>();
+        var scan = new DocumentScan([], [], new HashSet<string>(StringComparer.OrdinalIgnoreCase));
         var gate = new Lock();
 
         Parallel.ForEach(
@@ -794,17 +839,30 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
                 {
                     if (!onDisk.TryGetValue(info.FilePath, out var writeTime))
                     {
-                        lock (gate) deleted.Add((id, info));
+                        lock (gate) scan.Deleted.Add((id, info));
                     }
                     else if (writeTime > info.LastWriteUtc)
                     {
-                        lock (gate) changed.Add((id, info with { LastWriteUtc = writeTime }));
+                        lock (gate) scan.Changed.Add((id, info with { LastWriteUtc = writeTime }));
+                    }
+                }
+
+                foreach (var path in onDisk.Keys)
+                {
+                    if (IsUntrackedSourceFile(path))
+                    {
+                        lock (gate) scan.NewFiles.Add(path);
                     }
                 }
             });
 
-        return new DocumentScan(changed, deleted);
+        return scan;
     }
+
+    private bool IsUntrackedSourceFile(string path) =>
+        path.EndsWith(".cs", StringComparison.OrdinalIgnoreCase)
+        && !_knownDocumentPaths.ContainsKey(path)
+        && !_excludedSourceFiles.ContainsKey(path);
 
     /// <summary>Directory reads are IO-bound; a handful in flight saturates a local disk.</summary>
     private static int ScanParallelism => Math.Clamp(Environment.ProcessorCount, 1, 8);
@@ -851,11 +909,80 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     }
 
     /// <summary>
+    /// Sorts candidate new files into those that can be added to the workspace directly —
+    /// owned by a project that compiles them through the SDK default glob alone — and those
+    /// only an MSBuild evaluation can place (<paramref name="needReload"/>). Files no project
+    /// compiles (bin/obj, dot-folders, outside every project, or already on disk when MSBuild
+    /// last evaluated and not included then) are remembered as excluded so they are never
+    /// classified twice.
+    /// </summary>
+    private List<NewDocument> ClassifyNewFiles(IEnumerable<string> candidates, out List<string> needReload)
+    {
+        var additions = new List<NewDocument>();
+        needReload = [];
+
+        foreach (var path in candidates)
+        {
+            if (!IsUntrackedSourceFile(path) || !File.Exists(path)) continue;
+
+            if (FindOwningProjects(path) is not { } owner
+                || DefaultCompileGlob.IsDefaultExcluded(owner.Directory, path)
+                || ExistedAtLastLoad(path))
+            {
+                _excludedSourceFiles[path] = 0;
+                continue;
+            }
+
+            var solution = _solution;
+            var allDefaultGlob = owner.Projects
+                .Select(id => solution?.GetProject(id)?.FilePath)
+                .All(projectPath => projectPath is not null
+                    && _defaultGlobByProject.GetOrAdd(projectPath, DefaultCompileGlob.AppliesTo));
+
+            if (allDefaultGlob)
+                additions.Add(new NewDocument(path, owner.Directory, owner.Projects));
+            else
+                needReload.Add(path);
+        }
+
+        return additions;
+    }
+
+    /// <summary>
+    /// The projects whose directory is the deepest one containing <paramref name="path"/>,
+    /// across every loaded solution. A multi-targeted project contributes one instance per
+    /// target framework; all of them compile the file.
+    /// </summary>
+    private (string Directory, ProjectId[] Projects)? FindOwningProjects(string path)
+    {
+        var projectsByDirectory = _projectsByDirectory;
+        for (var dir = Path.GetDirectoryName(path); dir is not null; dir = Path.GetDirectoryName(dir))
+        {
+            if (projectsByDirectory.TryGetValue(dir, out var projects))
+                return (dir, projects);
+        }
+
+        return null;
+    }
+
+    /// <summary>
+    /// A .cs file that was already on disk when MSBuild last evaluated the projects, yet is
+    /// not a document, was excluded by the project itself (a Compile Remove, a nested
+    /// project's folder, ...). Re-evaluating would only exclude it again. Creation time is
+    /// part of the check because a copy keeps the source's write time.
+    /// </summary>
+    private bool ExistedAtLastLoad(string path)
+    {
+        var loadStarted = _lastLoadStartedUtc.UtcDateTime;
+        return File.GetLastWriteTimeUtc(path) < loadStarted && File.GetCreationTimeUtc(path) < loadStarted;
+    }
+
+    /// <summary>
     /// Applies a scan to the current snapshot. Must hold <see cref="_writeLock"/>. Every id is
     /// re-checked against the snapshot: a reload between the lock-free scan and here mints new
     /// ids, and the stale ones must not be applied.
     /// </summary>
-    private async Task ApplyDocumentChangesAsync(DocumentScan scan, CancellationToken ct)
+    private async Task ApplyDocumentChangesAsync(DocumentScan scan, List<NewDocument> additions, CancellationToken ct)
     {
         var solution = _solution!;
 
@@ -897,7 +1024,53 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         if (scan.Deleted.Count > 0)
             RebuildKnownDocumentPaths();
 
+        foreach (var addition in additions)
+            solution = AddNewDocument(solution, addition);
+
         _solution = solution;
+    }
+
+    /// <summary>
+    /// Adds a new file to each project instance that compiles it — the incremental
+    /// alternative to a full reload, which costs as much as the initial load. The text loads
+    /// lazily from disk, exactly as MSBuildWorkspace loads every other document.
+    /// </summary>
+    private Solution AddNewDocument(Solution solution, NewDocument addition)
+    {
+        var path = addition.FilePath;
+        if (_knownDocumentPaths.ContainsKey(path) || !File.Exists(path)) return solution;
+
+        var writeTime = File.GetLastWriteTimeUtc(path);
+        var directory = Path.GetDirectoryName(path) ?? string.Empty;
+        string[] folders = [.. Path.GetRelativePath(addition.ProjectDirectory, directory)
+            .Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+            .Where(segment => segment is not ("" or "."))];
+
+        var added = false;
+        foreach (var projectId in addition.Projects)
+        {
+            if (!solution.ContainsProject(projectId)) continue;
+
+            var documentId = DocumentId.CreateNewId(projectId, path);
+            solution = solution.AddDocument(DocumentInfo.Create(
+                documentId,
+                Path.GetFileName(path),
+                folders,
+                SourceCodeKind.Regular,
+                new FileTextLoader(path, defaultEncoding: null),
+                path));
+
+            _knownDocuments[documentId] = new TrackedDocument(path, directory, writeTime);
+            added = true;
+        }
+
+        if (added)
+        {
+            _knownDocumentPaths[path] = 0;
+            logger.LogInformation("Added new document without a reload: {Path}", path);
+        }
+
+        return solution;
     }
 
     /// <summary>
@@ -958,8 +1131,8 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         {
             try
             {
-                if (HasNewSourceFiles(_backgroundCts.Token))
-                    Interlocked.Exchange(ref _newSourceFilesPending, 1);
+                foreach (var path in FindUntrackedSourceFiles(_backgroundCts.Token))
+                    _pendingNewFiles[path] = 0;
             }
             catch (OperationCanceledException)
             {
@@ -984,11 +1157,13 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     /// </summary>
     internal Task WaitForStructuralScanAsync() => _structuralScan;
 
-    private bool HasNewSourceFiles(CancellationToken ct)
+    private List<string> FindUntrackedSourceFiles(CancellationToken ct)
     {
+        var found = new List<string>();
+
         // Captured once: a concurrent reload can swap the field mid-walk.
         var solution = _solution;
-        if (solution is null) return false;
+        if (solution is null) return found;
 
         var options = new EnumerationOptions
         {
@@ -997,15 +1172,14 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             AttributesToSkip = FileAttributes.Hidden | FileAttributes.System
         };
 
-        foreach (var projectId in solution.ProjectIds)
+        var walked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var project in solution.Projects)
         {
             ct.ThrowIfCancellationRequested();
 
-            var project = solution.GetProject(projectId);
-            if (project?.FilePath is null) continue;
-
             var projectDir = Path.GetDirectoryName(project.FilePath);
-            if (projectDir is null || !Directory.Exists(projectDir)) continue;
+            // One walk per directory, however many target frameworks load the project.
+            if (projectDir is null || !walked.Add(projectDir) || !Directory.Exists(projectDir)) continue;
 
             // Pre-compute bin/obj prefixes to avoid per-file Path.GetRelativePath allocation
             var sep = Path.DirectorySeparatorChar;
@@ -1020,12 +1194,12 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
                     file.StartsWith(objPrefix, StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                if (!_knownDocumentPaths.ContainsKey(file))
-                    return true;
+                if (IsUntrackedSourceFile(file))
+                    found.Add(file);
             }
         }
 
-        return false;
+        return found;
     }
 
     public void Dispose()
