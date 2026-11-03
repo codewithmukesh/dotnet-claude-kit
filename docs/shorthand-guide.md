@@ -104,7 +104,7 @@ Only the first three are Claude Code hooks (auto-run via `hooks/hooks.json`); th
 | Script | Kind | Behavior |
 |-------------|-------|----------|
 | `pre-bash-guard.sh` | Claude Code hook — PreToolUse (Bash) | Guards against dangerous bash commands |
-| `post-edit-format.sh` | Claude Code hook — PostToolUse (Edit/Write) | Runs `dotnet format` on modified files |
+| `post-edit-format.sh` | Claude Code hook — PostToolUse (Edit/Write) | Runs `dotnet format` on modified files, or CSharpier when the repo uses it |
 | `post-scaffold-restore.sh` | Claude Code hook — PostToolUse (Edit/Write) | Runs `dotnet restore` after .csproj changes |
 | `pre-commit-format.sh` | Git pre-commit (manual install) | Verifies formatting before commit |
 | `pre-commit-antipattern.sh` | Git pre-commit (manual install) | Scans for antipatterns before commit |

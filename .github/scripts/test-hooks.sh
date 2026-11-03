@@ -103,6 +103,83 @@ else
   pass "post-edit-format completed the directory walk for a real .cs file"
 fi
 
+echo ""
+echo "=== post-edit-format.sh: formatter choice ==="
+
+# A stub `dotnet` first on PATH records each invocation instead of formatting,
+# so these cases need neither CSharpier nor a buildable project.
+mkdir -p "$WORKDIR/stub"
+DOTNET_LOG="$WORKDIR/dotnet.log"
+cat >"$WORKDIR/stub/dotnet" <<EOF
+#!/usr/bin/env bash
+printf '%s\n' "\$*" >>"$DOTNET_LOG"
+EOF
+chmod +x "$WORKDIR/stub/dotnet"
+
+# A repository with a project and optionally a marker file.
+# Usage: make_repo <name> [<path relative to the repo> <content>]
+make_repo() {
+  local repo="$WORKDIR/$1"
+  mkdir -p "$repo/src/App"
+  printf '<Project Sdk="Microsoft.NET.Sdk" />\n' >"$repo/src/App/App.csproj"
+  printf 'class Foo { }\n' >"$repo/src/App/Foo.cs"
+  if [ $# -ge 3 ]; then
+    mkdir -p "$(dirname "$repo/$2")"
+    printf '%s\n' "$3" >"$repo/$2"
+  fi
+}
+
+# format_case <label> <repo> <expected: csharpier|dotnet-format|none> [VAR=value...]
+format_case() {
+  local label="$1" repo="$2" expect="$3"
+  shift 3
+  local file="$WORKDIR/$repo/src/App/Foo.cs" path
+  if command -v cygpath >/dev/null 2>&1; then
+    path=$(cygpath -w "$file")
+  else
+    path="$file"
+  fi
+  printf '{"hook_event_name":"PostToolUse","tool_name":"Edit","tool_input":{"file_path":"%s"}}' \
+    "${path//\\/\\\\}" >"$WORKDIR/f.json"
+  : >"$DOTNET_LOG"
+  run_with_timeout "$HOOK_TIMEOUT" \
+    env -u CLAUDE_TOOL_INPUT -u CLAUDE_EDITED_FILE "PATH=$WORKDIR/stub:$PATH" "$@" \
+    bash hooks/post-edit-format.sh <"$WORKDIR/f.json" >"$WORKDIR/fo" 2>"$WORKDIR/fe"
+  local rc=$?
+  local actual=none
+  if grep -q '^csharpier format ' "$DOTNET_LOG"; then
+    actual=csharpier
+  fi
+  if grep -q '^format .*--include' "$DOTNET_LOG"; then
+    actual=$([ "$actual" = none ] && echo dotnet-format || echo both)
+  fi
+  if [ "$rc" -eq 0 ] && [ "$actual" = "$expect" ]; then
+    pass "$label"
+  else
+    echo "  dotnet calls: [$(cat "$DOTNET_LOG")]"
+    echo "  stdout: [$(cat "$WORKDIR/fo")]"
+    fail "$label (exit $rc, ran $actual, expected $expect)"
+  fi
+}
+
+CSHARPIER_TOOL='{"version":1,"isRoot":true,"tools":{"csharpier":{"version":"1.3.0","commands":["csharpier"]}}}'
+make_repo csharpier-tool .config/dotnet-tools.json "$CSHARPIER_TOOL"
+make_repo csharpier-root-tool dotnet-tools.json "$CSHARPIER_TOOL"
+make_repo csharpier-rc .csharpierrc.json '{ "printWidth": 100 }'
+make_repo plain .config/dotnet-tools.json \
+  '{"version":1,"isRoot":true,"tools":{"dotnet-ef":{"version":"10.0.0","commands":["dotnet-ef"]}}}'
+
+# 2a. CSharpier owns formatting: run it, and never dotnet format on top.
+format_case "runs CSharpier when .config/dotnet-tools.json lists csharpier" csharpier-tool csharpier
+format_case "runs CSharpier when a root dotnet-tools.json lists csharpier (.NET 10 default)" \
+  csharpier-root-tool csharpier
+format_case "runs CSharpier when a .csharpierrc.json is found" csharpier-rc csharpier
+# 2b. No CSharpier marker: dotnet format, as before.
+format_case "runs dotnet format when the repository does not use CSharpier" plain dotnet-format
+# 2c. The opt-out runs nothing at all.
+format_case "CWM_POST_EDIT_FORMAT=off skips CSharpier" csharpier-tool none CWM_POST_EDIT_FORMAT=off
+format_case "CWM_POST_EDIT_FORMAT=off skips dotnet format" plain none CWM_POST_EDIT_FORMAT=off
+
 echo "=== pre-bash-guard.sh ==="
 
 # 3. Benign command must be allowed.
