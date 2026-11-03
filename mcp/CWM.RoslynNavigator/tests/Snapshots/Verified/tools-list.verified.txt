@@ -450,10 +450,29 @@
   },
   {
     "name": "get_project_graph",
-    "description": "Get the solution project dependency tree with names, paths, target frameworks, and project references. When several solutions are loaded, also lists them (Solutions) and which solution(s) each project belongs to.",
+    "description": "Get the solution's project dependency graph: one entry per csproj with its name, solution-relative path, target frameworks (a multi-targeted csproj is one entry listing all of them), and the projects its csproj references directly (omitted when none). Large solutions are paged: Count/TotalFound/Truncated report it, and summary=true or a project filter is cheaper than raising maxResults. summary=true returns counts, frameworks, top-level folders, dependency layers, and the most directly referenced projects instead of the list. project='Name' returns the matching projects with ReferencedBy (who depends on them). When several solutions are loaded, also lists them (Solutions) and which solution(s) each project belongs to.",
     "inputSchema": {
       "type": "object",
-      "properties": {}
+      "properties": {
+        "project": {
+          "description": "Optional: only projects whose name or path contains this value (case-insensitive). Each match also lists ReferencedBy.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "summary": {
+          "description": "True: return the solution's shape (counts, frameworks, folders, dependency layers, most-referenced projects) instead of the project list.",
+          "type": "boolean",
+          "default": false
+        },
+        "maxResults": {
+          "description": "Maximum projects to return. TotalFound in the response reports the full count; re-query with a higher value, a project filter, or summary=true if it exceeds Count.",
+          "type": "integer",
+          "default": 100
+        }
+      }
     }
   },
   {

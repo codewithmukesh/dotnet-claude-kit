@@ -26,7 +26,7 @@ CWM.RoslynNavigator is a Model Context Protocol (MCP) server that provides Claud
 | `get_type_hierarchy` | Inheritance chain, interfaces, and derived types |
 | `get_public_api` | Public members of a type without reading the full file |
 | `get_symbol_detail` | Full signature, parameters, return type, and XML docs |
-| `get_project_graph` | Solution project dependency tree; with several solutions loaded, also which solution(s) each project belongs to |
+| `get_project_graph` | Solution project dependency graph: one entry per csproj (solution-relative path, target frameworks, direct project references), paged at 100. `summary: true` returns counts, frameworks, folders, dependency layers, and the most-referenced projects; `project: "Name"` returns the matches with `ReferencedBy`. With several solutions loaded, also which solution(s) each project belongs to |
 | `get_dependency_graph` | Call dependency graph for a method |
 | `get_diagnostics` | Compiler and analyzer warnings/errors |
 | `get_test_coverage_map` | Heuristic test coverage by naming convention |
@@ -129,8 +129,8 @@ Defaults: 50 for symbol/list tools (`find_symbol`, `find_references`,
 `find_implementations`, `find_callers`, `find_overrides`, `find_dead_code`,
 `get_public_api`, `get_type_hierarchy`, `get_test_coverage_map`,
 `resolve_stack_trace`, `analyze_change_impact`), 100 for `detect_antipatterns`,
-`get_diagnostics`, `get_endpoint_map`, `get_di_registrations`, `get_nuget_packages`, and
-`get_dependency_graph` nodes, 200 for `get_file_outline` members. `get_symbol_source`
+`get_diagnostics`, `get_endpoint_map`, `get_di_registrations`, `get_nuget_packages`,
+`get_project_graph` projects, and `get_dependency_graph` nodes, 200 for `get_file_outline` members. `get_symbol_source`
 caps by characters instead (`maxChars`, default 8000, with a `Truncated` flag).
 `get_diagnostics` orders errors first and always includes per-severity totals, so a
 capped response never hides the important picture.
@@ -142,7 +142,8 @@ every source location once per framework. Results are merged by location before 
 and capping, so `TotalFound` counts distinct locations and a duplicate never uses up
 `maxResults`. `find_symbol` and `find_references` add `TargetFrameworks` to an entry only
 when it exists in some, not all, of its project's frameworks (code under `#if NET8_0`).
-`analyze_change_impact` counts a csproj once in `AffectedProjects`, and
+`get_project_graph` lists a multi-targeted csproj once with all its `TargetFrameworks`,
+`analyze_change_impact` counts it once in `AffectedProjects`, and
 `detect_antipatterns`, `get_diagnostics`, and `get_test_coverage_map` count each file once.
 
 ### Generated code

@@ -63,7 +63,7 @@ public static class ToolArguments
         ["get_endpoint_map"] = new() { ["file"] = "NoSuchFile12345.cs" },
         ["get_file_outline"] = new() { ["filePath"] = "NoSuchFile12345.cs" },
         ["get_nuget_packages"] = new() { ["projectFilter"] = "NoSuchProject12345" },
-        ["get_project_graph"] = null,
+        ["get_project_graph"] = new() { ["project"] = "NoSuchProject12345" },
         ["get_public_api"] = new() { ["typeName"] = "NoSuchType12345" },
         ["get_symbol_at"] = new() { ["file"] = "NoSuchFile12345.cs", ["line"] = 1 },
         ["get_symbol_detail"] = new() { ["symbolName"] = "NoSuchSymbol12345" },
@@ -91,8 +91,8 @@ public static class ToolArguments
     public static IEnumerable<string> InvalidTableTools => InvalidArgs.Keys;
 
     /// <summary>
-    /// Tools that take an argument whose value can be wrong. The rest (get_project_graph,
-    /// get_token_savings, get_workspace_status) take only maxResults, which is clamped.
+    /// Tools that take an argument whose value can be wrong. The rest (get_token_savings,
+    /// get_workspace_status) take only maxResults, which is clamped.
     /// </summary>
     public static TheoryData<string> ToolsWithInvalidArguments =>
         [.. InvalidArgs.Where(entry => entry.Value is not null).Select(entry => entry.Key).Order(StringComparer.Ordinal)];

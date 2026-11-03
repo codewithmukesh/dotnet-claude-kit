@@ -176,6 +176,27 @@ internal sealed class BenchmarkRunner(BenchSettings settings, TextWriter log)
 
     private static async Task<int?> CountLoadedProjectsAsync(ServerSession session, CancellationToken ct)
     {
+        // Roslyn projects (one per target framework), not csproj files: newer builds merge a
+        // multi-targeted csproj into one get_project_graph entry and page the list, so the
+        // workspace status count is the comparable number where the tool exists.
+        if (session.ToolNames.Contains("get_workspace_status"))
+        {
+            var status = await session.CallAsync("get_workspace_status", [], TimeSpan.FromMinutes(2), ct);
+            if (status.Status == "ok" && status.Payload is not null)
+            {
+                try
+                {
+                    using var document = JsonDocument.Parse(status.Payload);
+                    if (document.RootElement.TryGetProperty("ProjectCount", out var count) && count.TryGetInt32(out var projects))
+                        return projects;
+                }
+                catch (JsonException)
+                {
+                    // Fall back to counting graph entries.
+                }
+            }
+        }
+
         var graph = await session.CallAsync("get_project_graph", [], TimeSpan.FromMinutes(2), ct);
         if (graph.Status != "ok" || graph.Payload is null) return null;
         try

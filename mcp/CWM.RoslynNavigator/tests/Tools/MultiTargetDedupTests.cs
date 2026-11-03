@@ -147,4 +147,18 @@ public sealed class MultiTargetDedupTests(MultiTargetSolutionFixture fixture) : 
         Assert.Single(result.Violations, v => v.Id == "AP004");
         Assert.Equal(1, result.Summary!.ScannedFiles);
     }
+
+    [Fact]
+    public async Task GetProjectGraph_MultiTargeted_OneEntryListingEveryFramework()
+    {
+        // Act
+        var json = await GetProjectGraphTool.ExecuteAsync(Workspace, ct: Ct);
+
+        // Assert
+        var result = JsonSerializer.Deserialize<ProjectGraphResult>(json)!;
+        var project = Assert.Single(result.Projects);
+        Assert.Equal("Lib", project.Name);
+        Assert.Equal(["net10.0", "net8.0"], project.TargetFrameworks.Order());
+        Assert.Equal(1, result.TotalFound);
+    }
 }
