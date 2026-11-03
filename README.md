@@ -3,7 +3,7 @@
   <p align="center">
     <strong>Make Claude Code an expert .NET developer.</strong>
     <br />
-    48 skills &bull; 10 specialist agents &bull; 17 slash commands &bull; 10 rules &bull; 5 project templates &bull; 23 MCP tools &bull; automation hooks
+    52 skills &bull; 11 specialist agents &bull; 17 slash commands &bull; 10 rules &bull; 7 project templates &bull; 23 MCP tools &bull; automation hooks
     <br />
     Built for .NET 10 / C# 14. Architecture-aware. Token-efficient.
   </p>
@@ -97,7 +97,7 @@ An **action layer** on top of the knowledge layer — Claude doesn't just know t
 
 ### Plugin Install (Recommended)
 
-Install as a Claude Code plugin — all 48 skills (including 17 slash-command workflows), 10 agents, hooks, and MCP config activate globally. The 10 rules ship in this repo for you to copy into your project's `.claude/rules/`:
+Install as a Claude Code plugin — all 52 skills (including 17 slash-command workflows), 11 agents, hooks, and MCP config activate globally. The 10 rules ship in this repo for you to copy into your project's `.claude/rules/`:
 
 ```bash
 # In your terminal — install the Roslyn MCP server
@@ -145,13 +145,15 @@ cp templates/modular-monolith/CLAUDE.md ./CLAUDE.md   # Multi-module system
 cp templates/blazor-app/CLAUDE.md ./CLAUDE.md          # Blazor app
 cp templates/worker-service/CLAUDE.md ./CLAUDE.md      # Background workers
 cp templates/class-library/CLAUDE.md ./CLAUDE.md       # NuGet packages
+cp templates/console-cli/CLAUDE.md ./CLAUDE.md         # Console app / CLI tool
+cp templates/desktop-app/CLAUDE.md ./CLAUDE.md         # Avalonia / WPF / WinForms / MAUI
 ```
 
 Replace `[ProjectName]`, update tech stack, choose your architecture.
 
 </details>
 
-Start Claude Code — 48 skills, 10 agents, and 23 MCP tools activate automatically. Copy the 10 rules into your project's `.claude/rules/` to make them always-loaded.
+Start Claude Code — 52 skills, 11 agents, and 23 MCP tools activate automatically. Copy the 10 rules into your project's `.claude/rules/` to make them always-loaded.
 
 That's it. Claude now writes .NET code the way a senior .NET engineer would.
 
@@ -282,9 +284,9 @@ Project-level conventions that apply to every interaction once loaded. Rules shi
 | [hooks](.claude/rules/hooks.md) | Auto-accept formatting, never skip pre-commit hooks |
 | [packages](.claude/rules/packages.md) | Always use latest stable NuGet versions, never rely on training data versions |
 
-## Knowledge Skills (31)
+## Knowledge Skills (35)
 
-Code-heavy reference files that teach Claude .NET best practices. Each skill is under 400 lines with concrete code examples, anti-patterns (BAD/GOOD comparisons), and decision guides. (The other 16 of the 48 skills are the workflow orchestrators documented under [Slash Commands](#slash-commands-16).)
+Code-heavy reference files that teach Claude .NET best practices. Each skill is under 400 lines with concrete code examples, anti-patterns (BAD/GOOD comparisons), and decision guides. (The other 17 of the 52 skills are the workflow orchestrators documented under [Slash Commands](#slash-commands-17).)
 
 | Category | Skills | What Claude Learns |
 |----------|--------|--------------------|
@@ -296,11 +298,12 @@ Code-heavy reference files that teach Claude .NET best practices. Each skill is 
 | **Observability** | [logging](skills/logging/SKILL.md), [serilog](skills/serilog/SKILL.md), [opentelemetry](skills/opentelemetry/SKILL.md) | Health checks and correlation IDs, Serilog structured logging, OpenTelemetry traces and metrics |
 | **Testing** | [testing](skills/testing/SKILL.md) | xUnit v3, `WebApplicationFactory`, `Testcontainers`, Verify snapshots |
 | **DevOps** | [docker](skills/docker/SKILL.md), [container-publish](skills/container-publish/SKILL.md), [ci-cd](skills/ci-cd/SKILL.md), [aspire](skills/aspire/SKILL.md) | Multi-stage builds, Dockerfile-less SDK publishing, GitHub Actions, .NET Aspire orchestration |
+| **Console & Desktop** | [console-cli](skills/console-cli/SKILL.md), [desktop-mvvm](skills/desktop-mvvm/SKILL.md), [avalonia](skills/avalonia/SKILL.md), [native-aot](skills/native-aot/SKILL.md) | System.CommandLine 2.x, exit codes and stdout/stderr discipline, CommunityToolkit.Mvvm, Avalonia 12 compiled bindings, Native AOT and trimming |
 | **Cross-cutting** | [dependency-injection](skills/dependency-injection/SKILL.md), [configuration](skills/configuration/SKILL.md) | Keyed services, Options pattern, secrets management |
 | **Project Setup** | [project-setup](skills/project-setup/SKILL.md), [convention-learner](skills/convention-learner/SKILL.md) | Solution scaffolding, convention detection and enforcement |
 | **Workflow & Learning** | [workflow-mastery](skills/workflow-mastery/SKILL.md), [instinct-system](skills/instinct-system/SKILL.md) | Parallel worktrees, plan mode strategy, subagent patterns, context discipline; confidence-scored instincts, correction capture, discovery logging |
 
-## Agents (10)
+## Agents (11)
 
 Specialist agents that Claude routes queries to automatically. Each agent loads the right skills, uses MCP tools for context, and knows its boundaries.
 
@@ -316,8 +319,9 @@ Specialist agents that Claude routes queries to automatically. Each agent loads 
 | [code-reviewer](agents/code-reviewer.md) | "review this code", "PR review", "health check", "conventions" | MCP-driven multi-dimensional review, convention detection and enforcement |
 | [build-error-resolver](agents/build-error-resolver.md) | "fix build", "build errors", "won't compile" | Autonomous build-fix loop: parse errors → categorize → fix → rebuild |
 | [refactor-cleaner](agents/refactor-cleaner.md) | "clean up", "dead code", "de-sloppify" | Systematic cleanup: dead code removal, formatting, sealing, CancellationToken |
+| [app-engineer](agents/app-engineer.md) | "CLI", "console app", "dotnet tool", "desktop", "WPF", "Avalonia", "MVVM", "Native AOT" | Command trees and exit codes, MVVM view models, Avalonia controls, AOT/trimmed publishing |
 
-## Templates (5)
+## Templates (7)
 
 Drop-in `CLAUDE.md` files that configure Claude for specific project types. Copy one file, replace the placeholders, done.
 
@@ -328,6 +332,8 @@ Drop-in `CLAUDE.md` files that configure Claude for specific project types. Copy
 | [blazor-app](templates/blazor-app/) | Blazor Server / WASM / Auto | Component organization, render mode strategy, bUnit testing |
 | [worker-service](templates/worker-service/) | Background processing | BackgroundService patterns, Wolverine/MassTransit consumers, proper cancellation |
 | [class-library](templates/class-library/) | NuGet packages, shared libraries | Public API design, XML docs, semantic versioning, SourceLink |
+| [console-cli](templates/console-cli/) | Console apps, CLI tools, dotnet tools | System.CommandLine 2.x, exit codes, stdio discipline, tool packaging, Native AOT |
+| [desktop-app](templates/desktop-app/) | Avalonia, WPF, WinForms, MAUI | MVVM with CommunityToolkit.Mvvm, Generic Host, UI threading, per-OS publishing |
 
 ## Roslyn MCP Server
 
@@ -409,10 +415,10 @@ Every default is documented with an ADR explaining **why**:
 dotnet-claude-kit/
 ├── CLAUDE.md                    # Instructions for developing THIS repo
 ├── AGENTS.md                    # Agent routing & orchestration
-├── agents/                      # 10 specialist agents
-├── skills/                      # 48 skills (incl. 17 slash-command workflows)
+├── agents/                      # 11 specialist agents
+├── skills/                      # 52 skills (incl. 17 slash-command workflows)
 ├── .claude/rules/               # 10 always-loaded rules
-├── templates/                   # 5 drop-in CLAUDE.md templates
+├── templates/                   # 7 drop-in CLAUDE.md templates
 ├── knowledge/                   # Living reference documents + ADRs
 ├── mcp/CWM.RoslynNavigator/     # Roslyn MCP server (23 tools)
 ├── mcp-configs/                 # MCP server config templates

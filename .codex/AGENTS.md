@@ -16,13 +16,14 @@ This project uses [dotnet-claude-kit](https://github.com/codewithmukesh/dotnet-c
 | code-reviewer | `agents/code-reviewer.md` | Multi-dimensional code review, PR review, quality gatekeeper |
 | build-error-resolver | `agents/build-error-resolver.md` | Autonomous build error fixing, iterative compilation repair |
 | refactor-cleaner | `agents/refactor-cleaner.md` | Dead code removal, systematic cleanup, safe refactoring |
+| app-engineer | `agents/app-engineer.md` | Console/CLI tools, desktop MVVM (Avalonia, WPF, WinForms, MAUI), Native AOT |
 
 ## Skills
 
 Skills live in `skills/<skill-name>/SKILL.md` and follow the Agent Skills open standard.
 
 ### .NET Domain Skills
-api-versioning, architecture-advisor, aspire, authentication, caching, ci-cd, clean-architecture, configuration, ddd, dependency-injection, docker, ef-core, error-handling, httpclient-factory, logging, messaging, minimal-api, modern-csharp, openapi, opentelemetry, project-setup, project-structure, resilience, scalar, serilog, testing, vertical-slice, container-publish
+api-versioning, architecture-advisor, aspire, authentication, caching, ci-cd, clean-architecture, configuration, ddd, dependency-injection, docker, ef-core, error-handling, httpclient-factory, logging, messaging, minimal-api, modern-csharp, openapi, opentelemetry, project-setup, project-structure, resilience, scalar, serilog, testing, vertical-slice, console-cli, desktop-mvvm, avalonia, native-aot, container-publish
 
 ### Workflow Skills (each registers a slash command and carries its methodology inline)
 arch-check, build-fix, checkpoint, code-review, de-sloppify, dotnet-init, health-check, migrate, outdated, plan, scaffold, security-scan, spec, tdd, verify, wrap-up
