@@ -25,12 +25,21 @@ Measured on a 39-project, 3,750-document solution (warm workspace, second call):
 - Anti-pattern, endpoint, and DI scans run files in parallel with deterministic output order; stack traces resolve each distinct method once
 - `get_test_coverage_map` no longer counts anonymous types and tuples as untested production types, which had deflated the percentage
 - The navigator's own test suite shares one solution fixture (~26s → ~15s)
+
+### Testing (navigator)
+- **604 → 860 tests**, line coverage 79.5% → 81.6% with an 80% floor enforced in CI, and the suite runs on Windows, macOS, and Linux
+- **Every tool is contract-tested automatically by reflection:** not-ready and error states, and prompt cancellation, so a new tool can't ship without them
+- **End-to-end over real MCP stdio:** the built server is spawned, `tools/list` must match the assembly, and every tool is called with valid and invalid arguments
+- **Response and schema snapshots** catch silent contract changes (renamed fields change how agents call tools)
+- **Scale tests on generated 50/200/500-project solutions** with relative time budgets, response-size and memory ceilings, in a separate CI job. At 500 projects, load takes 45s and the heavy tools stay under 130ms except `find_dead_code`
+- TestData is isolated from the server's own build files, and the sample gained a test project so the coverage map's scan path runs
 - **Ready as soon as the solution opens** (20–29s → 8–10s on the same solution). Compilations now warm in the background at full parallelism, and cold symbol lookups compile projects concurrently. The 50-project lazy-load threshold is gone because every size now warms in the background
 - **New files no longer force a full reload.** A new `.cs` file in an SDK-style project is added in place on the next call (~1.5s, previously a 14–16s blocking reload after up to 60s). Projects with custom compile items still fall back to a reload. Files a project excludes no longer trigger a reload every 60 seconds
 - **Per-call change detection** uses directory listings instead of statting every document (~110ms → ~10ms per call). Deleted files are now dropped instead of lingering in results
 - Opt-in telemetry does its measuring off the request path (first recorded call 75ms → ~0ms)
 
 ### Fixed (navigator)
+- **Unknown option values silently meant "everything".** `get_diagnostics scope="galaxy"` returned the whole solution's diagnostics, and `find_dead_code scope="Project"` missed a case-sensitive check and scanned everything. Seven tools now reject unknown values with `InvalidArgument`, and a file or project filter that matches nothing returns `FileNotFound`/`InvalidArgument` instead of an empty result
 - **Tool calls stalled or returned `Loading` during reloads.** After the first load, a `.csproj`/`Directory.*` change now reloads in the background while calls keep answering from the previous snapshot (flagged with a `WorkspaceWarning`), then swaps atomically. Racing callers share one reload, a failed reload keeps the last good snapshot, and old workspaces are disposed only when their last call finishes. Over real stdio with a csproj edit every 7s: 98% → 100% of calls answered, worst call 8.3s → 14ms, 24 → 7 loads for 6 edits
 - **Nested build files were never watched.** `Directory.Build.props`/`.targets`, `Directory.Packages.props`, `global.json`, and `NuGet.config` are now watched in every folder from each project up to the root, as MSBuild resolves them, and so are the `.sln`/`.slnx` files themselves
 - **MCP roots were one-shot.** Discovery retries when no root has a solution yet, `roots/list_changed` is handled, and an explicit `--solution` always wins
