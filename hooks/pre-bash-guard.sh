@@ -404,6 +404,11 @@ check_rm() {
       block "recursive delete of the shared package cache '$t'. Every project on this machine restores from it — clear a single package or use 'dotnet nuget locals' deliberately instead."
   done
   ((force)) || return 0
+  # No visible target means the paths arrive from somewhere the guard cannot
+  # read: xargs stdin, or find's {} placeholder (dropped as grouping by the
+  # tokenizer). A bare `rm -rf` does nothing, so blocking it costs nothing.
+  ((${#targets[@]})) ||
+    block "rm -rf with targets supplied by xargs or find -exec. The guard cannot see what will be deleted — list the paths explicitly."
   for t in "${targets[@]}"; do
     is_safe_target "$t" ||
       block "rm -rf detected in a project directory. Verify the target path is intentional."

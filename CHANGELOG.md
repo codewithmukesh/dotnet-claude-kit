@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Quoted strings, comments, and heredoc bodies are data and never trigger a rule
   - Coverage went up rather than down: `sudo rm -rf`, `xargs rm -rf`, `find -exec rm -rf`, `$(...)` and `` `...` `` bodies, and combined `sh -c` flag spellings (`-lc`, `-cx`, `-ec`) are now recognised — an exact `-c` token match had been one letter away from a bypass
   - Parsing runs in-process instead of spawning six `echo | grep` pipelines, so a typical command costs ~15ms instead of ~79ms
+- **`rm -rf` with no visible target is blocked again** — after the command-word parse, `xargs rm -rf` and `find … -exec rm -rf {} +` had no target the guard could see, so the allowlist loop never ran and the command passed. Paths fed from stdin or `{}` are unknowable, so a forced recursive `rm` without explicit targets now blocks
+- **`hooks/post-edit-format.sh` formatted nothing on Windows** — `dotnet format --include` takes a cwd-relative path and the project argument must be a native path under Git Bash; either mistake was a silent no-op. A failed `dotnet format` is now printed instead of discarded (the hook still exits 0)
 - **`.github/scripts/test-hooks.sh` reported false passes where `timeout` is absent** — the watchdog fallback backgrounds the hook, and bash gives an asynchronous command `/dev/null` for stdin unless it carries its own redirection. The hook under test read an empty payload, blocked nothing, and every case "passed". On macOS and minimal Linux images the whole pre-bash-guard suite was vacuous
 
 ### Added

@@ -231,6 +231,12 @@ guard_case 2 "blocks rm -rf passed through xargs" \
   "find . -name obj | xargs rm -rf /Users/dev/project"
 guard_case 2 "blocks rm -rf passed through find -exec" \
   "find . -name '*.tmp' -exec rm -rf /Users/dev/project {} ;"
+guard_case 2 "blocks rm -rf whose targets come only from xargs stdin" \
+  "git ls-files | xargs rm -rf"
+guard_case 2 "blocks rm -rf whose only target is find's {} placeholder" \
+  "find . -name '*.cs' -exec rm -rf {} +"
+guard_case 0 "allows rm -r without -f when targets come from xargs" \
+  "git ls-files | xargs rm -r"
 
 echo ""
 echo "=== pre-bash-guard.sh: shared machine resources ==="
