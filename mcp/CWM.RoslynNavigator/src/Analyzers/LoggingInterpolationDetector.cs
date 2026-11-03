@@ -45,11 +45,6 @@ internal sealed class LoggingInterpolationDetector : IAntiPatternDetector
             if (template is null)
                 continue;
 
-            // A template the compiler folds to a single constant is correct code, whether it
-            // was written as adjacent literals or as a const reference.
-            if (model.GetConstantValue(template, context.Ct).HasValue)
-                continue;
-
             var (message, snippetSource) = template switch
             {
                 InterpolatedStringExpressionSyntax => (
@@ -62,6 +57,12 @@ internal sealed class LoggingInterpolationDetector : IAntiPatternDetector
             };
 
             if (message is null || snippetSource is null)
+                continue;
+
+            // A template the compiler folds to a single constant is correct code, whether it
+            // was written as adjacent literals or as a const reference. Asked only now: a plain
+            // literal template (most log calls) never needs the method body bound.
+            if (model.GetConstantValue(template, context.Ct).HasValue)
                 continue;
 
             var line = snippetSource.GetLocation().GetLineSpan().StartLinePosition.Line + 1;

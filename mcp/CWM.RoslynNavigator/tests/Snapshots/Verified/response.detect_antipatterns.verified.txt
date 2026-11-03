@@ -2,159 +2,98 @@
   "Violations": [
     {
       "Id": "AP001",
-      "Severity": "error",
-      "Message": "async void method 'FireAndForget' swallows exceptions and cannot be awaited",
       "File": "SampleApi/AntiPatternExamples.cs",
       "Line": 20,
       "Snippet": "async void FireAndForget(...)",
-      "Suggestion": "Change return type to Task or Task<T>",
-      "Confidence": "high",
-      "Member": "AntiPatternExamples.FireAndForget",
-      "SourceKind": "production"
+      "Member": "AntiPatternExamples.FireAndForget"
     },
     {
       "Id": "AP002",
-      "Severity": "error",
-      "Message": "Synchronous blocking via .GetAwaiter().GetResult() causes deadlocks and thread pool starvation",
-      "File": "SampleApi/AntiPatternExamples.cs",
-      "Line": 42,
-      "Snippet": "task.GetAwaiter().GetResult()",
-      "Suggestion": "Use await instead of synchronous blocking",
-      "Confidence": "high",
-      "Member": "AntiPatternExamples.GetResultViaAwaiter",
-      "SourceKind": "production"
-    },
-    {
-      "Id": "AP002",
-      "Severity": "error",
-      "Message": "Synchronous blocking via .Result causes deadlocks and thread pool starvation",
       "File": "SampleApi/AntiPatternExamples.cs",
       "Line": 35,
       "Snippet": "task.Result",
-      "Suggestion": "Use await instead of synchronous blocking",
-      "Confidence": "high",
       "Member": "AntiPatternExamples.GetResultSync",
-      "SourceKind": "production"
+      "Message": "Synchronous blocking via .Result causes deadlocks and thread pool starvation"
+    },
+    {
+      "Id": "AP002",
+      "File": "SampleApi/AntiPatternExamples.cs",
+      "Line": 42,
+      "Snippet": "task.GetAwaiter().GetResult()",
+      "Member": "AntiPatternExamples.GetResultViaAwaiter"
     },
     {
       "Id": "AP003",
-      "Severity": "warning",
-      "Message": "Direct HttpClient instantiation causes socket exhaustion under load",
       "File": "SampleApi/AntiPatternExamples.cs",
       "Line": 48,
       "Snippet": "new HttpClient()",
-      "Suggestion": "Use IHttpClientFactory via dependency injection",
-      "Confidence": "high",
-      "Member": "AntiPatternExamples.CreateHttpClient",
-      "SourceKind": "production"
+      "Member": "AntiPatternExamples.CreateHttpClient"
     },
     {
       "Id": "AP004",
-      "Severity": "warning",
-      "Message": "Direct use of DateTime.Now is untestable and inconsistent across time zones",
       "File": "SampleApi/AntiPatternExamples.cs",
       "Line": 55,
       "Snippet": "DateTime.Now",
-      "Suggestion": "Inject TimeProvider and use TimeProvider.GetUtcNow()",
-      "Confidence": "high",
-      "Member": "AntiPatternExamples.UseDateTime",
-      "SourceKind": "production"
+      "Member": "AntiPatternExamples.UseDateTime"
     },
     {
       "Id": "AP004",
-      "Severity": "warning",
-      "Message": "Direct use of DateTime.UtcNow is untestable and inconsistent across time zones",
       "File": "SampleApi/AntiPatternExamples.cs",
       "Line": 56,
       "Snippet": "DateTime.UtcNow",
-      "Suggestion": "Inject TimeProvider and use TimeProvider.GetUtcNow()",
-      "Confidence": "high",
       "Member": "AntiPatternExamples.UseDateTime",
-      "SourceKind": "production"
+      "Message": "Direct use of DateTime.UtcNow is untestable and inconsistent across time zones"
     },
     {
       "Id": "AP005",
-      "Severity": "warning",
-      "Message": "catch(Exception) catches all exceptions including critical system exceptions",
       "File": "SampleApi/AntiPatternExamples.cs",
       "Line": 68,
       "Snippet": "catch (Exception) { ... }",
-      "Suggestion": "Catch specific exception types relevant to the operation",
-      "Confidence": "high",
-      "Member": "AntiPatternExamples.BroadCatch",
-      "SourceKind": "production"
+      "Member": "AntiPatternExamples.BroadCatch"
     },
     {
       "Id": "AP006",
-      "Severity": "warning",
-      "Message": "String concatenation in LogWarning() bypasses structured logging",
-      "File": "SampleApi/AntiPatternExamples.cs",
-      "Line": 83,
-      "Snippet": "\"User \" + name + \" logged in\"",
-      "Suggestion": "Use message template: LogWarning(\"Message {Param}\", value)",
-      "Confidence": "high",
-      "Member": "AntiPatternExamples.LogWithConcatenation",
-      "SourceKind": "production"
-    },
-    {
-      "Id": "AP006",
-      "Severity": "warning",
-      "Message": "String interpolation in LogInformation() bypasses structured logging",
       "File": "SampleApi/AntiPatternExamples.cs",
       "Line": 77,
       "Snippet": "$\"User {name} logged in\"",
-      "Suggestion": "Use message template: LogInformation(\"Message {Param}\", value)",
-      "Confidence": "high",
       "Member": "AntiPatternExamples.LogWithInterpolation",
-      "SourceKind": "production"
+      "Message": "String interpolation in LogInformation() bypasses structured logging"
+    },
+    {
+      "Id": "AP006",
+      "File": "SampleApi/AntiPatternExamples.cs",
+      "Line": 83,
+      "Snippet": "\"User \" + name + \" logged in\"",
+      "Member": "AntiPatternExamples.LogWithConcatenation",
+      "Suggestion": "Use message template: LogWarning(\"Message {Param}\", value)"
     },
     {
       "Id": "AP007",
-      "Severity": "error",
-      "Message": "Empty catch block silently swallows errors",
       "File": "SampleApi/AntiPatternExamples.cs",
       "Line": 93,
       "Snippet": "catch (InvalidOperationException) { }",
-      "Suggestion": "Log the exception or rethrow. If intentionally ignoring, add a comment explaining why",
-      "Confidence": "high",
-      "Member": "AntiPatternExamples.EmptyCatch",
-      "SourceKind": "production"
+      "Member": "AntiPatternExamples.EmptyCatch"
     },
     {
       "Id": "AP008",
-      "Severity": "warning",
-      "Message": "#pragma warning disable CS0219 has no matching restore",
       "File": "SampleApi/AntiPatternExamples.cs",
       "Line": 99,
-      "Snippet": "#pragma warning disable CS0219",
-      "Suggestion": "Add #pragma warning restore CS0219 after the affected code",
-      "Confidence": "high",
-      "Member": null,
-      "SourceKind": "production"
+      "Snippet": "#pragma warning disable CS0219"
     },
     {
       "Id": "AP009",
-      "Severity": "warning",
-      "Message": "Public async method 'DoWorkAsync' has no CancellationToken parameter",
       "File": "SampleApi/AntiPatternExamples.cs",
       "Line": 106,
       "Snippet": "public async Task DoWorkAsync(...)",
-      "Suggestion": "Add CancellationToken ct = default as the last parameter",
-      "Confidence": "medium",
       "Member": "AntiPatternExamples.DoWorkAsync",
-      "SourceKind": "production"
+      "Confidence": "medium"
     },
     {
       "Id": "AP010",
-      "Severity": "warning",
-      "Message": "EF Core read query without AsNoTracking() allocates unnecessary change-tracking state",
       "File": "SampleApi/AntiPatternExamples.cs",
       "Line": 119,
       "Snippet": "db.Customers.Where(c => c.Name != \"\").ToListAsync()",
-      "Suggestion": "Add .AsNoTracking() before the terminal method for read-only queries",
-      "Confidence": "high",
-      "Member": "AntiPatternExamples.ListCustomersAsync",
-      "SourceKind": "production"
+      "Member": "AntiPatternExamples.ListCustomersAsync"
     }
   ],
   "Count": 13,
@@ -244,5 +183,67 @@
     "MigrationFiles": 0,
     "SuppressionConfig": null,
     "GradeOn": "high-confidence findings only"
-  }
+  },
+  "Rules": [
+    {
+      "Id": "AP001",
+      "Severity": "error",
+      "Message": "async void method 'FireAndForget' swallows exceptions and cannot be awaited",
+      "Suggestion": "Change return type to Task or Task<T>"
+    },
+    {
+      "Id": "AP002",
+      "Severity": "error",
+      "Message": "Synchronous blocking via .GetAwaiter().GetResult() causes deadlocks and thread pool starvation",
+      "Suggestion": "Use await instead of synchronous blocking"
+    },
+    {
+      "Id": "AP003",
+      "Severity": "warning",
+      "Message": "Direct HttpClient instantiation causes socket exhaustion under load",
+      "Suggestion": "Use IHttpClientFactory via dependency injection"
+    },
+    {
+      "Id": "AP004",
+      "Severity": "warning",
+      "Message": "Direct use of DateTime.Now is untestable and inconsistent across time zones",
+      "Suggestion": "Inject TimeProvider and use TimeProvider.GetUtcNow()"
+    },
+    {
+      "Id": "AP005",
+      "Severity": "warning",
+      "Message": "catch(Exception) catches all exceptions including critical system exceptions",
+      "Suggestion": "Catch specific exception types relevant to the operation"
+    },
+    {
+      "Id": "AP006",
+      "Severity": "warning",
+      "Message": "String concatenation in LogWarning() bypasses structured logging",
+      "Suggestion": "Use message template: LogInformation(\"Message {Param}\", value)"
+    },
+    {
+      "Id": "AP007",
+      "Severity": "error",
+      "Message": "Empty catch block silently swallows errors",
+      "Suggestion": "Log the exception or rethrow. If intentionally ignoring, add a comment explaining why"
+    },
+    {
+      "Id": "AP008",
+      "Severity": "warning",
+      "Message": "#pragma warning disable CS0219 has no matching restore",
+      "Suggestion": "Add #pragma warning restore CS0219 after the affected code"
+    },
+    {
+      "Id": "AP009",
+      "Severity": "warning",
+      "Message": "Public async method 'DoWorkAsync' has no CancellationToken parameter",
+      "Suggestion": "Add CancellationToken ct = default as the last parameter"
+    },
+    {
+      "Id": "AP010",
+      "Severity": "warning",
+      "Message": "EF Core read query without AsNoTracking() allocates unnecessary change-tracking state",
+      "Suggestion": "Add .AsNoTracking() before the terminal method for read-only queries"
+    }
+  ]
 }

@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 
@@ -73,7 +74,7 @@ internal sealed class EfCoreNoTrackingDetector : IAntiPatternDetector
     public IEnumerable<AntiPatternViolation> Detect(DetectionContext context)
     {
         var model = context.Model;
-        if (model is null)
+        if (model is null || !CanSeeEntityQueries(model.Compilation))
             yield break;
 
         foreach (var invocation in context.Root.DescendantNodes().OfType<InvocationExpressionSyntax>())
@@ -102,11 +103,9 @@ internal sealed class EfCoreNoTrackingDetector : IAntiPatternDetector
             if (chainMethods.Any(MutationMethods.Contains))
                 continue;
 
-            // Load-to-mutate: tracking is required for SaveChanges to detect the edit.
-            if (IsLoadToMutate(invocation, model, context.Ct))
-                continue;
-
-            // Check if chain starts from a DbSet<T> property
+            // Check if chain starts from a DbSet<T> property. Checked before load-to-mutate:
+            // both bind, but this one binds a single expression and rejects every
+            // LINQ-to-objects chain, which is most ToList/First calls in a codebase.
             var chainRoot = GetChainRoot(invocation);
             if (chainRoot is null)
                 continue;
@@ -117,6 +116,10 @@ internal sealed class EfCoreNoTrackingDetector : IAntiPatternDetector
             // and ChangeTracker (context.ChangeTracker.Entries) also live in the EF Core
             // assembly but return scalars and tracker entries, which AsNoTracking cannot affect.
             if (!IsEntityQuerySource(typeInfo.Type))
+                continue;
+
+            // Load-to-mutate: tracking is required for SaveChanges to detect the edit.
+            if (IsLoadToMutate(invocation, model, context.Ct))
                 continue;
 
             var line = invocation.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
@@ -305,4 +308,20 @@ internal sealed class EfCoreNoTrackingDetector : IAntiPatternDetector
     /// </summary>
     private static bool IsEntityQuerySource(ITypeSymbol? type) =>
         type?.Name is "DbSet" or "DbQuery";
+
+    private static readonly ConditionalWeakTable<Compilation, StrongBox<bool>> EntityQueryVisibility = new();
+
+    /// <summary>
+    /// Whether any DbSet/DbQuery type is visible to the compilation — declared in source or in
+    /// a referenced EF Core / EF6 assembly. A project that cannot see one cannot produce a
+    /// finding, so its trees skip the binding entirely; most projects in a solution are not
+    /// the data layer.
+    /// </summary>
+    private static bool CanSeeEntityQueries(Compilation compilation) =>
+        EntityQueryVisibility.GetValue(compilation, static c => new StrongBox<bool>(
+            c.ContainsSymbolsWithName(name => name is "DbSet" or "DbQuery", SymbolFilter.Type)
+            || c.GetTypeByMetadataName("Microsoft.EntityFrameworkCore.DbSet`1") is not null
+            || c.GetTypeByMetadataName("Microsoft.EntityFrameworkCore.DbQuery`1") is not null
+            || c.GetTypeByMetadataName("System.Data.Entity.DbSet`1") is not null
+            || c.GetTypeByMetadataName("System.Data.Entity.Infrastructure.DbQuery`1") is not null)).Value;
 }

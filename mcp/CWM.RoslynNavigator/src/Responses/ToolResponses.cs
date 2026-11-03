@@ -253,18 +253,25 @@ internal sealed record SymbolDetail(
     string File,
     int Line);
 
+/// <summary>
+/// One finding. Fields equal to the finding's rule (see <see cref="AntiPatternRule"/>) are
+/// omitted: Severity, Message, and Suggestion appear only when they differ from the rule's.
+/// Confidence is omitted when "high" and SourceKind when "production".
+/// </summary>
 internal sealed record AntiPatternInfo(
     string Id,
-    string Severity,
-    string Message,
     string File,
     int Line,
     string Snippet,
-    string Suggestion,
-    string Confidence = "high",
-    string? Member = null,
-    string SourceKind = "production");
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Member = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Message = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Suggestion = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Severity = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Confidence = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SourceKind = null);
 
+/// <summary>What one detector id means, stated once instead of on every finding.</summary>
+internal sealed record AntiPatternRule(string Id, string Severity, string Message, string Suggestion);
 /// <summary>Per-detector counts, complete even when the violation list is truncated.</summary>
 internal sealed record AntiPatternIdSummary(
     string Id,
@@ -296,7 +303,25 @@ internal sealed record AntiPatternsResult(
     int TotalFound,
     bool Truncated,
     int Limit,
-    AntiPatternSummary? Summary = null);
+    AntiPatternSummary? Summary = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<AntiPatternRule>? Rules = null)
+{
+    /// <summary>Each finding with its rule's values filled back in for the omitted fields.</summary>
+    public List<AntiPatternInfo> Expand()
+    {
+        var rules = (Rules ?? []).ToDictionary(r => r.Id, StringComparer.Ordinal);
+        return [.. Violations.Select(v => rules.TryGetValue(v.Id, out var rule)
+            ? v with
+            {
+                Message = v.Message ?? rule.Message,
+                Suggestion = v.Suggestion ?? rule.Suggestion,
+                Severity = v.Severity ?? rule.Severity,
+                Confidence = v.Confidence ?? "high",
+                SourceKind = v.SourceKind ?? "production",
+            }
+            : v with { Confidence = v.Confidence ?? "high", SourceKind = v.SourceKind ?? "production" })];
+    }
+}
 
 // Dead code detection
 internal sealed record DeadCodeInfo(

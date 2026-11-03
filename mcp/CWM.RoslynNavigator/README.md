@@ -314,9 +314,13 @@ xUnit `[Fact]` is not a defect, so that detector runs on production only.
 `detect_antipatterns` takes `scope`: `production` (default) or `all`. The response
 summary always reports the file counts per kind, so nothing is silently skipped.
 
+To keep the response small, `Rules` states each reported detector's `Severity`, `Message`,
+and `Suggestion` once; a violation carries its own only where it differs from its rule.
+A violation omits `Confidence` when it is `high` and `SourceKind` when it is `production`.
+
 ### Confidence levels
 
-Findings carry `confidence`:
+Findings carry `confidence` (omitted in the response when `high`):
 
 - **`high`** — wrong regardless of context. Safe to grade and to act on directly.
 - **`medium`** — suspicious, but with legitimate uses the detector cannot rule out:

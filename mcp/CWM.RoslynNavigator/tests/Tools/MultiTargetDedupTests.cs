@@ -144,7 +144,7 @@ public sealed class MultiTargetDedupTests(MultiTargetSolutionFixture fixture) : 
 
         // Assert
         var result = JsonSerializer.Deserialize<AntiPatternsResult>(json)!;
-        Assert.Single(result.Violations, v => v.Id == "AP004");
+        Assert.Single(result.Expand(), v => v.Id == "AP004");
         Assert.Equal(1, result.Summary!.ScannedFiles);
     }
 
