@@ -1,0 +1,52 @@
+{
+  "Name": "clean-architecture",
+  "Tier": "small",
+  "Repository": "https://github.com/ardalis/CleanArchitecture",
+  "Commit": "e7c79be54ba0b001a5b332c1efe935f520b9db4b",
+  "CloneDirectory": "CleanArchitecture",
+  "Solution": "Clean.Architecture.slnx",
+  "Restore": "dotnet restore Clean.Architecture.slnx -p:NuGetAudit=false",
+  "Notes": [
+    "Restore needs -p:NuGetAudit=false: the repo treats NuGet vulnerability warnings (NU1902/NU1903 on SSH.NET and System.Security.Cryptography.Pkcs at this commit) as errors. Nothing in the source is changed."
+  ],
+  "Targets": {
+    "TypeName": "AppDbContext",
+    "TypeFile": "src/Clean.Architecture.Infrastructure/Data/AppDbContext.cs",
+    "InterfaceName": "IEmailSender",
+    "BaseClassName": "AppDbContext",
+    "MethodType": "GetContributorByIdRequest",
+    "MethodName": "BuildRoute",
+    "MethodFile": "src/Clean.Architecture.Web/Contributors/GetById.GetContributorByIdRequest.cs",
+    "MethodLine": 6,
+    "LargeFile": "src/Clean.Architecture.ServiceDefaults/Extensions.cs",
+    "DiagnosticsFile": "src/Clean.Architecture.Infrastructure/Data/AppDbContext.cs",
+    "StackTrace": "System.InvalidOperationException: Sequence contains no elements\n   at System.Linq.ThrowHelper.ThrowNoElementsException()\n   at Clean.Architecture.Web.Contributors.GetContributorByIdRequest.BuildRoute()\n   at Clean.Architecture.FunctionalTests.ApiEndpoints.ContributorGetById.ReturnsSeedContributorGivenId1()\n   at Clean.Architecture.FunctionalTests.ApiEndpoints.ContributorGetById.ReturnsNotFoundGivenId1000()\n   at System.Threading.ExecutionContext.RunInternal(ExecutionContext executionContext, ContextCallback callback, Object state)",
+    "StackMethods": [
+      "BuildRoute",
+      "ReturnsSeedContributorGivenId1",
+      "ReturnsNotFoundGivenId1000"
+    ],
+    "SelectedWith": "current 0.12.0.0",
+    "SelectionLog": [
+      "interface IEmailSender: find_implementations TotalFound=2",
+      "interface IListContributorsQueryService: find_implementations TotalFound=2",
+      "interface IDeleteContributorService: find_implementations TotalFound=1",
+      "class Contributor: find_references TotalFound=error AmbiguousMatch",
+      "class AppDbContext: find_references TotalFound=23",
+      "class List: find_references TotalFound=error AmbiguousMatch",
+      "class ContributorStatus: find_references TotalFound=14",
+      "class Create: find_references TotalFound=error AmbiguousMatch",
+      "class GetContributorByIdRequest: find_references TotalFound=9",
+      "class Program: find_references TotalFound=7",
+      "class Delete: find_references TotalFound=error AmbiguousMatch",
+      "class Constants: find_references TotalFound=7",
+      "class DeleteContributorService: find_references TotalFound=6",
+      "class Update: find_references TotalFound=error AmbiguousMatch",
+      "class UpdateContributorRequest: find_references TotalFound=7",
+      "method AppDbContext.SaveChanges: find_callers TotalFound=0",
+      "method GetContributorByIdRequest.BuildRoute: find_callers TotalFound=2",
+      "large file src\\Clean.Architecture.ServiceDefaults\\Extensions.cs (4801 bytes): get_file_outline ok",
+      "stack trace: GetContributorByIdRequest.BuildRoute + 2 callers"
+    ]
+  }
+}

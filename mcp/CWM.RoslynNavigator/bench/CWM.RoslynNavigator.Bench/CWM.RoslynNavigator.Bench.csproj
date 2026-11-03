@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Black-box benchmark harness. Talks to a server build over real MCP stdio, so the same
+    harness measures the current source build and any published release. It is a console
+    app, not a test project: `dotnet test` must never start a multi-minute corpus run.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>14</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>CWM.RoslynNavigator.Bench</RootNamespace>
+    <AssemblyName>CWM.RoslynNavigator.Bench</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <IsTestProject>false</IsTestProject>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol" />
+  </ItemGroup>
+
+  <!--
+    The token arithmetic and the file-read baseline are compiled in from the server's own
+    sources rather than re-implemented, so the benchmark and the server's opt-in telemetry
+    can never disagree about what a token or a baseline is.
+  -->
+  <ItemGroup>
+    <Compile Include="..\..\src\Telemetry\TokenEstimator.cs" Link="Shared\TokenEstimator.cs" />
+    <Compile Include="..\..\src\Telemetry\BaselineCalculator.cs" Link="Shared\BaselineCalculator.cs" />
+    <Compile Include="..\..\src\Telemetry\ResponseInspector.cs" Link="Shared\ResponseInspector.cs" />
+  </ItemGroup>
+
+</Project>
