@@ -41,6 +41,7 @@ CWM.RoslynNavigator is a Model Context Protocol (MCP) server that provides Claud
 | `analyze_change_impact` | Blast radius of changing one symbol: references by project and file, implementations and overrides that must move with it, transitive callers (interface/base dispatch included, counted in `IndirectCallers`), risk rating |
 | `get_token_savings` | Tokens this server has saved in this repository, with a per-tool leaderboard. Opt-in — see [Token savings](#token-savings) |
 | `get_symbol_at` | The symbol at a file position — pass the identifier `text` (or a `column`) on a `line`. Kind, signature, containing type, definition, `SymbolId`, and declared/expression types with nullability |
+| `preview_rename` | What a semantic rename **would** change — per-line old/new text across implementations, overrides and call sites, plus compiler errors it would introduce. Never writes to disk or the workspace — see [Rename preview](#rename-preview) |
 | `get_workspace_status` | What is loaded and how completely: solutions, project/document counts, warm-up progress, snapshot version, and every project that loaded or compiled incompletely — see [Workspace health](#workspace-health) |
 
 ### Symbol names
@@ -163,6 +164,25 @@ When the workspace is incomplete, any tool result that comes back **empty** — 
 (or `Count`) of 0, or a `SymbolNotFound` / `FileNotFound` error — gains a `WorkspaceWarning`
 property naming the incomplete projects, so "nothing found" is not mistaken for "nothing
 exists". Non-empty results and healthy workspaces are untouched.
+
+### Rename preview
+
+`preview_rename` runs Roslyn's renamer (`Renamer.RenameSymbolAsync`) on the immutable
+`Solution` snapshot and diffs the result. The workspace is never updated and nothing is
+written — the server's tools stay read-only; apply the edits yourself.
+
+| Field | Meaning |
+|-------|---------|
+| `Changes` | One entry per changed line: `File`, `Line`, `Old`, `New` (trimmed), capped by `maxResults` with the usual `Count`/`TotalFound`/`Truncated`/`Limit` |
+| `Files` | Distinct files touched |
+| `Conflicts` | Errors present after the rename but not before (e.g. `CS0111` when the new name duplicates a member), up to 20; `ConflictCount` is the total |
+
+Conflicts are checked where a rename can break things without a full rebuild: semantic
+errors in the changed documents, and declaration errors (duplicate members, clashing type
+names) across the projects that contain them. Roslyn's own conflict-resolution details are
+not public API, so they are not reported separately. `newName` must be a valid C#
+identifier (`@` escapes a keyword); `renameOverloads`, `renameInStrings`, and
+`renameInComments` mirror the IDE options.
 
 ## Token savings
 
@@ -529,7 +549,7 @@ WorkspaceInitializer.cs → BackgroundService triggers workspace load on startup
 SolutionDiscovery.cs    → Auto-detect .sln/.slnx from args or working directory
 SolutionFileReader.cs   → List a solution's projects (multi-solution dedupe and membership)
 SymbolResolver.cs       → Cross-project symbol resolution with disambiguation
-Tools/                  → MCP tool implementations (25 read-only tools)
+Tools/                  → MCP tool implementations (26 read-only tools)
 Responses/              → Token-optimized JSON response DTOs
 Telemetry/              → Opt-in local measurement, behind one call-tool filter
 

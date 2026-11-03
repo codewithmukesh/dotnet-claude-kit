@@ -415,6 +415,31 @@ internal sealed record SymbolAtResult(
     bool IsGenerated,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Assembly = null);
 
+// Rename preview
+/// <summary>One changed line: its text before and after the rename, trimmed.</summary>
+internal sealed record RenameEdit(string File, int Line, string Old, string New);
+
+/// <summary>
+/// What a rename would change. Count/TotalFound/Truncated describe <see cref="Changes"/>;
+/// <see cref="Conflicts"/> are compiler errors the rename would introduce (capped at 20,
+/// <see cref="ConflictCount"/> is the full number).
+/// </summary>
+internal sealed record RenamePreviewResult(
+    string Symbol,
+    string Kind,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SymbolId,
+    string OldName,
+    string NewName,
+    List<RenameEdit> Changes,
+    int Count,
+    int TotalFound,
+    int Files,
+    bool Truncated,
+    int Limit,
+    List<DiagnosticInfo> Conflicts,
+    int ConflictCount,
+    string Note);
+
 // Symbol source
 internal sealed record SymbolSourceResult(
     string Name,
