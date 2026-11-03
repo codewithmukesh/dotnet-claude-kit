@@ -33,7 +33,9 @@ internal sealed record WarmUpProgress(string State, int Compiled, int Total, lon
 internal sealed class WorkspaceHealth(TimeProvider clock)
 {
     private readonly ConcurrentQueue<LoadDiagnostic> _diagnostics = new();
+    private readonly ConcurrentDictionary<(string Kind, string Message), byte> _seenDiagnostics = new();
     private readonly ConcurrentDictionary<ProjectId, string> _compileProblems = new();
+    private readonly ConcurrentDictionary<ProjectId, IReadOnlyList<string>> _removedAnalyzers = new();
     private readonly Lock _gate = new();
     private int _compiled;
     private int _total;
@@ -46,10 +48,27 @@ internal sealed class WorkspaceHealth(TimeProvider clock)
     /// <summary>Bumped on every recorded fact; part of the problem-list cache key.</summary>
     public int Revision => Volatile.Read(ref _revision);
 
+    /// <summary>
+    /// Records a load diagnostic once. A parallel load (<see cref="ParallelSolutionLoader"/>)
+    /// can evaluate a shared project in several build hosts, each reporting the same message.
+    /// </summary>
     public void RecordDiagnostic(WorkspaceDiagnosticKind kind, string message)
     {
-        _diagnostics.Enqueue(new LoadDiagnostic(
-            kind == WorkspaceDiagnosticKind.Failure ? "failure" : "warning", message, null));
+        var kindName = kind == WorkspaceDiagnosticKind.Failure ? "failure" : "warning";
+        if (!_seenDiagnostics.TryAdd((kindName, message), 0))
+            return;
+
+        _diagnostics.Enqueue(new LoadDiagnostic(kindName, message, null));
+        Interlocked.Increment(ref _revision);
+    }
+
+    /// <summary>
+    /// Records analyzer/generator paths that did not exist at load and were removed from the
+    /// project (see <see cref="UnresolvedAnalyzerReferences"/>), so they are still reported.
+    /// </summary>
+    public void RecordRemovedAnalyzers(ProjectId projectId, IReadOnlyList<string> paths)
+    {
+        _removedAnalyzers[projectId] = paths;
         Interlocked.Increment(ref _revision);
     }
 
@@ -167,6 +186,12 @@ internal sealed class WorkspaceHealth(TimeProvider clock)
 
             if (_compileProblems.TryGetValue(project.Id, out var compileProblem))
                 issues.Add(compileProblem);
+
+            if (_removedAnalyzers.TryGetValue(project.Id, out var removed))
+            {
+                foreach (var analyzerPath in removed)
+                    issues.Add($"analyzer/generator not found: {Path.GetFileName(analyzerPath)} (not built yet? build that project, or the solution, to load it)");
+            }
 
             foreach (var reference in project.AnalyzerReferences)
             {

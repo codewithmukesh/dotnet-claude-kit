@@ -156,6 +156,14 @@ project, the issues found:
 - compilation threw, or the core library is unresolved (references missing — run `dotnet restore`)
 - an analyzer or source generator file that does not exist
 
+The last case is common on a fresh clone that was restored but not built: a project that
+references an in-solution analyzer project (`OutputItemType="Analyzer"`) points at a DLL
+that is not there yet. Roslyn cannot index such a reference, and implementation and
+derived-type searches used to fail with `Unexpected value 'UnresolvedAnalyzerReference'`.
+The server now drops those references when it loads (they contribute nothing to a
+compilation anyway) and lists them here, so every tool works on a fresh clone. Build the
+analyzer project to get its generated code.
+
 It also carries the raw `LoadDiagnostics`, background warm-up progress (`WarmUp`:
 `Compiled` of `Total`), `SnapshotVersion`, which increments on every reload or
 in-place document refresh, and `Reloading` / `ReloadReason` / `LastReloadError` for
@@ -403,6 +411,11 @@ You can also add it manually to your Claude Code global settings (`~/.claude/set
 Working across several solutions (e.g. microservices)? Repeat `--solution`, or add
 `--all-solutions` — see [Multiple Solutions](#multiple-solutions).
 
+Load tuning, rarely needed: `--load-parallelism N` sets how many MSBuild build hosts load
+the solution side by side (default: automatic; `1` = one host), and `--all-target-frameworks`
+keeps every target framework of a multi-targeted project loaded instead of one — see
+[Scaling](#scaling).
+
 ### As a Local Tool (per-repo)
 
 ```bash
@@ -572,6 +585,35 @@ One strategy for every solution size:
 - **Ready at open.** Tools answer as soon as the solution(s) are open; until then they
   return a `Loading` status. On a 39-project solution that is ~13 s after start instead of
   ~23 s.
+- **Several build hosts when the graph allows it.** MSBuildWorkspace evaluates and
+  design-time-builds projects one at a time in a single build host, which is nearly all of
+  the load time on a large solution. When a solution declares 12 or more projects, the
+  server reads the `ProjectReference` graph from the project files and splits the projects
+  into up to 4 groups (one per 4 cores and per 8 GB of memory), each loaded through a
+  solution filter over the real solution by its own build host, then merged so shared
+  projects exist once. Each group also loads its references, so this only pays off when no
+  project references nearly everything: the server estimates the speed-up from the graph and
+  splits only above 1.8×. Measured: eShop ready 7.2 s → 4.5 s, ABP 74 s → 53 s; OrchardCore
+  (whose web host references 228 of its 257 projects) and jellyfin stay on one host. The
+  cost is memory while loading: each build host holds up to ~1 GB until the load ends (ABP
+  with 4 hosts: 4.5 GB for server plus hosts, against 2.1 GB with one). `--load-parallelism N`
+  forces N hosts (`1` turns it off); the server logs a `Load profile` line after every load
+  showing where the time went.
+- **One target framework per project.** MSBuild loads a multi-targeted project once per
+  target framework, so its files are parsed, compiled, held in memory, and found by every
+  search 2-5 times. After a load the server keeps one instance per project — the highest
+  plain `netX.Y` the SDK supports, else .NET with an OS suffix, .NET Core, .NET Standard,
+  .NET Framework, in that order — and drops the others, except an instance a kept project
+  references (a `netstandard2.0`-only consumer keeps the library's `netstandard2.0` build) or
+  one that compiles a source file the primary does not, such as a file behind a conditional
+  `Compile` item (per-framework generated files under `obj/` are ignored for this check);
+  those stay, with a `Secondary target framework kept` load diagnostic saying why.
+  `get_workspace_status` lists the drop as a load diagnostic. The trade-off: code inside
+  `#if` blocks for a dropped framework is not indexed. Measured on ABP: 690 → 271
+  projects, 15,212 → 6,207 documents, warm-up 4.5-5.0 s → 3.2-3.8 s, peak working set at
+  warm-up ~1,025 MB → ~870 MB; on eShop 35 → 28 projects, 1,293 → 673 documents. Ready
+  time is unchanged (every framework is still evaluated; pruning takes ~0.2 s on ABP).
+  Pass `--all-target-frameworks` to keep every instance.
 - **Background warm-up.** Every project then compiles in the background, one build per
   core, dependencies first. A reload cancels the warm-up of the snapshot it replaces.
 - **Queries never wait in line.** A tool that needs a compilation the warm-up has not

@@ -110,6 +110,7 @@ var app = builder.Build();
 var workspaceManager = app.Services.GetRequiredService<WorkspaceManager>();
 workspaceManager.Services = app.Services;
 workspaceManager.DiscoverAllSolutions = SolutionDiscovery.IsAllSolutionsMode(args);
+WorkspaceOptions.Apply(args, workspaceManager);
 workspaceManager.HasConfiguredSolutions = solutionPaths.Count > 0;
 
 var logger = app.Services.GetRequiredService<ILogger<Program>>();

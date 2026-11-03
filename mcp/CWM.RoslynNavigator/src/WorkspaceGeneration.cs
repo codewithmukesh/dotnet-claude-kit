@@ -1,4 +1,4 @@
-using Microsoft.CodeAnalysis.MSBuild;
+using Microsoft.CodeAnalysis;
 
 namespace CWM.RoslynNavigator;
 
@@ -12,13 +12,13 @@ namespace CWM.RoslynNavigator;
 /// duration instead; once the generation is retired and its last lease is released, the
 /// workspace is disposed, so a superseded workspace never outlives the calls that use it.</para>
 /// </summary>
-internal sealed class WorkspaceGeneration(MSBuildWorkspace workspace, Action onDisposed)
+internal sealed class WorkspaceGeneration(Workspace workspace, Action onDisposed)
 {
     private int _leases;
     private int _retired;
     private int _disposed;
 
-    public MSBuildWorkspace Workspace => workspace;
+    public Workspace Workspace => workspace;
 
     public bool IsDisposed => Volatile.Read(ref _disposed) == 1;
 
