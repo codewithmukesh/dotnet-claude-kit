@@ -86,7 +86,13 @@ if [[ -n "$PROJECT" ]]; then
     case "$FILE" in
         "$CWD"/*) INCLUDE="${FILE#"$CWD"/}" ;;
     esac
-    dotnet format "$PROJECT" --include "$INCLUDE" --no-restore 2>/dev/null || true
+    # Report a failed format instead of discarding it — that is what kept the
+    # path bug above invisible. Still exit 0: mid-edit files routinely fail to
+    # compile, and a hook that fails there would interrupt an ordinary edit.
+    if ! FORMAT_OUTPUT=$(dotnet format "$PROJECT" --include "$INCLUDE" --no-restore 2>&1); then
+        echo "post-edit-format: dotnet format failed for $INCLUDE (file left unformatted)"
+        echo "$FORMAT_OUTPUT"
+    fi
 else
     echo "No .csproj or .sln found for $FILE, skipping format"
 fi
