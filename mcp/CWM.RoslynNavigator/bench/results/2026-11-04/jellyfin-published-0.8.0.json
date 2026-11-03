@@ -1,0 +1,646 @@
+{
+  "Schema": 1,
+  "RunDate": "2026-11-04",
+  "GeneratedAtUtc": "2026-11-03T19:04:58.6852506+00:00",
+  "Corpus": {
+    "Name": "jellyfin",
+    "Tier": "medium",
+    "Repository": "https://github.com/jellyfin/jellyfin",
+    "Commit": "5b385862fb97201d954a6ac7c9c745d791a738fa",
+    "Solution": "Jellyfin.slnx",
+    "ProjectsDeclared": 41,
+    "ProjectsLoaded": 41,
+    "CsFiles": 2248,
+    "CsBytes": 13749380,
+    "Notes": [
+      "The in-solution analyzer project src/Jellyfin.CodeAnalysis (referenced as OutputItemType=Analyzer from Directory.Build.props) is built after restore, as it would be in any developer's working copy. On a restore-only clone it is an UnresolvedAnalyzerReference, and the server's SymbolFinder-based tools throw (server bug; see the Server bugs section of bench/README.md)."
+    ]
+  },
+  "Build": {
+    "Label": "published-0.8.0",
+    "ServerVersion": "0.8.0.0",
+    "Executable": "cwm-roslyn-navigator.exe"
+  },
+  "Environment": {
+    "Os": "Microsoft Windows 10.0.26300",
+    "ProcessorCount": 24,
+    "Runtime": ".NET 10.0.14",
+    "Machine": "X64"
+  },
+  "Settings": {
+    "WarmIterations": 5,
+    "CallTimeoutSeconds": 300,
+    "WarmSkipMs": 60000,
+    "GrepHeadLimit": 250,
+    "BytesPerToken": 3.5,
+    "DivisorCalibrated": false,
+    "PrefillTokensPerSecond": 10000
+  },
+  "Startup": {
+    "ReadyMs": 16585,
+    "FirstAnswerMs": 16594,
+    "FirstAnswerStatus": "ok",
+    "WarmMs": 16321,
+    "Memory": {
+      "Supported": true,
+      "ServerPeakBytes": 1220915200,
+      "BuildHostPeakBytes": 305074176,
+      "CombinedPeakBytes": 1219198976,
+      "BuildHostProcesses": 2
+    },
+    "Restarts": 0,
+    "LoadProblems": []
+  },
+  "Tools": [
+    {
+      "Tool": "find_symbol",
+      "Arguments": {
+        "name": "BaseItem",
+        "kind": "class",
+        "maxResults": "50"
+      },
+      "Status": "ok",
+      "ColdMs": 2.3,
+      "WarmMedianMs": 1.1,
+      "WarmP95Ms": 1.7,
+      "WarmSamples": 5,
+      "Bytes": 184,
+      "Tokens": 53
+    },
+    {
+      "Tool": "find_references",
+      "Arguments": {
+        "symbolName": "IApplicationPaths",
+        "maxResults": "100"
+      },
+      "Status": "ok",
+      "ColdMs": 839.9,
+      "WarmMedianMs": 4.5,
+      "WarmP95Ms": 6.8,
+      "WarmSamples": 5,
+      "Bytes": 18772,
+      "Tokens": 5363
+    },
+    {
+      "Tool": "find_implementations",
+      "Arguments": {
+        "interfaceName": "IApplicationPaths",
+        "maxResults": "100"
+      },
+      "Status": "ok",
+      "ColdMs": 1014.3,
+      "WarmMedianMs": 1.4,
+      "WarmP95Ms": 3.1,
+      "WarmSamples": 5,
+      "Bytes": 264,
+      "Tokens": 75
+    },
+    {
+      "Tool": "find_callers",
+      "Arguments": {
+        "methodName": "GetParent",
+        "className": "BaseItem",
+        "maxResults": "100"
+      },
+      "Status": "ok",
+      "ColdMs": 134.9,
+      "WarmMedianMs": 6.8,
+      "WarmP95Ms": 8.5,
+      "WarmSamples": 5,
+      "Bytes": 3633,
+      "Tokens": 1038
+    },
+    {
+      "Tool": "find_overrides",
+      "Arguments": {
+        "methodName": "GetDefaultPrimaryImageAspectRatio",
+        "className": "BaseItem",
+        "maxResults": "100"
+      },
+      "Status": "ok",
+      "ColdMs": 15.7,
+      "WarmMedianMs": 4.1,
+      "WarmP95Ms": 5,
+      "WarmSamples": 5,
+      "Bytes": 2563,
+      "Tokens": 732
+    },
+    {
+      "Tool": "get_type_hierarchy",
+      "Arguments": {
+        "typeName": "BaseItem",
+        "maxResults": "100"
+      },
+      "Status": "ok",
+      "ColdMs": 4.9,
+      "WarmMedianMs": 3.1,
+      "WarmP95Ms": 3.5,
+      "WarmSamples": 5,
+      "Bytes": 595,
+      "Tokens": 170
+    },
+    {
+      "Tool": "get_public_api",
+      "Arguments": {
+        "typeName": "BaseItem",
+        "maxResults": "100"
+      },
+      "Status": "ok",
+      "ColdMs": 18.5,
+      "WarmMedianMs": 2.3,
+      "WarmP95Ms": 3.5,
+      "WarmSamples": 5,
+      "Bytes": 9247,
+      "Tokens": 2642
+    },
+    {
+      "Tool": "get_symbol_detail",
+      "Arguments": {
+        "symbolName": "GetParent",
+        "containingType": "BaseItem"
+      },
+      "Status": "ok",
+      "ColdMs": 6.1,
+      "WarmMedianMs": 1,
+      "WarmP95Ms": 1.4,
+      "WarmSamples": 5,
+      "Bytes": 329,
+      "Tokens": 94
+    },
+    {
+      "Tool": "get_symbol_source",
+      "Arguments": {
+        "symbolName": "GetParent",
+        "containingType": "BaseItem",
+        "file": "MediaBrowser.Controller/Entities/BaseItem.cs",
+        "line": "1105"
+      },
+      "Status": "ok",
+      "ColdMs": 3.6,
+      "WarmMedianMs": 0.8,
+      "WarmP95Ms": 1.1,
+      "WarmSamples": 5,
+      "Bytes": 404,
+      "Tokens": 115,
+      "Truncated": false
+    },
+    {
+      "Tool": "get_file_outline",
+      "Arguments": {
+        "filePath": "MediaBrowser.Controller/MediaEncoding/EncodingHelper.cs",
+        "maxResults": "500"
+      },
+      "Status": "not-ready",
+      "ColdMs": 2.3,
+      "WarmMedianMs": 0.6,
+      "WarmP95Ms": 1.2,
+      "WarmSamples": 5,
+      "Bytes": 132,
+      "Tokens": 38,
+      "ErrorMessage": "{\"State\":\"NotFound\",\"Message\":\"File \\u0027MediaBrowser.Controller/MediaEncoding/EncodingHelper.cs\\u0027 not found in the solution.\"}"
+    },
+    {
+      "Tool": "get_project_graph",
+      "Arguments": {},
+      "Status": "ok",
+      "ColdMs": 5.8,
+      "WarmMedianMs": 4.9,
+      "WarmP95Ms": 5.5,
+      "WarmSamples": 5,
+      "Bytes": 21095,
+      "Tokens": 6027
+    },
+    {
+      "Tool": "get_dependency_graph",
+      "Arguments": {
+        "symbolName": "BaseItem.GetParent",
+        "file": "MediaBrowser.Controller/Entities/BaseItem.cs",
+        "line": "1105",
+        "depth": "2"
+      },
+      "Status": "ok",
+      "ColdMs": 4.4,
+      "WarmMedianMs": 0.9,
+      "WarmP95Ms": 2.1,
+      "WarmSamples": 5,
+      "Bytes": 86,
+      "Tokens": 25,
+      "Truncated": false
+    },
+    {
+      "Tool": "detect_circular_dependencies",
+      "Arguments": {
+        "scope": "projects"
+      },
+      "Status": "ok",
+      "ColdMs": 3.5,
+      "WarmMedianMs": 0.4,
+      "WarmP95Ms": 0.7,
+      "WarmSamples": 5,
+      "Bytes": 23,
+      "Tokens": 7
+    },
+    {
+      "Tool": "get_diagnostics",
+      "Arguments": {
+        "scope": "file",
+        "path": "MediaBrowser.Controller/Entities/BaseItem.cs",
+        "maxResults": "100"
+      },
+      "Status": "ok",
+      "ColdMs": 7.7,
+      "WarmMedianMs": 0.9,
+      "WarmP95Ms": 1.5,
+      "WarmSamples": 5,
+      "Bytes": 76,
+      "Tokens": 22
+    },
+    {
+      "Tool": "resolve_stack_trace",
+      "Arguments": {
+        "stackTrace": "<573 chars>",
+        "maxResults": "50"
+      },
+      "Status": "n/a",
+      "ColdMs": 0,
+      "WarmSamples": 0,
+      "Bytes": 0,
+      "Tokens": 0,
+      "Note": "Tool not exposed by this build."
+    },
+    {
+      "Tool": "get_nuget_packages",
+      "Arguments": {
+        "maxResults": "100"
+      },
+      "Status": "ok",
+      "ColdMs": 34,
+      "WarmMedianMs": 14.8,
+      "WarmP95Ms": 15.3,
+      "WarmSamples": 5,
+      "Bytes": 9096,
+      "Tokens": 2599
+    },
+    {
+      "Tool": "analyze_change_impact",
+      "Arguments": {
+        "symbolName": "BaseItem.GetParent",
+        "file": "MediaBrowser.Controller/Entities/BaseItem.cs",
+        "line": "1105",
+        "depth": "2"
+      },
+      "Status": "n/a",
+      "ColdMs": 0,
+      "WarmSamples": 0,
+      "Bytes": 0,
+      "Tokens": 0,
+      "Note": "Tool not exposed by this build."
+    },
+    {
+      "Tool": "get_di_registrations",
+      "Arguments": {
+        "maxResults": "100"
+      },
+      "Status": "ok",
+      "ColdMs": 1439.6,
+      "WarmMedianMs": 222.1,
+      "WarmP95Ms": 1291.2,
+      "WarmSamples": 5,
+      "Bytes": 21219,
+      "Tokens": 6063
+    },
+    {
+      "Tool": "get_endpoint_map",
+      "Arguments": {
+        "maxResults": "100"
+      },
+      "Status": "ok",
+      "ColdMs": 388.7,
+      "WarmMedianMs": 348.4,
+      "WarmP95Ms": 366.3,
+      "WarmSamples": 5,
+      "Bytes": 209,
+      "Tokens": 60
+    },
+    {
+      "Tool": "get_test_coverage_map",
+      "Arguments": {
+        "maxResults": "50"
+      },
+      "Status": "ok",
+      "ColdMs": 16857.5,
+      "WarmMedianMs": 5416.6,
+      "WarmP95Ms": 6050.1,
+      "WarmSamples": 5,
+      "Bytes": 6066,
+      "Tokens": 1733
+    },
+    {
+      "Tool": "detect_antipatterns",
+      "Arguments": {
+        "maxResults": "100"
+      },
+      "Status": "ok",
+      "ColdMs": 3062.6,
+      "WarmMedianMs": 2648.7,
+      "WarmP95Ms": 2896.8,
+      "WarmSamples": 5,
+      "Bytes": 32977,
+      "Tokens": 9422
+    },
+    {
+      "Tool": "find_dead_code",
+      "Arguments": {
+        "scope": "solution",
+        "maxResults": "50"
+      },
+      "Status": "ok",
+      "ColdMs": 14948,
+      "WarmMedianMs": 11225.1,
+      "WarmP95Ms": 11398.1,
+      "WarmSamples": 5,
+      "Bytes": 1625,
+      "Tokens": 464
+    }
+  ],
+  "Tasks": [
+    {
+      "Id": "locate-type",
+      "Title": "Locate the definition of BaseItem",
+      "Tool": "find_symbol",
+      "NavigatorStatus": "ok",
+      "NavigatorTokens": 53,
+      "NavigatorCalls": 1,
+      "NavigatorMeasuredMs": 1.1,
+      "GrepPattern": "\\b(class|record|struct|interface|enum)\\s+BaseItem\\b",
+      "GrepMatches": 1,
+      "GrepLinesShown": 1,
+      "GrepTokens": 44,
+      "GrepMeasuredMs": 81.7,
+      "FilesRead": 1,
+      "FileTokens": 30585,
+      "FileReadMeasuredMs": 0.1,
+      "ManualTokens": 30629,
+      "ManualCalls": 2,
+      "ManualMeasuredMs": 81.8,
+      "SavedTokens": 30576,
+      "SavingsPercent": 99.8,
+      "Multiplier": 577.9,
+      "ModelledSecondsSaved": 3.06
+    },
+    {
+      "Id": "interface-usages",
+      "Title": "Find all usages of IApplicationPaths",
+      "Tool": "find_references",
+      "NavigatorStatus": "ok",
+      "NavigatorTokens": 5363,
+      "NavigatorCalls": 1,
+      "NavigatorMeasuredMs": 4.5,
+      "GrepPattern": "\\bIApplicationPaths\\b",
+      "GrepMatches": 146,
+      "GrepLinesShown": 146,
+      "GrepTokens": 6064,
+      "GrepMeasuredMs": 80.3,
+      "FilesRead": 56,
+      "FileTokens": 181690,
+      "FileReadMeasuredMs": 4,
+      "ManualTokens": 187754,
+      "ManualCalls": 57,
+      "ManualMeasuredMs": 84.3,
+      "SavedTokens": 182391,
+      "SavingsPercent": 97.1,
+      "Multiplier": 35,
+      "ModelledSecondsSaved": 18.24
+    },
+    {
+      "Id": "implementations",
+      "Title": "List implementations of IApplicationPaths",
+      "Tool": "find_implementations",
+      "NavigatorStatus": "ok",
+      "NavigatorTokens": 75,
+      "NavigatorCalls": 1,
+      "NavigatorMeasuredMs": 1.4,
+      "GrepPattern": "[:,]\\s*IApplicationPaths\\b",
+      "GrepMatches": 22,
+      "GrepLinesShown": 22,
+      "GrepTokens": 1353,
+      "GrepMeasuredMs": 77.8,
+      "FilesRead": 2,
+      "FileTokens": 2898,
+      "FileReadMeasuredMs": 0.1,
+      "ManualTokens": 4251,
+      "ManualCalls": 3,
+      "ManualMeasuredMs": 78,
+      "SavedTokens": 4176,
+      "SavingsPercent": 98.2,
+      "Multiplier": 56.7,
+      "ModelledSecondsSaved": 0.42
+    },
+    {
+      "Id": "outline-file",
+      "Title": "Outline EncodingHelper.cs (largest file)",
+      "Tool": "get_file_outline",
+      "NavigatorStatus": "not-ready",
+      "NavigatorTokens": 38,
+      "NavigatorCalls": 1,
+      "NavigatorMeasuredMs": 0.6,
+      "GrepMatches": 0,
+      "GrepLinesShown": 0,
+      "GrepTokens": 0,
+      "GrepMeasuredMs": 0,
+      "FilesRead": 1,
+      "FileTokens": 102369,
+      "FileReadMeasuredMs": 0.2,
+      "ManualTokens": 102369,
+      "ManualCalls": 1,
+      "ManualMeasuredMs": 0.2
+    },
+    {
+      "Id": "read-method",
+      "Title": "Read the body of BaseItem.GetParent",
+      "Tool": "get_symbol_source",
+      "NavigatorStatus": "ok",
+      "NavigatorTruncated": false,
+      "NavigatorTokens": 115,
+      "NavigatorCalls": 1,
+      "NavigatorMeasuredMs": 0.8,
+      "GrepPattern": "\\bGetParent\\s*\\(",
+      "GrepMatches": 35,
+      "GrepLinesShown": 35,
+      "GrepTokens": 1161,
+      "GrepMeasuredMs": 80.3,
+      "FilesRead": 1,
+      "FileTokens": 30585,
+      "FileReadMeasuredMs": 0.1,
+      "ManualTokens": 31746,
+      "ManualCalls": 2,
+      "ManualMeasuredMs": 80.4,
+      "SavedTokens": 31631,
+      "SavingsPercent": 99.6,
+      "Multiplier": 276.1,
+      "ModelledSecondsSaved": 3.16
+    },
+    {
+      "Id": "find-callers",
+      "Title": "Find callers of BaseItem.GetParent",
+      "Tool": "find_callers",
+      "NavigatorStatus": "ok",
+      "NavigatorTokens": 1038,
+      "NavigatorCalls": 1,
+      "NavigatorMeasuredMs": 6.8,
+      "GrepPattern": "\\bGetParent\\s*\\(",
+      "GrepMatches": 35,
+      "GrepLinesShown": 35,
+      "GrepTokens": 1161,
+      "GrepMeasuredMs": 80.2,
+      "FilesRead": 12,
+      "FileTokens": 143589,
+      "FileReadMeasuredMs": 1.1,
+      "ManualTokens": 144750,
+      "ManualCalls": 13,
+      "ManualMeasuredMs": 81.3,
+      "SavedTokens": 143712,
+      "SavingsPercent": 99.3,
+      "Multiplier": 139.5,
+      "ModelledSecondsSaved": 14.37
+    },
+    {
+      "Id": "type-hierarchy",
+      "Title": "Type hierarchy of BaseItem",
+      "Tool": "get_type_hierarchy",
+      "NavigatorStatus": "ok",
+      "NavigatorTokens": 170,
+      "NavigatorCalls": 1,
+      "NavigatorMeasuredMs": 3.1,
+      "GrepPattern": ":\\s*[^;{]*\\bBaseItem\\b",
+      "GrepMatches": 93,
+      "GrepLinesShown": 93,
+      "GrepTokens": 2841,
+      "GrepMeasuredMs": 86.2,
+      "FilesRead": 0,
+      "FileTokens": 0,
+      "FileReadMeasuredMs": 0,
+      "ManualTokens": 2841,
+      "ManualCalls": 1,
+      "ManualMeasuredMs": 86.2,
+      "SavedTokens": 2671,
+      "SavingsPercent": 94,
+      "Multiplier": 16.7,
+      "ModelledSecondsSaved": 0.27
+    },
+    {
+      "Id": "project-graph",
+      "Title": "Project dependency graph",
+      "Tool": "get_project_graph",
+      "NavigatorStatus": "ok",
+      "NavigatorTokens": 6027,
+      "NavigatorCalls": 1,
+      "NavigatorMeasuredMs": 4.9,
+      "GrepPattern": "<ProjectReference",
+      "GrepMatches": 92,
+      "GrepLinesShown": 92,
+      "GrepTokens": 4080,
+      "GrepMeasuredMs": 2.7,
+      "FilesRead": 41,
+      "FileTokens": 18051,
+      "FileReadMeasuredMs": 3.2,
+      "ManualTokens": 22131,
+      "ManualCalls": 42,
+      "ManualMeasuredMs": 5.9,
+      "SavedTokens": 16104,
+      "SavingsPercent": 72.8,
+      "Multiplier": 3.7,
+      "ModelledSecondsSaved": 1.61
+    },
+    {
+      "Id": "di-registrations",
+      "Title": "DI registrations",
+      "Tool": "get_di_registrations",
+      "NavigatorStatus": "ok",
+      "NavigatorTokens": 6063,
+      "NavigatorCalls": 1,
+      "NavigatorMeasuredMs": 222.1,
+      "GrepPattern": "\\.(TryAdd|Add)(Keyed)?(Scoped|Transient|Singleton|Enumerable)\\b",
+      "GrepMatches": 180,
+      "GrepLinesShown": 180,
+      "GrepTokens": 7319,
+      "GrepMeasuredMs": 88.5,
+      "FilesRead": 2,
+      "FileTokens": 13499,
+      "FileReadMeasuredMs": 0.2,
+      "ManualTokens": 20818,
+      "ManualCalls": 3,
+      "ManualMeasuredMs": 88.8,
+      "SavedTokens": 14755,
+      "SavingsPercent": 70.9,
+      "Multiplier": 3.4,
+      "ModelledSecondsSaved": 1.48
+    },
+    {
+      "Id": "endpoint-map",
+      "Title": "HTTP endpoint map",
+      "Tool": "get_endpoint_map",
+      "NavigatorStatus": "ok",
+      "NavigatorTokens": 60,
+      "NavigatorCalls": 1,
+      "NavigatorMeasuredMs": 348.4,
+      "GrepPattern": "\\.Map(Get|Post|Put|Delete|Patch|Methods|Group)\\s*\\(|\\[(Http(Get|Post|Put|Delete|Patch)|Route)\\b",
+      "GrepMatches": 436,
+      "GrepLinesShown": 250,
+      "GrepTokens": 6388,
+      "GrepMeasuredMs": 91.8,
+      "FilesRead": 1,
+      "FileTokens": 404,
+      "FileReadMeasuredMs": 0.1,
+      "ManualTokens": 6792,
+      "ManualCalls": 2,
+      "ManualMeasuredMs": 92,
+      "SavedTokens": 6732,
+      "SavingsPercent": 99.1,
+      "Multiplier": 113.2,
+      "ModelledSecondsSaved": 0.67
+    },
+    {
+      "Id": "stack-trace",
+      "Title": "Resolve a stack trace to source",
+      "Tool": "resolve_stack_trace",
+      "NavigatorStatus": "n/a",
+      "NavigatorTokens": 0,
+      "NavigatorCalls": 1,
+      "GrepPattern": "\\b(GetParent|GetItemsWithImages|GetImageDisplayParent|OnUserDataManagerUserDataSaved)\\s*\\(",
+      "GrepMatches": 53,
+      "GrepLinesShown": 53,
+      "GrepTokens": 1931,
+      "GrepMeasuredMs": 85.8,
+      "FilesRead": 0,
+      "FileTokens": 0,
+      "FileReadMeasuredMs": 0,
+      "ManualTokens": 1931,
+      "ManualCalls": 1,
+      "ManualMeasuredMs": 85.8
+    },
+    {
+      "Id": "file-diagnostics",
+      "Title": "Diagnostics for BaseItem.cs",
+      "Tool": "get_diagnostics",
+      "NavigatorStatus": "ok",
+      "NavigatorTokens": 22,
+      "NavigatorCalls": 1,
+      "NavigatorMeasuredMs": 0.9,
+      "GrepMatches": 0,
+      "GrepLinesShown": 0,
+      "GrepTokens": 0,
+      "GrepMeasuredMs": 0,
+      "FilesRead": 1,
+      "FileTokens": 30585,
+      "FileReadMeasuredMs": 0.1,
+      "ManualTokens": 30585,
+      "ManualCalls": 1,
+      "ManualMeasuredMs": 0.1,
+      "SavedTokens": 30563,
+      "SavingsPercent": 99.9,
+      "Multiplier": 1390.2,
+      "ModelledSecondsSaved": 3.06
+    }
+  ]
+}
