@@ -1,9 +1,11 @@
 using System.Collections.Concurrent;
+using System.IO.Enumeration;
 using System.Security.Cryptography;
 using System.Text.Json;
 using CWM.RoslynNavigator.Responses;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
+using Microsoft.CodeAnalysis.Text;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
@@ -606,7 +608,8 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
                 // GetLastWriteTimeUtc returns year 1601 for non-existent files
                 if (writeTime.Year < 1900) continue;
 
-                _knownDocuments[document.Id] = new DocumentInfo(document.FilePath, projectId, writeTime);
+                _knownDocuments[document.Id] = new DocumentInfo(
+                    document.FilePath, Path.GetDirectoryName(document.FilePath) ?? string.Empty, writeTime);
                 _knownDocumentPaths[document.FilePath] = 0;
             }
         }
@@ -683,15 +686,16 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         }
     }
 
-    private readonly record struct DocumentInfo(string FilePath, ProjectId ProjectId, DateTime LastWriteUtc);
+    /// <summary>A tracked document: its path, the directory holding it, and its last-seen write time.</summary>
+    private readonly record struct DocumentInfo(string FilePath, string Directory, DateTime LastWriteUtc);
 
     /// <summary>A csproj or Directory.* file, tracked by both timestamp and content.</summary>
     private readonly record struct BuildFileInfo(DateTime LastWriteUtc, string? Hash);
 
     /// <summary>
     /// Refreshes the workspace to reflect on-disk changes. Uses tiered cooldowns to
-    /// keep per-call overhead low: .csproj + document timestamps every 5s, full
-    /// directory scan for new files every 60s.
+    /// keep per-call overhead low: build files plus one listing per document directory
+    /// (edits and deletions) every 5s, full recursive walk for new files every 60s.
     /// </summary>
     public async Task RefreshChangedDocumentsAsync(CancellationToken ct = default)
     {
@@ -734,35 +738,179 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             StartStructuralScan();
         }
 
-        // Phase 3: collect changed documents without holding the lock (stat calls are
-        // the expensive part — keeping them lock-free avoids blocking concurrent tool calls).
-        var changed = new List<(DocumentId Id, DocumentInfo Info)>();
-        foreach (var (docId, info) in _knownDocuments)
-        {
-            var currentWriteTime = File.GetLastWriteTimeUtc(info.FilePath);
-            if (currentWriteTime > info.LastWriteUtc)
-                changed.Add((docId, info with { LastWriteUtc = currentWriteTime }));
-        }
-
-        if (changed.Count == 0) return;
+        // Phase 3: collect changed and deleted documents without holding the lock (the
+        // directory reads are the expensive part — keeping them lock-free avoids blocking
+        // concurrent tool calls).
+        var scan = ScanKnownDocuments(ct);
+        if (scan.Changed.Count == 0 && scan.Deleted.Count == 0) return;
 
         // Apply mutations under lock.
         await _writeLock.WaitAsync(ct);
         try
         {
-            foreach (var (docId, info) in changed)
-            {
-                var text = await File.ReadAllTextAsync(info.FilePath, ct);
-                var sourceText = Microsoft.CodeAnalysis.Text.SourceText.From(text);
-                _solution = _solution.WithDocumentText(docId, sourceText);
-                _knownDocuments[docId] = info;
-
-                logger.LogDebug("Refreshed changed document: {Path}", info.FilePath);
-            }
+            await ApplyDocumentChangesAsync(scan, ct);
         }
         finally
         {
             _writeLock.Release();
+        }
+    }
+
+    private sealed record DocumentScan(
+        List<(DocumentId Id, DocumentInfo Info)> Changed,
+        List<(DocumentId Id, DocumentInfo Info)> Deleted);
+
+    /// <summary>
+    /// Compares every tracked document against its directory listing. One enumeration per
+    /// directory returns the timestamps of all its files, which is far cheaper than a stat
+    /// per document (measured on 3,750 documents: 118 ms of stats per call, 57 ms of
+    /// sequential enumeration), and the directories are read in parallel. A document whose
+    /// directory no longer lists it has been deleted.
+    /// </summary>
+    private DocumentScan ScanKnownDocuments(CancellationToken ct)
+    {
+        var byDirectory = new Dictionary<string, List<KeyValuePair<DocumentId, DocumentInfo>>>(
+            StringComparer.OrdinalIgnoreCase);
+        foreach (var entry in _knownDocuments)
+        {
+            if (!byDirectory.TryGetValue(entry.Value.Directory, out var documents))
+                byDirectory[entry.Value.Directory] = documents = [];
+            documents.Add(entry);
+        }
+
+        var changed = new List<(DocumentId, DocumentInfo)>();
+        var deleted = new List<(DocumentId, DocumentInfo)>();
+        var gate = new Lock();
+
+        Parallel.ForEach(
+            byDirectory,
+            new ParallelOptions { MaxDegreeOfParallelism = ScanParallelism, CancellationToken = ct },
+            pair =>
+            {
+                var onDisk = ReadDirectoryTimestamps(pair.Key);
+                if (onDisk is null) return; // Unreadable right now: infer nothing, retry next call.
+
+                foreach (var (id, info) in pair.Value)
+                {
+                    if (!onDisk.TryGetValue(info.FilePath, out var writeTime))
+                    {
+                        lock (gate) deleted.Add((id, info));
+                    }
+                    else if (writeTime > info.LastWriteUtc)
+                    {
+                        lock (gate) changed.Add((id, info with { LastWriteUtc = writeTime }));
+                    }
+                }
+            });
+
+        return new DocumentScan(changed, deleted);
+    }
+
+    /// <summary>Directory reads are IO-bound; a handful in flight saturates a local disk.</summary>
+    private static int ScanParallelism => Math.Clamp(Environment.ProcessorCount, 1, 8);
+
+    private static readonly EnumerationOptions DirectoryListing = new()
+    {
+        RecurseSubdirectories = false,
+        IgnoreInaccessible = true,
+        AttributesToSkip = 0
+    };
+
+    /// <summary>
+    /// Last-write times of the files directly in <paramref name="directory"/>, keyed by full
+    /// path. Empty when the directory itself is gone (every document in it was deleted);
+    /// null when it exists but cannot be read, so a transient failure never reads as a
+    /// deletion.
+    /// </summary>
+    private static Dictionary<string, DateTime>? ReadDirectoryTimestamps(string directory)
+    {
+        var result = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            var entries = new FileSystemEnumerable<(string Path, DateTime LastWriteUtc)>(
+                directory,
+                (ref FileSystemEntry entry) => (entry.ToFullPath(), entry.LastWriteTimeUtc.UtcDateTime),
+                DirectoryListing)
+            {
+                ShouldIncludePredicate = (ref FileSystemEntry entry) => !entry.IsDirectory
+            };
+
+            foreach (var (path, lastWriteUtc) in entries)
+                result[path] = lastWriteUtc;
+
+            return result;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return result;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Applies a scan to the current snapshot. Must hold <see cref="_writeLock"/>. Every id is
+    /// re-checked against the snapshot: a reload between the lock-free scan and here mints new
+    /// ids, and the stale ones must not be applied.
+    /// </summary>
+    private async Task ApplyDocumentChangesAsync(DocumentScan scan, CancellationToken ct)
+    {
+        var solution = _solution!;
+
+        foreach (var (docId, info) in scan.Changed)
+        {
+            if (!solution.ContainsDocument(docId)) continue;
+
+            string text;
+            try
+            {
+                text = await File.ReadAllTextAsync(info.FilePath, ct);
+            }
+            catch (FileNotFoundException)
+            {
+                continue; // Deleted since the scan; the next scan reports it as such.
+            }
+            catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+            {
+                continue; // Locked mid-save; the timestamp is not advanced, so it is retried.
+            }
+
+            solution = solution.WithDocumentText(docId, SourceText.From(text));
+            _knownDocuments[docId] = info;
+            logger.LogDebug("Refreshed changed document: {Path}", info.FilePath);
+        }
+
+        foreach (var (docId, info) in scan.Deleted)
+        {
+            // Re-checked under the lock: an editor that saves by delete-and-rename leaves the
+            // file briefly missing, and dropping it then would hide its symbols until the next
+            // scan noticed the "new" file.
+            if (!solution.ContainsDocument(docId) || File.Exists(info.FilePath)) continue;
+
+            solution = solution.RemoveDocument(docId);
+            _knownDocuments.TryRemove(docId, out _);
+            logger.LogInformation("Removed deleted document: {Path}", info.FilePath);
+        }
+
+        if (scan.Deleted.Count > 0)
+            RebuildKnownDocumentPaths();
+
+        _solution = solution;
+    }
+
+    /// <summary>
+    /// A path can back several documents (a multi-targeted project loads once per target
+    /// framework), so it is dropped only when no tracked document still uses it.
+    /// </summary>
+    private void RebuildKnownDocumentPaths()
+    {
+        var live = _knownDocuments.Values.Select(d => d.FilePath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in _knownDocumentPaths.Keys)
+        {
+            if (!live.Contains(path))
+                _knownDocumentPaths.TryRemove(path, out _);
         }
     }
 
