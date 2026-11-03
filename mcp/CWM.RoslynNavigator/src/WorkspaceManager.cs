@@ -90,7 +90,9 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             // Dispose previous workspace to avoid leaking Roslyn Solution snapshots
             _workspace?.Dispose();
 
-            _workspace = MSBuildWorkspace.Create();
+            // Shadow-copying host: analyzers and generators load from temp copies, never from
+            // ~/.nuget/packages, so this long-lived process cannot block `dotnet restore` (#25).
+            _workspace = MSBuildWorkspace.Create(ShadowCopyAnalyzerService.HostServices);
             _workspace.RegisterWorkspaceFailedHandler(args =>
             {
                 if (args.Diagnostic.Kind == WorkspaceDiagnosticKind.Failure)

@@ -18,7 +18,15 @@
     <PackageReference Include="Microsoft.Build.Locator" />
     <PackageReference Include="Microsoft.Build.Framework" ExcludeAssets="runtime" PrivateAssets="all" />
     <PackageReference Include="Microsoft.Extensions.Logging" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" GeneratePathProperty="true" />
+  </ItemGroup>
+
+  <!-- A real NuGet source generator for the analyzer shadow-copy tests (#25). Copied into the
+       output so the tests never touch, or lock, the global packages folder itself. -->
+  <ItemGroup>
+    <None Include="$(PkgMicrosoft_Extensions_Logging_Abstractions)\analyzers\dotnet\roslyn4.4\cs\*.dll"
+          Link="TestAnalyzers\%(Filename)%(Extension)"
+          CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
