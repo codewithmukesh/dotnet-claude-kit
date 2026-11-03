@@ -18,13 +18,13 @@
 <p align="center">
   <a href="https://codewithmukesh.com/blog/dotnet-claude-kit-guide/"><strong>📖 Full Guide</strong></a> &bull;
   <a href="#installation">Installation</a> &bull;
-  <a href="#quick-start">Quick Start</a> &bull;
+  <a href="#per-project-setup">Quick Start</a> &bull;
   <a href="#what-makes-this-10x">10x Features</a> &bull;
-  <a href="#slash-commands-14">Commands</a> &bull;
-  <a href="#knowledge-skills-31">Skills</a> &bull;
-  <a href="#agents-10">Agents</a> &bull;
+  <a href="#slash-commands-17">Commands</a> &bull;
+  <a href="#knowledge-skills-35">Skills</a> &bull;
+  <a href="#agents-11">Agents</a> &bull;
   <a href="#rules-10">Rules</a> &bull;
-  <a href="#templates-5">Templates</a> &bull;
+  <a href="#templates-7">Templates</a> &bull;
   <a href="#roslyn-mcp-server">MCP Server</a> &bull;
   <a href="#contributing">Contributing</a>
 </p>
@@ -47,17 +47,18 @@ Claude Code is powerful, but out of the box it doesn't know **your** .NET conven
 
 ## What This Is
 
-A curated knowledge and action layer that sits between Claude Code and your .NET project. Drop a single `CLAUDE.md` into your repo and Claude instantly knows:
+A curated knowledge and action layer that sits between Claude Code and your .NET project. Install the plugin, run `/dotnet-init` once, and Claude knows:
 
 - Which architecture fits your project (VSA, Clean Architecture, DDD, Modular Monolith)
 - How to write modern C# 14 with primary constructors, collection expressions, and records
 - How to build minimal APIs with `IEndpointGroup` auto-discovery, `TypedResults`, and proper OpenAPI metadata
 - How to use EF Core without repository wrappers, with compiled queries and interceptors
 - How to test with `WebApplicationFactory` + `Testcontainers` instead of in-memory fakes
+- How to build console tools, CLIs (System.CommandLine), and desktop apps (MVVM, Avalonia, WPF), and ship them with Native AOT
 - How to navigate your codebase via Roslyn semantic analysis instead of expensive file reads
 - **How to scaffold complete features, run health checks, review PRs, and enforce conventions**
 
-**No configuration. No setup wizards. Just copy one file and go.**
+**One plugin install, one `/dotnet-init`, and you're set.**
 
 ## What Makes This 10x
 
@@ -120,6 +121,16 @@ Then inside a Claude Code session:
 claude --plugin-dir /path/to/dotnet-claude-kit
 ```
 
+**Using [APM](https://github.com/microsoft/apm) (Agent Package Manager)?** The repo installs as-is, with skills, agents, hooks, and the MCP server config:
+
+```bash
+apm install codewithmukesh/dotnet-claude-kit --target claude    # or --target copilot
+```
+
+Pin a tag or commit SHA (`codewithmukesh/dotnet-claude-kit#<tag-or-sha>`) to keep installs reproducible. For the Copilot target, APM renames agents to `*.agent.md` itself.
+
+> **Windows: "Failed to finalize marketplace cache" (EPERM)?** That's a Claude Code installer issue ([anthropics/claude-code#12174](https://github.com/anthropics/claude-code/issues/12174)). Close every Claude Code session, delete `%USERPROFILE%\.claude\plugins\marketplaces\*dotnet-claude-kit*`, pause OneDrive sync if `.claude` lives under it, and run the marketplace add again.
+
 ### Per-Project Setup
 
 Navigate to your project directory (existing or empty) and run:
@@ -128,7 +139,9 @@ Navigate to your project directory (existing or empty) and run:
 /dotnet-init
 ```
 
-**Existing project?** It detects your solution, scans .csproj SDKs, reads your tech stack from config, asks architecture questions, and generates a customized `CLAUDE.md`.
+**Existing project?** It detects your solution, scans .csproj SDKs, reads your tech stack from config, asks architecture questions, and generates a customized `CLAUDE.md`. It works for web APIs, console apps and CLI tools, desktop apps (WPF, Avalonia, WinForms, MAUI), and libraries.
+
+**Already have a `CLAUDE.md`?** `/dotnet-init` never overwrites it silently. It asks you to **Merge** (recommended: keeps your own sections and adds or refreshes only the kit's), **Overwrite**, or **Keep**, and backs your original up to `CLAUDE.md.bak` first.
 
 **Greenfield project?** It asks what you're building, scaffolds the full solution structure (`dotnet new sln`, projects, `Directory.Build.props`, `src/` and `tests/` folders), then generates `CLAUDE.md`. Follow up with `/scaffold` to add your first feature.
 
@@ -211,7 +224,7 @@ public static class CreateOrder
     internal sealed class Handler(AppDbContext db, TimeProvider clock)
         : IRequestHandler<Command, Result<Response>>
     {
-        public async Task<Result<Response>> Handle(Command request, CancellationToken ct)
+        public async ValueTask<Result<Response>> Handle(Command request, CancellationToken ct)
         {
             var order = Order.Create(request.CustomerId, request.Items, clock.GetUtcNow());
             db.Orders.Add(order);
@@ -360,9 +373,12 @@ Token-efficient codebase navigation via Roslyn semantic analysis. Instead of Cla
 | `get_file_outline` | Type/member skeleton of a file, no bodies | Reading the file to see what's in it |
 | `get_nuget_packages` | PackageReference inventory with CPM awareness | Parsing csproj/props files manually |
 | `get_endpoint_map` | Route inventory with auth posture per endpoint | Grepping Map*/controllers by hand |
-| `get_di_registrations` | DI map: lifetimes, duplicates, captive risks | Reading Program.cs and extensions |
+| `get_di_registrations` | DI map: lifetimes, duplicates, captive risks (MS.DI, Prism, Autofac) | Reading Program.cs and extensions |
+| `resolve_stack_trace` | Maps an exception's frames to file:line in your own code | Reading the trace and hunting for each method |
+| `analyze_change_impact` | "What breaks if I change this?" — callers, implementers, affected tests | Chaining several reference searches |
+| `get_token_savings` | Measured tokens saved in this repo, per-tool leaderboard (opt-in, local only) | Guessing whether the tools pay off |
 
-The MCP server starts automatically via `.mcp.json`. No manual setup required.
+Once the `CWM.RoslynNavigator` global tool is installed, the plugin's `.mcp.json` starts the server automatically. The server loads analyzers from shadow copies, so it never locks files in `~/.nuget/packages` or blocks `dotnet restore`.
 
 See [mcp/CWM.RoslynNavigator/README.md](mcp/CWM.RoslynNavigator/README.md) for details.
 
@@ -386,8 +402,8 @@ Three Claude Code hooks run automatically (declared in `hooks/hooks.json`); the 
 
 | Script | Kind | What It Does |
 |------|-------|-------------|
-| `pre-bash-guard.sh` | Claude Code hook — PreToolUse (Bash) | Blocks destructive git ops (force push, reset --hard), warns on risky commands |
-| `post-edit-format.sh` | Claude Code hook — PostToolUse (*.cs) | Auto-formats C# files after edits |
+| `pre-bash-guard.sh` | Claude Code hook — PreToolUse (Bash) | Parses each command and blocks destructive ones (force push, `reset --hard`, `clean -f`, `rm -rf` outside build output) plus machine-wide ones (`pkill`, `dotnet build-server shutdown`, deleting NuGet caches). A command that only *mentions* one, like a grep pattern or a commit message, passes ([ADR-007](knowledge/decisions/007-command-word-guard.md)) |
+| `post-edit-format.sh` | Claude Code hook — PostToolUse (*.cs) | Auto-formats C# files after edits, and prints the error if `dotnet format` fails |
 | `post-scaffold-restore.sh` | Claude Code hook — PostToolUse (*.csproj) | `dotnet restore` after project file changes |
 | `pre-commit-format.sh` | Git pre-commit (manual install) | `dotnet format --verify-no-changes` ensures consistent formatting |
 | `pre-commit-antipattern.sh` | Git pre-commit (manual install) | Detects `async void`, sync-over-async, `new HttpClient()`, and `DateTime.Now` in the lines a commit adds ([why text, not an analyzer](knowledge/decisions/006-three-tier-antipattern-detection.md)) |
@@ -443,6 +459,7 @@ dotnet-claude-kit works with multiple AI coding tools:
 | **Cursor** | `.cursor/rules/dotnet-rules.md` | Consolidated .NET rules for Cursor IDE |
 | **Codex CLI** | `.codex/AGENTS.md` | Agent configuration pointing to skills and agents |
 | **OpenCode** | `opencode.json` + `.opencode/AGENTS.md` | Roslyn MCP server, consolidated rules, and agent/skill catalog |
+| **APM** (Claude, Copilot, Cursor, Codex) | Repo layout as-is | `apm install codewithmukesh/dotnet-claude-kit --target <tool>` deploys skills, agents, hooks, and the MCP server |
 
 ## Documentation
 
