@@ -25,6 +25,13 @@ Measured on a 39-project, 3,750-document solution (warm workspace, second call):
 - Anti-pattern, endpoint, and DI scans run files in parallel with deterministic output order; stack traces resolve each distinct method once
 - `get_test_coverage_map` no longer counts anonymous types and tuples as untested production types, which had deflated the percentage
 - The navigator's own test suite shares one solution fixture (~26s → ~15s)
+- **Ready as soon as the solution opens** (20–29s → 8–10s on the same solution). Compilations now warm in the background at full parallelism, and cold symbol lookups compile projects concurrently. The 50-project lazy-load threshold is gone because every size now warms in the background
+- **New files no longer force a full reload.** A new `.cs` file in an SDK-style project is added in place on the next call (~1.5s, previously a 14–16s blocking reload after up to 60s). Projects with custom compile items still fall back to a reload. Files a project excludes no longer trigger a reload every 60 seconds
+- **Per-call change detection** uses directory listings instead of statting every document (~110ms → ~10ms per call). Deleted files are now dropped instead of lingering in results
+- Opt-in telemetry does its measuring off the request path (first recorded call 75ms → ~0ms)
+
+### Fixed (navigator)
+- **Dependent projects saw stale compilations after an edit.** The custom compilation LRU evicted only the edited project, so projects referencing it kept the previous snapshot's compilation and reported stale diagnostics and symbols. The cache bounded no memory anyway (Roslyn keeps compilations alive through the `Solution`), so it is removed and compilations come straight from the current snapshot
 
 ### Fixed
 - **`hooks/pre-bash-guard.sh` now matches command words, not command text** — the guard grepped the raw command string, so it blocked commands that merely *mentioned* a destructive one: a `grep` searching for `rm -rf`, a `#` comment describing an old cleanup, `git log --grep='git reset --hard'`, `echo`ing docs about force push, and any heredoc script body containing the phrase. It now splits the command on `;`, `&&`, `||`, `|`, newlines and grouping, and matches only each segment's command word — taken after stripping `VAR=value` assignments, `sudo`/`env`/`command`/`nohup`, and any leading path, so `/bin/rm` still reads as `rm`
