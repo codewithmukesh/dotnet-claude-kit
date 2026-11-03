@@ -1,6 +1,4 @@
 using CWM.RoslynNavigator.Tests.Fixtures;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CWM.RoslynNavigator.Tests;
 
@@ -19,12 +17,12 @@ public sealed class MultiSolutionReloadTests : IDisposable
         TestSolutionFixture.RegisterMSBuild();
 
         _root = Path.Combine(Path.GetTempPath(), "cwm-rn-multi-" + Guid.NewGuid().ToString("N"));
-        BuildFileChangeDetectionTests.CopyDirectory(
+        TestDataCopy.CopyDirectory(
             Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, Path.Combine(_root, "SampleSolution"));
-        BuildFileChangeDetectionTests.CopyDirectory(
+        TestDataCopy.CopyDirectory(
             Path.GetDirectoryName(TestSolutionFixture.SecondSolutionPath)!, Path.Combine(_root, "SecondSolution"));
 
-        _workspace = new WorkspaceManager(NullLoggerFactory.Instance.CreateLogger<WorkspaceManager>(), _clock);
+        _workspace = TestWorkspace.Create(_clock);
     }
 
     private string[] SolutionPaths =>

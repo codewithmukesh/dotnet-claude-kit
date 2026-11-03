@@ -136,7 +136,7 @@ public class GetDiRegistrationsTests(TestSolutionFixture fixture)
     [InlineData("My.Ns.IFoo<T>", "IFoo")]
     [InlineData("IFoo", "IFoo")]
     [InlineData("(factory)", "(factory)")]
-    public void SimpleTypeName_StripsNamespaceAndGenerics(string input, string expected)
+    public void SimpleTypeName_QualifiedGenericName_StripsNamespaceAndGenerics(string input, string expected)
     {
         Assert.Equal(expected, GetDiRegistrationsTool.SimpleTypeName(input));
     }
@@ -300,7 +300,7 @@ public class GetDiRegistrationsTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public void OtherContainers_AreCountedInUnrecognized()
+    public void AnalyzeSemantic_UnsupportedContainer_CountedAsUnrecognized()
     {
         var (registrations, unrecognized) = AnalyzeSemantic("""
             dry.Register<IFoo, Foo>();

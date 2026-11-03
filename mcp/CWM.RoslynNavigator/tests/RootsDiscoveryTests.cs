@@ -21,9 +21,9 @@ public sealed class RootsDiscoveryTests : IDisposable
     public RootsDiscoveryTests()
     {
         TestSolutionFixture.RegisterMSBuild();
-        BuildFileChangeDetectionTests.CopyDirectory(
+        TestDataCopy.CopyDirectory(
             Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, SampleRoot);
-        BuildFileChangeDetectionTests.CopyDirectory(
+        TestDataCopy.CopyDirectory(
             Path.GetDirectoryName(TestSolutionFixture.SecondSolutionPath)!, SecondRoot);
         Directory.CreateDirectory(EmptyRoot);
 
@@ -80,7 +80,7 @@ public sealed class RootsDiscoveryTests : IDisposable
         Assert.Equal(1, _rootRequests);
 
         // ...but once the cooldown has passed: the solution has been created meanwhile.
-        BuildFileChangeDetectionTests.CopyDirectory(SampleRoot, EmptyRoot);
+        TestDataCopy.CopyDirectory(SampleRoot, EmptyRoot);
         _clock.Advance(TimeSpan.FromSeconds(31));
         Assert.Null(await _workspace.EnsureReadyOrStatusAsync(ct));
         Assert.Equal(2, _rootRequests);
@@ -138,7 +138,7 @@ public sealed class RootsDiscoveryTests : IDisposable
     }
 
     [Fact]
-    public async Task ConfiguredSolution_RootsAreNeverConsulted()
+    public async Task EnsureReady_ConfiguredSolution_NeverConsultsRoots()
     {
         var ct = TestContext.Current.CancellationToken;
         _roots = [SecondRoot];

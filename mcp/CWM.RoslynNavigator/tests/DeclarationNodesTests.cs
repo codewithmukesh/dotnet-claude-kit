@@ -122,7 +122,7 @@ public class DeclarationNodesTests
     }
 
     [Fact]
-    public void Members_SkipsSymbolsInsideMemberBodies()
+    public void Members_LocalsAndLocalFunctions_AreSkipped()
     {
         var (model, root) = Compile();
         var ct = TestContext.Current.CancellationToken;
@@ -138,7 +138,7 @@ public class DeclarationNodesTests
     }
 
     [Fact]
-    public void Types_FindsEveryNamedTypeTheFullWalkFinds()
+    public void Types_ComparedWithFullWalk_FindsEveryNamedType()
     {
         var (model, root) = Compile();
         var ct = TestContext.Current.CancellationToken;

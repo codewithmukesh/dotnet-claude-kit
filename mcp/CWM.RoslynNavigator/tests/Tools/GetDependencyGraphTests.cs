@@ -66,7 +66,7 @@ public class GetDependencyGraphTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task GetDependencyGraph_DepthClampedTo5()
+    public async Task GetDependencyGraph_DepthAboveFive_IsClampedToFive()
     {
         // Passing depth > 5 should be clamped to 5
         var json = await GetDependencyGraphTool.ExecuteAsync(

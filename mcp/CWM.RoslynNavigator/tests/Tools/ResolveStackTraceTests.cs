@@ -21,7 +21,7 @@ public class ResolveStackTraceTests(TestSolutionFixture fixture)
         """;
 
     [Fact]
-    public async Task ResolveStackTrace_ParsesHeader()
+    public async Task ResolveStackTrace_RealisticTrace_ParsesHeader()
     {
         var json = await ResolveStackTraceTool.ExecuteAsync(
             fixture.WorkspaceManager, RealisticTrace, ct: TestContext.Current.CancellationToken);
@@ -58,7 +58,7 @@ public class ResolveStackTraceTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task ResolveStackTrace_PointsAtTopmostSolutionFrame()
+    public async Task ResolveStackTrace_RealisticTrace_PointsAtTopmostSolutionFrame()
     {
         var json = await ResolveStackTraceTool.ExecuteAsync(
             fixture.WorkspaceManager, RealisticTrace, ct: TestContext.Current.CancellationToken);

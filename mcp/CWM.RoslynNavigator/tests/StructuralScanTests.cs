@@ -1,7 +1,5 @@
 using System.Diagnostics;
 using CWM.RoslynNavigator.Tests.Fixtures;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CWM.RoslynNavigator.Tests;
 
@@ -15,7 +13,7 @@ public sealed class StructuralScanTests : IDisposable
     private readonly List<string> _links = [];
 
     [Fact]
-    public void EnumerateProjectSourceFiles_SkipsExcludedAndForeignFolders()
+    public void EnumerateProjectSourceFiles_ExcludedAndForeignFolders_AreSkipped()
     {
         var project = Path.Combine(_root, "App");
         string[] expected =
@@ -58,9 +56,9 @@ public sealed class StructuralScanTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
         TestSolutionFixture.RegisterMSBuild();
-        BuildFileChangeDetectionTests.CopyDirectory(Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, _root);
+        TestDataCopy.CopyDirectory(Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, _root);
         var clock = new TestClock(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
-        using var workspace = new WorkspaceManager(NullLoggerFactory.Instance.CreateLogger<WorkspaceManager>(), clock);
+        using var workspace = TestWorkspace.Create(clock);
         await workspace.LoadSolutionAsync(Path.Combine(_root, "SampleSolution.sln"), ct);
 
         var api = Path.Combine(_root, "SampleApi");

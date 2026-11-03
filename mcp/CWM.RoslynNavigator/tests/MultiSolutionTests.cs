@@ -106,7 +106,7 @@ public sealed class MultiSolutionTests(MultiSolutionFixture fixture) : IClassFix
     }
 
     [Fact]
-    public async Task GetProjectGraph_ListsEverySolution()
+    public async Task GetProjectGraph_TwoSolutions_ListsEverySolution()
     {
         var result = await GetProjectGraphAsync();
 
@@ -118,7 +118,7 @@ public sealed class MultiSolutionTests(MultiSolutionFixture fixture) : IClassFix
     }
 
     [Fact]
-    public async Task GetProjectGraph_ReportsSolutionMembershipPerProject()
+    public async Task GetProjectGraph_TwoSolutions_ReportsMembershipPerProject()
     {
         var result = await GetProjectGraphAsync();
 

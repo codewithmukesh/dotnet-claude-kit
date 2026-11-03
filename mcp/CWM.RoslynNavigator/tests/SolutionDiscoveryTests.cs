@@ -174,7 +174,7 @@ public class SolutionDiscoveryTests : IDisposable
 
     // 13. Root solution wins over subdirectory
     [Fact]
-    public void FindSolutionPath_RootSlnWinsOverSubdirectory()
+    public void FindSolutionPath_RootAndSubdirectorySln_ReturnsRootSln()
     {
         var rootSln = CreateFile("Root.sln");
         CreateFile("src", "Sub.sln");

@@ -8,7 +8,7 @@ public class RepoPathTests
     [InlineData(@"C:\repo\app", "c:/repo/app")]
     [InlineData("/repo/app/", "/repo/app")]
     [InlineData("C:/Repo/App", "c:/repo/app")]
-    public void Normalize_MakesPathsComparable(string input, string expected)
+    public void Normalize_PathVariants_BecomeComparable(string input, string expected)
     {
         Assert.Equal(expected, RepoPath.Normalize(input));
     }
@@ -28,13 +28,13 @@ public class RepoPathTests
     [InlineData("C--Users-mukesh-repos-app", "C:/Users/mukesh/repos/app")]
     [InlineData("-home-mukesh-repos-app", "/home/mukesh/repos/app")]
     [InlineData("nonsense", null)]
-    public void FromTranscriptDirectoryName_DecodesBestEffort(string input, string? expected)
+    public void FromTranscriptDirectoryName_EncodedPath_DecodesBestEffort(string input, string? expected)
     {
         Assert.Equal(expected, RepoPath.FromTranscriptDirectoryName(input));
     }
 
     [Fact]
-    public void FromTranscriptDirectoryName_CannotRecoverHyphenatedNames()
+    public void FromTranscriptDirectoryName_HyphenatedName_CannotBeRecovered()
     {
         // Documents why cwd from the line content is authoritative: the encoding is lossy,
         // and a real repository name containing a hyphen decodes wrongly.
@@ -80,7 +80,7 @@ public class ReportBuilderTests
     }
 
     [Fact]
-    public void Build_JoinsTelemetryToTranscriptsByRepositoryPath()
+    public void Build_TelemetryAndTranscriptForSameRepo_JoinsByPath()
     {
         var report = ReportBuilder.Build(
             [Telemetry(@"C:\repo\app\App.sln", Call("find_symbol"))],
@@ -188,7 +188,7 @@ public class ReportBuilderTests
     }
 
     [Fact]
-    public void Build_MethodologyCarriesTheUncalibratedWarning()
+    public void Build_UncalibratedDivisor_MethodCarriesWarning()
     {
         var report = ReportBuilder.Build([], [], 3.5, calibrated: false, 3.00m);
 

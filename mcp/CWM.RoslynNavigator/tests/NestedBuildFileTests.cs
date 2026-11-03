@@ -1,6 +1,4 @@
 using CWM.RoslynNavigator.Tests.Fixtures;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CWM.RoslynNavigator.Tests;
 
@@ -20,7 +18,7 @@ public sealed class NestedBuildFileTests : IDisposable
     public NestedBuildFileTests()
     {
         TestSolutionFixture.RegisterMSBuild();
-        _workspace = new WorkspaceManager(NullLoggerFactory.Instance.CreateLogger<WorkspaceManager>(), _clock);
+        _workspace = TestWorkspace.Create(_clock);
     }
 
     [Fact]
@@ -30,7 +28,7 @@ public sealed class NestedBuildFileTests : IDisposable
         // Repo layout: repo/App.sln, repo/src/Directory.Build.props, repo/src/SampleApi/...
         var solutionDirectory = Path.Combine(_root, "repo");
         var src = Path.Combine(solutionDirectory, "src");
-        BuildFileChangeDetectionTests.CopyDirectory(Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, src);
+        TestDataCopy.CopyDirectory(Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, src);
         File.Move(Path.Combine(src, "SampleSolution.sln"), Path.Combine(solutionDirectory, "SampleSolution.sln"));
         await RewriteAsync(Path.Combine(solutionDirectory, "SampleSolution.sln"), s => s.Replace(", \"Sample", ", \"src\\Sample"), ct);
         var props = Path.Combine(src, "Directory.Build.props");
@@ -50,7 +48,7 @@ public sealed class NestedBuildFileTests : IDisposable
     {
         var ct = TestContext.Current.CancellationToken;
         var solutionDirectory = Path.Combine(_root, "services", "orders");
-        BuildFileChangeDetectionTests.CopyDirectory(Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, solutionDirectory);
+        TestDataCopy.CopyDirectory(Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, solutionDirectory);
         var props = Path.Combine(_root, "Directory.Build.props");
         await File.WriteAllTextAsync(props, "<Project />", ct);
 

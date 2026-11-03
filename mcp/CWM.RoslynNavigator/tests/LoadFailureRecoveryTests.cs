@@ -21,14 +21,14 @@ public sealed class LoadFailureRecoveryTests : IDisposable
     public LoadFailureRecoveryTests()
     {
         TestSolutionFixture.RegisterMSBuild();
-        _workspace = new WorkspaceManager(NullLoggerFactory.Instance.CreateLogger<WorkspaceManager>(), _clock);
+        _workspace = TestWorkspace.Create(_clock);
     }
 
     [Fact]
     public async Task CorruptPrimarySolution_ReportsError_ThenRecoversAfterFixAndCooldown()
     {
         var ct = TestContext.Current.CancellationToken;
-        BuildFileChangeDetectionTests.CopyDirectory(Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, _root);
+        TestDataCopy.CopyDirectory(Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, _root);
         var solution = Path.Combine(_root, "SampleSolution.sln");
         var good = await File.ReadAllTextAsync(solution, ct);
         await File.WriteAllTextAsync(solution, "this is not a solution file", ct);
@@ -83,7 +83,7 @@ public sealed class LoadFailureRecoveryTests : IDisposable
     public async Task RetryAfterError_Cancelled_KeepsTheOriginalError()
     {
         var ct = TestContext.Current.CancellationToken;
-        BuildFileChangeDetectionTests.CopyDirectory(Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, _root);
+        TestDataCopy.CopyDirectory(Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath)!, _root);
         var solution = Path.Combine(_root, "SampleSolution.sln");
         var good = await File.ReadAllTextAsync(solution, ct);
         await File.WriteAllTextAsync(solution, "this is not a solution file", ct);

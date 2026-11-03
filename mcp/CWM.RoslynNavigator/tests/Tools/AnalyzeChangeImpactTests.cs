@@ -35,7 +35,7 @@ public class AnalyzeChangeImpactTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task AnalyzeChangeImpact_ReferenceCountsAgreeAcrossGroupings()
+    public async Task AnalyzeChangeImpact_CrossProjectType_ReferenceCountsAgreeAcrossGroupings()
     {
         var json = await AnalyzeChangeImpactTool.ExecuteAsync(
             fixture.WorkspaceManager, "SampleDomain.Order", maxResults: 500,

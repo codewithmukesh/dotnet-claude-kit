@@ -9,7 +9,7 @@ namespace CWM.RoslynNavigator.Tests.Tools;
 public class GetNugetPackagesTests(TestSolutionFixture fixture)
 {
     [Fact]
-    public async Task GetNugetPackages_ReturnsAllProjectsWithTfm()
+    public async Task GetNugetPackages_SampleSolution_ReturnsAllProjectsWithTfm()
     {
         var json = await GetNugetPackagesTool.ExecuteAsync(
             fixture.WorkspaceManager, ct: TestContext.Current.CancellationToken);

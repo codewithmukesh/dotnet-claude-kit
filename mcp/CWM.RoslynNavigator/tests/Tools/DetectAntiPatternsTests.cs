@@ -24,7 +24,7 @@ public class DetectAntiPatternsTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task DetectsAsyncVoid_AP001()
+    public async Task DetectAntiPatterns_AsyncVoidMethod_ReportsAP001()
     {
         var result = await RunAsync(file: "AntiPatternExamples.cs");
 
@@ -35,7 +35,7 @@ public class DetectAntiPatternsTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task SkipsEventHandler_AP001()
+    public async Task DetectAntiPatterns_AsyncVoidEventHandler_IsNotReported()
     {
         var result = await RunAsync(file: "AntiPatternExamples.cs");
 
@@ -44,7 +44,7 @@ public class DetectAntiPatternsTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task DetectsSyncOverAsync_AP002()
+    public async Task DetectAntiPatterns_SyncOverAsync_ReportsAP002()
     {
         var result = await RunAsync(file: "AntiPatternExamples.cs");
 
@@ -54,7 +54,7 @@ public class DetectAntiPatternsTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task DetectsNewHttpClient_AP003()
+    public async Task DetectAntiPatterns_NewHttpClient_ReportsAP003()
     {
         var result = await RunAsync(file: "AntiPatternExamples.cs");
 
@@ -64,7 +64,7 @@ public class DetectAntiPatternsTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task DetectsDateTimeNow_AP004()
+    public async Task DetectAntiPatterns_DateTimeNow_ReportsAP004()
     {
         var result = await RunAsync(file: "AntiPatternExamples.cs");
 
@@ -73,7 +73,7 @@ public class DetectAntiPatternsTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task DetectsBroadCatch_AP005()
+    public async Task DetectAntiPatterns_BroadCatch_ReportsAP005()
     {
         var result = await RunAsync(file: "AntiPatternExamples.cs");
 
@@ -83,7 +83,7 @@ public class DetectAntiPatternsTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task DetectsLoggingInterpolation_AP006()
+    public async Task DetectAntiPatterns_LoggingInterpolation_ReportsAP006()
     {
         var result = await RunAsync(file: "AntiPatternExamples.cs");
 
@@ -92,7 +92,7 @@ public class DetectAntiPatternsTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task DetectsEmptyCatch_AP007()
+    public async Task DetectAntiPatterns_EmptyCatch_ReportsAP007()
     {
         var result = await RunAsync(file: "AntiPatternExamples.cs");
 
@@ -102,7 +102,7 @@ public class DetectAntiPatternsTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task DetectsPragmaWithoutRestore_AP008()
+    public async Task DetectAntiPatterns_PragmaWithoutRestore_ReportsAP008()
     {
         var result = await RunAsync(file: "AntiPatternExamples.cs");
 
@@ -112,7 +112,7 @@ public class DetectAntiPatternsTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task DetectsMissingCancellationToken_AP009()
+    public async Task DetectAntiPatterns_MissingCancellationToken_ReportsAP009()
     {
         var result = await RunAsync(file: "AntiPatternExamples.cs");
 
@@ -122,7 +122,7 @@ public class DetectAntiPatternsTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task SeverityFilterError_OnlyReturnsErrors()
+    public async Task DetectAntiPatterns_SeverityError_OnlyReturnsErrors()
     {
         var result = await RunAsync(file: "AntiPatternExamples.cs", severity: "error");
 
@@ -131,7 +131,7 @@ public class DetectAntiPatternsTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task ProjectFilter_LimitsToProject()
+    public async Task DetectAntiPatterns_ProjectFilter_LimitsToProject()
     {
         var result = await RunAsync(projectFilter: "SampleDomain");
 
@@ -142,7 +142,7 @@ public class DetectAntiPatternsTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task MaxResults_LimitsOutput()
+    public async Task DetectAntiPatterns_MaxResults_LimitsOutput()
     {
         var result = await RunAsync(file: "AntiPatternExamples.cs", maxResults: 3);
 
@@ -151,7 +151,7 @@ public class DetectAntiPatternsTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task FileFilter_LimitsToFile()
+    public async Task DetectAntiPatterns_FileFilter_LimitsToFile()
     {
         var result = await RunAsync(file: "AntiPatternExamples.cs");
 

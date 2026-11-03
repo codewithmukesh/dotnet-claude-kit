@@ -41,7 +41,7 @@ public class AmbiguityRoundTripTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task FileHint_MatchesOnDirectoryBoundaryOnly()
+    public async Task FileHint_PartialFileName_MatchesOnlyOnDirectoryBoundary()
     {
         // "OrderRepository.cs" is a suffix of IOrderRepository.cs, InMemoryOrderRepository.cs
         // and CachedOrderRepository.cs, but names none of them. A hint that matches nothing
@@ -63,7 +63,7 @@ public class AmbiguityRoundTripTests(TestSolutionFixture fixture)
     [InlineData(@"C:\repo\SampleApi\OrderService.cs", "OrderService.cs", true)]
     [InlineData(@"C:\repo\SampleApi\OrderService.cs", "Service.cs", false)]
     [InlineData("/repo/SampleApi/OrderService.cs", "pi/OrderService.cs", false)]
-    public void PathMatches_RequiresDirectoryBoundary(string filePath, string requested, bool expected) =>
+    public void PathMatches_RequestedSuffix_RequiresDirectoryBoundary(string filePath, string requested, bool expected) =>
         Assert.Equal(expected, DocumentResolver.PathMatches(filePath, requested));
 
     private Task<string> InvokeAsync(string tool, string name, string file, int line, CancellationToken ct) => tool switch

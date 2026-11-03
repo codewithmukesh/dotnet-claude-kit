@@ -58,7 +58,7 @@ public sealed class TranscriptMinerTests : IDisposable
     }
 
     [Fact]
-    public void Mine_AccumulatesMeasuredUsage()
+    public void Mine_SeveralAssistantTurns_AccumulatesMeasuredUsage()
     {
         WriteTranscript("proj", "s1.jsonl",
             Assistant("/repo/a", "s1", ToolUse("Read", """{"file_path":"/repo/a/X.cs"}""")),
@@ -74,7 +74,7 @@ public sealed class TranscriptMinerTests : IDisposable
     }
 
     [Fact]
-    public void Mine_CountsRoslynCallsPerTool()
+    public void Mine_RoslynToolUses_CountsCallsPerTool()
     {
         WriteTranscript("proj", "s1.jsonl",
             Assistant("/repo/a", "s1", ToolUse("mcp__cwm-roslyn-navigator__find_symbol", "{}")),
@@ -150,7 +150,7 @@ public sealed class TranscriptMinerTests : IDisposable
     }
 
     [Fact]
-    public void Mine_GroupsSessionsAcrossFilesByRepo()
+    public void Mine_SessionsInSeveralFiles_GroupsByRepo()
     {
         WriteTranscript("proj", "s1.jsonl",
             Assistant("/repo/a", "s1", ToolUse("mcp__cwm-roslyn-navigator__find_symbol", "{}")));

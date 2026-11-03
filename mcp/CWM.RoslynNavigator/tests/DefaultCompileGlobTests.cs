@@ -70,7 +70,7 @@ public sealed class DefaultCompileGlobTests : IDisposable
     [InlineData("X.cs", false)]
     [InlineData("Features/Binary/X.cs", false)]
     [InlineData("Features/obj/X.cs", false)]
-    public void IsDefaultExcluded_MatchesSdkDefaults(string relative, bool expected)
+    public void IsDefaultExcluded_PathUnderProject_MatchesSdkDefaults(string relative, bool expected)
     {
         var projectDir = Path.Combine(_root, "App");
 

@@ -9,7 +9,7 @@ namespace CWM.RoslynNavigator.Tests.Tools;
 public class GetProjectGraphTests(TestSolutionFixture fixture)
 {
     [Fact]
-    public async Task GetProjectGraph_ReturnsAllProjects()
+    public async Task GetProjectGraph_SampleSolution_ReturnsAllProjects()
     {
         var json = await GetProjectGraphTool.ExecuteAsync(fixture.WorkspaceManager, ct: TestContext.Current.CancellationToken);
         var result = JsonSerializer.Deserialize<ProjectGraphResult>(json)!;

@@ -20,7 +20,7 @@ public class WorkspaceManagerTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public void GetSolution_ShouldReturnNonNull()
+    public void GetSolution_LoadedSample_ReturnsSolution()
     {
         var solution = fixture.WorkspaceManager.GetSolution();
         Assert.NotNull(solution);
@@ -38,7 +38,7 @@ public class WorkspaceManagerTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task GetAllCompilationsAsync_ShouldReturnAll()
+    public async Task GetAllCompilationsAsync_LoadedSample_ReturnsOnePerProject()
     {
         var compilations = await fixture.WorkspaceManager.GetAllCompilationsAsync(TestContext.Current.CancellationToken);
 
@@ -46,7 +46,7 @@ public class WorkspaceManagerTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public void GetStatusMessage_ShouldReturnReady()
+    public void GetStatusMessage_LoadedSample_ReportsReady()
     {
         var message = fixture.WorkspaceManager.GetStatusMessage();
 

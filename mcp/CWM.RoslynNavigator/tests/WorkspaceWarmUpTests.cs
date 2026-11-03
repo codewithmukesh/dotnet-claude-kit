@@ -1,6 +1,4 @@
 using CWM.RoslynNavigator.Tests.Fixtures;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CWM.RoslynNavigator.Tests;
 
@@ -15,7 +13,7 @@ public sealed class WorkspaceWarmUpTests : IDisposable
     public WorkspaceWarmUpTests()
     {
         TestSolutionFixture.RegisterMSBuild();
-        _workspace = new WorkspaceManager(NullLoggerFactory.Instance.CreateLogger<WorkspaceManager>(), TimeProvider.System);
+        _workspace = TestWorkspace.Create(TimeProvider.System);
     }
 
     [Fact]
@@ -62,7 +60,7 @@ public sealed class WorkspaceWarmUpTests : IDisposable
     }
 
     [Fact]
-    public async Task Reload_CancelsThePreviousWarmUp()
+    public async Task LoadSolutionAsync_WhileWarmingUp_CancelsThePreviousWarmUp()
     {
         var ct = TestContext.Current.CancellationToken;
         await _workspace.LoadSolutionAsync(TestSolutionFixture.SampleSolutionPath, ct);

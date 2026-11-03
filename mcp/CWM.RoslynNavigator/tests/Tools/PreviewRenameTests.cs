@@ -28,7 +28,7 @@ public class PreviewRenameTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task PreviewRename_NeverTouchesWorkspaceOrDisk()
+    public async Task PreviewRename_AnyRename_NeverTouchesWorkspaceOrDisk()
     {
         var ct = TestContext.Current.CancellationToken;
         var workspace = fixture.WorkspaceManager;
@@ -86,7 +86,7 @@ public class PreviewRenameTests(TestSolutionFixture fixture)
     [InlineData("var", true)]
     [InlineData("_Value2", true)]
     [InlineData("int", false)]
-    public void IsValidIdentifier_HandlesKeywords(string name, bool expected) =>
+    public void IsValidIdentifier_KeywordsAndNames_ClassifiesCorrectly(string name, bool expected) =>
         Assert.Equal(expected, PreviewRenameTool.IsValidIdentifier(name));
 
     [Fact]

@@ -9,7 +9,7 @@ namespace CWM.RoslynNavigator.Tests.Tools;
 public class GetTestCoverageMapTests(TestSolutionFixture fixture)
 {
     [Fact]
-    public async Task GetTestCoverageMap_ReturnsResults()
+    public async Task GetTestCoverageMap_Solution_FindsProductionTypes()
     {
         var json = await GetTestCoverageMapTool.ExecuteAsync(
             fixture.WorkspaceManager,
@@ -95,7 +95,7 @@ public class GetTestCoverageMapTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task GetTestCoverageMap_DetectsUntestedTypes()
+    public async Task GetTestCoverageMap_TypeWithoutTestClass_IsUntested()
     {
         var json = await GetTestCoverageMapTool.ExecuteAsync(
             fixture.WorkspaceManager, projectFilter: "SampleApi",
@@ -109,7 +109,7 @@ public class GetTestCoverageMapTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public async Task GetTestCoverageMap_PercentageCalculation()
+    public async Task GetTestCoverageMap_Solution_PercentageWithinBounds()
     {
         var json = await GetTestCoverageMapTool.ExecuteAsync(
             fixture.WorkspaceManager,
