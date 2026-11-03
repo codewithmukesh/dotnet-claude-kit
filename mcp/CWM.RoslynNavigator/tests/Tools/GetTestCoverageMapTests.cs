@@ -38,16 +38,20 @@ public class GetTestCoverageMapTests(TestSolutionFixture fixture)
                 "HttpContext", "FakeHostLifetime", "OrderService", "OrderServiceTests", "ProductService",
             ],
             result.Coverage.Select(e => e.Type));
+        // SampleTests is a test project, so its types are never listed as production types
+        // (TotalTypes is unchanged by adding it). Every class it declares counts as a test
+        // class — OrderTests, OrderApiTests and the five framework stubs — and each [Fact] /
+        // [Theory] method counts as a test.
         Assert.Equal(28, result.TotalTypes);
-        Assert.Equal(0, result.TestClassCount);
-        Assert.Equal(0, result.TestMethodCount);
+        Assert.Equal(7, result.TestClassCount);
+        Assert.Equal(4, result.TestMethodCount);
     }
 
     [Fact]
-    public async Task GetTestCoverageMap_NoTestProjects_AllTypesUntested()
+    public async Task GetTestCoverageMap_TestClassOnlyInProductionProject_DoesNotCount()
     {
-        // SampleSolution has no dedicated test projects (no xUnit/NUnit references,
-        // no project names ending in "Tests"), so all types should be untested.
+        // SampleApi.OrderServiceTests sits in a production project. Only classes in test
+        // projects (SampleTests) are candidates, so OrderService stays untested.
         var json = await GetTestCoverageMapTool.ExecuteAsync(
             fixture.WorkspaceManager, projectFilter: "SampleApi",
             ct: TestContext.Current.CancellationToken);
@@ -55,7 +59,39 @@ public class GetTestCoverageMapTests(TestSolutionFixture fixture)
 
         var orderServiceEntry = result.Coverage.FirstOrDefault(c => c.Type == "OrderService");
         Assert.NotNull(orderServiceEntry);
-        Assert.False(orderServiceEntry.HasTests, "No test projects exist in SampleSolution");
+        Assert.False(orderServiceEntry.HasTests, "OrderServiceTests is not in a test project");
+    }
+
+    [Fact]
+    public async Task GetTestCoverageMap_TestProjectHasMatchingClass_MarksTypeTested()
+    {
+        // Arrange — SampleTests.OrderTests matches SampleDomain.Order by name.
+        var ct = TestContext.Current.CancellationToken;
+
+        // Act
+        var json = await GetTestCoverageMapTool.ExecuteAsync(
+            fixture.WorkspaceManager, projectFilter: "SampleDomain", ct: ct);
+
+        // Assert
+        var result = JsonSerializer.Deserialize<TestCoverageMapResult>(json)!;
+        var order = Assert.Single(result.Coverage, c => c.Type == "Order");
+        Assert.True(order.HasTests);
+        Assert.Equal("SampleTests/OrderTests.cs", order.TestFile);
+        Assert.Equal(1, result.TestedTypes);
+        Assert.All(result.Coverage.Where(c => c.Type != "Order"), c => Assert.False(c.HasTests, c.Type));
+    }
+
+    [Fact]
+    public async Task GetTestCoverageMap_TestProjectFilter_ListsNoProductionTypes()
+    {
+        // Act
+        var json = await GetTestCoverageMapTool.ExecuteAsync(
+            fixture.WorkspaceManager, projectFilter: "SampleTests", ct: TestContext.Current.CancellationToken);
+
+        // Assert — a known project, so not an error; but it holds tests, not production types.
+        var result = JsonSerializer.Deserialize<TestCoverageMapResult>(json)!;
+        Assert.Empty(result.Coverage);
+        Assert.Equal(0, result.TotalTypes);
     }
 
     [Fact]

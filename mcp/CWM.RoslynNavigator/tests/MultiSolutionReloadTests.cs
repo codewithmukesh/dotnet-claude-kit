@@ -54,7 +54,7 @@ public sealed class MultiSolutionReloadTests : IDisposable
 
         Assert.Equal(loadsAfterInitial + 1, _workspace.LoadCount);
         Assert.Equal(WorkspaceState.Ready, _workspace.State);
-        Assert.Equal(4, _workspace.ProjectCount);
+        Assert.Equal(5, _workspace.ProjectCount);
         Assert.Contains(_workspace.GetSolution()!.Projects, p => p.Name == "ShippingService");
         Assert.Equal(2, _workspace.LoadedSolutions.Count);
     }
@@ -69,7 +69,7 @@ public sealed class MultiSolutionReloadTests : IDisposable
         await _workspace.LoadSolutionsAsync([SolutionPaths[0], broken], ct);
 
         Assert.Equal(WorkspaceState.Ready, _workspace.State);
-        Assert.Equal(3, _workspace.ProjectCount);
+        Assert.Equal(4, _workspace.ProjectCount);
         Assert.NotNull(_workspace.LoadedSolutions.Single(s => s.Name == "Broken.slnx").Error);
     }
 

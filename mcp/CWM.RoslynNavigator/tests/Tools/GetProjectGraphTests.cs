@@ -14,7 +14,7 @@ public class GetProjectGraphTests(TestSolutionFixture fixture)
         var json = await GetProjectGraphTool.ExecuteAsync(fixture.WorkspaceManager, ct: TestContext.Current.CancellationToken);
         var result = JsonSerializer.Deserialize<ProjectGraphResult>(json)!;
 
-        Assert.Equal(3, result.Projects.Count);
+        Assert.Equal(4, result.Projects.Count); // Domain, Infrastructure, Api, Tests
         Assert.Contains(result.Projects, p => p.Name == "SampleDomain");
         Assert.Contains(result.Projects, p => p.Name == "SampleInfrastructure");
         Assert.Contains(result.Projects, p => p.Name == "SampleApi");

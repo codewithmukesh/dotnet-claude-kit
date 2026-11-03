@@ -22,6 +22,12 @@
       "TargetFramework": "net10.0",
       "Cpm": false,
       "Packages": []
+    },
+    {
+      "Name": "SampleTests",
+      "TargetFramework": "net10.0",
+      "Cpm": false,
+      "Packages": []
     }
   ],
   "Count": 1,

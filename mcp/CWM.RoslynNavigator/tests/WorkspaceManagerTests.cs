@@ -14,9 +14,9 @@ public class WorkspaceManagerTests(TestSolutionFixture fixture)
     }
 
     [Fact]
-    public void ProjectCount_ShouldBeThree()
+    public void ProjectCount_SampleSolution_IsFour()
     {
-        Assert.Equal(3, fixture.WorkspaceManager.ProjectCount);
+        Assert.Equal(4, fixture.WorkspaceManager.ProjectCount);
     }
 
     [Fact]
@@ -42,7 +42,7 @@ public class WorkspaceManagerTests(TestSolutionFixture fixture)
     {
         var compilations = await fixture.WorkspaceManager.GetAllCompilationsAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal(3, compilations.Count);
+        Assert.Equal(4, compilations.Count);
     }
 
     [Fact]

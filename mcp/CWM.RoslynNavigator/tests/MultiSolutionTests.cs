@@ -26,7 +26,7 @@ public sealed class MultiSolutionTests(MultiSolutionFixture fixture) : IClassFix
             .ToList();
 
         Assert.Single(domainProjects);
-        Assert.Equal(4, Workspace.ProjectCount); // Domain, Infrastructure, Api + ShippingService
+        Assert.Equal(5, Workspace.ProjectCount); // Domain, Infrastructure, Api, Tests + ShippingService
     }
 
     [Fact]
@@ -113,7 +113,7 @@ public sealed class MultiSolutionTests(MultiSolutionFixture fixture) : IClassFix
         Assert.Equal(Primary, result.Solution);
         Assert.NotNull(result.Solutions);
         Assert.Equal([Primary, Second], result.Solutions.Select(s => s.Name));
-        Assert.Equal(3, result.Solutions.Single(s => s.Name == Primary).ProjectCount);
+        Assert.Equal(4, result.Solutions.Single(s => s.Name == Primary).ProjectCount);
         Assert.Equal(2, result.Solutions.Single(s => s.Name == Second).ProjectCount);
     }
 

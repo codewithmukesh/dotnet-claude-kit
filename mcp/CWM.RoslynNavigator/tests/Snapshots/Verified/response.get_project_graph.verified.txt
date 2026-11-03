@@ -23,6 +23,15 @@
       "References": [
         "SampleDomain"
       ]
+    },
+    {
+      "Name": "SampleTests",
+      "Path": "{SampleSolution}/SampleTests/SampleTests.csproj",
+      "TargetFramework": "net10.0",
+      "References": [
+        "SampleApi",
+        "SampleDomain"
+      ]
     }
   ]
 }

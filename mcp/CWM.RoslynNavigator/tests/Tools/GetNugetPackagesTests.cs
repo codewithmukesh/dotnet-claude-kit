@@ -15,7 +15,7 @@ public class GetNugetPackagesTests(TestSolutionFixture fixture)
             fixture.WorkspaceManager, ct: TestContext.Current.CancellationToken);
         var result = JsonSerializer.Deserialize<NugetPackagesResult>(json)!;
 
-        Assert.Equal(3, result.Projects.Count);
+        Assert.Equal(4, result.Projects.Count); // Domain, Infrastructure, Api, Tests
         Assert.All(result.Projects, p => Assert.Equal("net10.0", p.TargetFramework));
     }
 

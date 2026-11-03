@@ -8,15 +8,15 @@
     {
       "Name": "SampleSolution.sln",
       "Path": "SampleSolution.sln",
-      "ProjectCount": 3
+      "ProjectCount": 4
     }
   ],
-  "ProjectCount": 3,
-  "DocumentCount": 30,
+  "ProjectCount": 4,
+  "DocumentCount": 36,
   "WarmUp": {
     "State": "completed",
-    "Compiled": 3,
-    "Total": 3,
+    "Compiled": 4,
+    "Total": 4,
     "ElapsedMs": 0
   },
   "IncompleteProjects": [],

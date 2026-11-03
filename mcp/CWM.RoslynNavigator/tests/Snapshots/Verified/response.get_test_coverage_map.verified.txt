@@ -15,8 +15,8 @@
     {
       "Type": "Order",
       "File": "SampleDomain/Order.cs",
-      "HasTests": false,
-      "TestFile": null
+      "HasTests": true,
+      "TestFile": "SampleTests/OrderTests.cs"
     },
     {
       "Type": "OrderItem",
@@ -38,10 +38,10 @@
     }
   ],
   "TotalTypes": 6,
-  "TestedTypes": 0,
-  "Percentage": 0,
-  "Applicable": true,
-  "NotApplicableReason": null,
-  "TestMethodCount": 0,
-  "TestClassCount": 0
+  "TestedTypes": 1,
+  "Percentage": 16,
+  "Applicable": false,
+  "NotApplicableReason": "Behaviour-driven suite (4 test methods across 6 production types) where only 16% of type names have a matching *Tests class. Tests appear to be organised by feature rather than by type, so this metric understates real coverage.",
+  "TestMethodCount": 4,
+  "TestClassCount": 7
 }
