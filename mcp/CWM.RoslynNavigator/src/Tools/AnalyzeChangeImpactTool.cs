@@ -46,44 +46,64 @@ public static class AnalyzeChangeImpactTool
         var directReferences = 0;
         var testReferences = 0;
 
-        var references = await SymbolFinder.FindReferencesAsync(symbol, solution, ct);
+        // For a member, the call search finds the references that can reach it: calls to it,
+        // to the interface or base member it implements or overrides (which may dispatch to
+        // it), and to its own overrides and implementations. It does not cascade sideways the
+        // way FindReferencesAsync does — up to IDisposable.Dispose and back down to every other
+        // Dispose in the solution (OrchardCore: 855 definitions, 2,361 locations, 71 s for
+        // WorkflowExecutionContext.Dispose) — none of which a change here affects. The same
+        // search seeds the caller walk, so it runs once.
+        IReadOnlyList<SymbolCallerInfo>? firstLevel = null;
+        IEnumerable<Location> referenceLocations;
+        if (symbol is IMethodSymbol or IPropertySymbol or IEventSymbol)
+        {
+            firstLevel = [.. await SymbolFinder.FindCallersAsync(symbol, solution, ct)];
+            referenceLocations = firstLevel.SelectMany(c => c.Locations);
+        }
+        else
+        {
+            referenceLocations = (await SymbolFinder.FindReferencesAsync(symbol, solution, ct))
+                .SelectMany(r => r.Locations)
+                .Select(l => l.Location);
+        }
 
         // Each source position counts once: Roslyn reports it once per project that compiles
         // the file (every target framework of a multi-targeted project), and those flavors
         // are one project to the person making the change.
         var seenPositions = new HashSet<(string?, int)>();
 
-        foreach (var reference in references)
+        foreach (var location in referenceLocations)
         {
-            foreach (var location in reference.Locations)
+            ct.ThrowIfCancellationRequested();
+
+            if (!location.IsInSource
+                || !seenPositions.Add((location.SourceTree?.FilePath, location.SourceSpan.Start))
+                || solution.GetDocument(location.SourceTree) is not { } document)
             {
-                ct.ThrowIfCancellationRequested();
-
-                if (!seenPositions.Add((location.Location.SourceTree?.FilePath, location.Location.SourceSpan.Start)))
-                    continue;
-
-                var document = location.Document;
-                var project = document.Project;
-                var isTest = testProjects.Contains(project.Id);
-                var projectName = ProjectDisplayName(project);
-
-                directReferences++;
-                if (isTest) testReferences++;
-
-                var projectEntry = perProject.GetValueOrDefault(projectName);
-                perProject[projectName] = (projectEntry.Count + 1, isTest);
-
-                var path = document.FilePath is { } p ? workspace.ToRelativePath(p) : "unknown";
-                var fileEntry = perFile.GetValueOrDefault(path);
-                perFile[path] = (fileEntry.Count + 1, isTest);
+                continue;
             }
+
+            var project = document.Project;
+            var isTest = testProjects.Contains(project.Id);
+            var projectName = ProjectDisplayName(project);
+
+            directReferences++;
+            if (isTest) testReferences++;
+
+            var projectEntry = perProject.GetValueOrDefault(projectName);
+            perProject[projectName] = (projectEntry.Count + 1, isTest);
+
+            var path = document.FilePath is { } p ? workspace.ToRelativePath(p) : "unknown";
+            var fileEntry = perFile.GetValueOrDefault(path);
+            perFile[path] = (fileEntry.Count + 1, isTest);
         }
 
         var (implementations, overrides) = await CountDependentDeclarationsAsync(symbol, solution, ct);
 
-        var (transitive, indirectCallers) = symbol is IMethodSymbol method
-            ? await CollectTransitiveCallersAsync(method, solution, depth, ct)
-            : ([], 0);
+        var walk = symbol is IMethodSymbol method && firstLevel is not null
+            ? await CollectTransitiveCallersAsync(method, firstLevel, solution, depth, ct)
+            : new CallerWalk([], 0, false);
+        var transitive = walk.Callers;
 
         var projectPage = Paging.Apply(
             perProject
@@ -111,6 +131,8 @@ public static class AnalyzeChangeImpactTool
 
         var (risk, rationale) = RateRisk(
             symbol, directReferences, perProject.Count, implementations, overrides, crossesAssembly);
+        if (walk.Stopped)
+            rationale += $"; caller walk stopped at its {MaxCallerSearches}-search bound, so TransitiveCallerCount is a lower bound";
 
         return JsonSerializer.Serialize(new ChangeImpactResult(
             Symbol: SymbolResolver.BuildQualifiedName(symbol),
@@ -127,11 +149,11 @@ public static class AnalyzeChangeImpactTool
             Files: filePage.Items,
             TransitiveCallers: callerPage.Items,
             TransitiveCallerCount: transitive.Count,
-            Truncated: projectPage.Truncated || filePage.Truncated || callerPage.Truncated,
+            Truncated: projectPage.Truncated || filePage.Truncated || callerPage.Truncated || walk.Stopped,
             Limit: Math.Max(1, maxResults),
             Risk: risk,
             Rationale: rationale,
-            IndirectCallers: indirectCallers));
+            IndirectCallers: walk.Indirect));
     }
 
     /// <summary>
@@ -182,14 +204,26 @@ public static class AnalyzeChangeImpactTool
         SymbolResolver.GetLocation(symbol) is { } location ? (location.File, location.Line) : (symbol.ToDisplayString(), 0);
 
     /// <summary>
-    /// Breadth-first walk up the call graph. Visited symbols are tracked across levels so
-    /// a recursive or mutually-recursive call chain terminates. Callers that reach a method
-    /// through the interface member it implements (or a base member it overrides) are
-    /// included — Roslyn reports them as indirect, and in DI code they are most callers —
-    /// and counted separately.
+    /// Upper bound on caller searches per call. Each is a solution-wide search; a method
+    /// reached through a widely implemented interface (IDisposable.Dispose) fans out to
+    /// hundreds of callers per level. Hitting the bound sets Truncated.
     /// </summary>
-    private static async Task<(List<string> Callers, int Indirect)> CollectTransitiveCallersAsync(
+    private const int MaxCallerSearches = 2000;
+
+    private sealed record CallerWalk(List<string> Callers, int Indirect, bool Stopped);
+
+    /// <summary>
+    /// Breadth-first walk up the call graph, starting from the root's callers already found.
+    /// Visited symbols are tracked across levels so a recursive or mutually-recursive call
+    /// chain terminates. Callers that reach a method through the interface member it
+    /// implements (or a base member it overrides) are included — Roslyn reports them as
+    /// indirect, and in DI code they are most callers — and counted separately. Each level's
+    /// searches run in parallel and are merged in frontier order, so the output matches a
+    /// sequential walk.
+    /// </summary>
+    private static async Task<CallerWalk> CollectTransitiveCallersAsync(
         IMethodSymbol root,
+        IReadOnlyList<SymbolCallerInfo> rootCallers,
         Solution solution,
         int depth,
         CancellationToken ct)
@@ -198,37 +232,50 @@ public static class AnalyzeChangeImpactTool
         var ordered = new List<string>();
         // Target-framework flavors of one caller are distinct symbols with one declaration.
         var listed = new HashSet<(string?, int)> { DeclarationKey(root) };
-        var frontier = new List<ISymbol> { root };
         var indirect = 0;
+        var searches = 1;
+        var stopped = false;
 
-        for (var level = 0; level < depth && frontier.Count > 0; level++)
+        IReadOnlyList<IReadOnlyList<SymbolCallerInfo>> levelResults = [rootCallers];
+
+        for (var level = 0; level < depth; level++)
         {
             var next = new List<ISymbol>();
 
-            foreach (var current in frontier)
+            foreach (var callers in levelResults)
             {
-                ct.ThrowIfCancellationRequested();
-
-                var callers = await SymbolFinder.FindCallersAsync(current, solution, ct);
-
                 // Direct calls first, so a caller reached both ways counts as direct.
                 foreach (var caller in callers.OrderBy(c => c.IsDirect ? 0 : 1))
                 {
                     if (!visited.Add(caller.CallingSymbol)) continue;
                     if (!listed.Add(DeclarationKey(caller.CallingSymbol))) continue;
 
-                    if (!caller.IsDirect) indirect++;
+                    if (!caller.IsDirect && !CallerDispatch.IsSameDeclaration(caller.CalledSymbol, root)) indirect++;
                     ordered.Add(SymbolResolver.BuildQualifiedName(caller.CallingSymbol));
                     next.Add(caller.CallingSymbol);
                 }
             }
 
-            frontier = next;
+            if (stopped || level + 1 >= depth || next.Count == 0)
+                break;
+
+            if (searches + next.Count > MaxCallerSearches)
+            {
+                next = next.Take(Math.Max(0, MaxCallerSearches - searches)).ToList();
+                stopped = true;
+            }
+
+            searches += next.Count;
+            var results = new IReadOnlyList<SymbolCallerInfo>[next.Count];
+            await Parallel.ForEachAsync(
+                Enumerable.Range(0, next.Count),
+                new ParallelOptions { CancellationToken = ct, MaxDegreeOfParallelism = Environment.ProcessorCount },
+                async (i, token) => results[i] = [.. await SymbolFinder.FindCallersAsync(next[i], solution, token)]);
+            levelResults = results;
         }
 
-        return (ordered, indirect);
+        return new CallerWalk(ordered, indirect, stopped);
     }
-
     /// <summary>"Lib(net8.0)" → "Lib": target-framework flavors of one csproj are one project here.</summary>
     private static string ProjectDisplayName(Project project)
     {
