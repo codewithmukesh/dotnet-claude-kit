@@ -281,7 +281,7 @@ if (!File.Exists(path))
 
 ```csharp
 // BAD — blocks a thread, Ctrl+C cannot interrupt the download
-root.SetAction(parseResult => client.GetStringAsync(url).Result);
+root.SetAction(parseResult => Console.WriteLine(client.GetStringAsync(url).Result));
 
 // GOOD — async action, token flows to every call
 root.SetAction(async (parseResult, ct) =>
