@@ -437,9 +437,15 @@ jobs:
         run: dotnet build mcp/CWM.RoslynNavigator/CWM.RoslynNavigator.slnx --no-restore -c Release
 
   test-mcp:
-    name: Test MCP Server
-    runs-on: ubuntu-latest
+    # All three OSes: path separators, case sensitivity, and file locking differ, and a
+    # Windows-only path bug once shipped because this job ran on Linux alone.
+    name: Test MCP Server (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     needs: build-mcp
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - uses: actions/checkout@v5
 
@@ -458,7 +464,7 @@ jobs:
         uses: actions/upload-artifact@v7
         if: always()
         with:
-          name: test-results
+          name: test-results-${{ matrix.os }}
           path: TestResults/*.trx
 
   format-check:
