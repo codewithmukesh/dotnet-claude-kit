@@ -74,6 +74,11 @@ public static class FindDeadCodeTool
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
         if (notReady is not null) return notReady;
 
+        var invalid = ArgumentChecks.Choice("scope", scope, "file", "project", "solution")
+            ?? ArgumentChecks.Choice("kind", kind, "type", "method", "property", "all");
+        if (invalid is not null) return invalid;
+        scope = scope.ToLowerInvariant();
+
         var solution = workspace.GetSolution();
         if (solution is null)
             return JsonSerializer.Serialize(new DeadCodeResult([], 0, 0, false, Math.Max(1, maxResults)));

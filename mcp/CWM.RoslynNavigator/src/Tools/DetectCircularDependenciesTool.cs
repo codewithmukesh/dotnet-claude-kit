@@ -19,6 +19,9 @@ public static class DetectCircularDependenciesTool
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
         if (notReady is not null) return notReady;
 
+        if (ArgumentChecks.Choice("scope", scope, "projects", "types") is { } invalid)
+            return invalid;
+
         var solution = workspace.GetSolution();
         if (solution is null)
             return JsonSerializer.Serialize(new CircularDependenciesResult([], 0));

@@ -21,7 +21,7 @@ public static class GetDiRegistrationsTool
     [McpServerTool(Name = "get_di_registrations"), Description("Map of dependency-injection registrations: service, implementation, lifetime, and file:line. Supported containers: Microsoft.Extensions.DependencyInjection (Add{Singleton,Scoped,Transient}/AddKeyed*/TryAdd*), Prism IContainerRegistry (Register/RegisterSingleton/RegisterScoped/RegisterInstance/RegisterMany, matched by receiver type), and Autofac ContainerBuilder (RegisterType/Register/RegisterInstance with As<>/SingleInstance/InstancePerLifetimeScope chains). Flags duplicate registrations of the same service (which may be intentional multi-registration) and captive-dependency risks — a singleton implementation whose constructor takes a service registered as scoped. Best-effort static analysis: factory-lambda registrations report '(factory)' and instances '(instance)' as the implementation, matching is by type name, and registrations built via reflection, Scrutor/assembly scanning, or extension-method indirection are not seen. When calls against other containers (DryIoc, Unity, Castle Windsor, SimpleInjector, Ninject, ...) are seen but not mapped, the response carries a Note with the counts — so Count 0 with a Note does not mean no DI.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Optional: filter to registrations in files whose path contains this value")] string? file = null,
+        [Description("Optional: filter to registrations in files whose path contains this value. A value matching no file returns a FileNotFound error.")] string? file = null,
         [Description("Maximum registrations to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count. Duplicates and captive risks are always computed from the full set.")] int maxResults = 100,
         CancellationToken ct = default)
     {
@@ -38,6 +38,11 @@ public static class GetDiRegistrationsTool
             .SelectMany(p => p.Documents)
             .Where(d => d.FilePath is not null && seenFiles.Add(d.FilePath))
             .ToArray();
+
+        // Every document is still scanned (type lookups span files), but a filter naming no
+        // file is a mistake to report, not "this file registers nothing".
+        if (file is not null && !documents.Any(d => d.FilePath!.Contains(file, StringComparison.OrdinalIgnoreCase)))
+            return ArgumentChecks.FileFilterMatchesNothing(file);
 
         // Files are analysed in parallel into per-document slots, then merged in document
         // order so first-wins type lookup, registration order and truncation match a

@@ -39,6 +39,11 @@ public static class DetectAntiPatternsTool
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
         if (notReady is not null) return notReady;
 
+        var invalid = ArgumentChecks.Choice("severity", severity, "warning", "error")
+            ?? ArgumentChecks.Choice("scope", scope, "production", "all")
+            ?? ArgumentChecks.Choice("confidence", confidence, "medium", "high");
+        if (invalid is not null) return invalid;
+
         var solution = workspace.GetSolution();
         if (solution is null)
             return JsonSerializer.Serialize(new AntiPatternsResult(
