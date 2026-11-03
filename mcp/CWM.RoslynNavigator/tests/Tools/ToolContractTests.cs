@@ -29,6 +29,17 @@ public sealed class ToolContractTests
         Assert.All(tools, t => Assert.Contains(t.Method.GetParameters(), p => p.ParameterType == typeof(CancellationToken)));
     }
 
+    [Fact]
+    public void ToolArguments_Tables_CoverExactlyTheDiscoveredTools()
+    {
+        // Act
+        var names = ToolCatalog.Names.Order(StringComparer.Ordinal);
+
+        // Assert — a new tool must get valid and invalid arguments before it is covered.
+        Assert.Equal(names, ToolArguments.ValidTableTools.Order(StringComparer.Ordinal));
+        Assert.Equal(names, ToolArguments.InvalidTableTools.Order(StringComparer.Ordinal));
+    }
+
     [Theory]
     [MemberData(nameof(ToolCatalog.NameData), MemberType = typeof(ToolCatalog))]
     public async Task Invoke_WorkspaceNotStarted_ReturnsStatusJsonWithoutThrowing(string toolName)

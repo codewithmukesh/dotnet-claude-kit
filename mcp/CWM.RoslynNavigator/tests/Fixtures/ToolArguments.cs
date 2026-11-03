@@ -86,5 +86,14 @@ public static class ToolArguments
             ? args
             : throw new KeyNotFoundException($"No invalid arguments for '{tool}'. Add it to ToolArguments.");
 
-    public static IEnumerable<string> Tools => ValidArgs.Keys;
+    public static IEnumerable<string> ValidTableTools => ValidArgs.Keys;
+
+    public static IEnumerable<string> InvalidTableTools => InvalidArgs.Keys;
+
+    /// <summary>
+    /// Tools that take an argument whose value can be wrong. The rest (get_project_graph,
+    /// get_token_savings, get_workspace_status) take only maxResults, which is clamped.
+    /// </summary>
+    public static TheoryData<string> ToolsWithInvalidArguments =>
+        [.. InvalidArgs.Where(entry => entry.Value is not null).Select(entry => entry.Key).Order(StringComparer.Ordinal)];
 }
