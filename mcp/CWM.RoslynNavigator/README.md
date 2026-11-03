@@ -17,7 +17,7 @@ CWM.RoslynNavigator is a Model Context Protocol (MCP) server that provides Claud
 
 | Tool | Description |
 |------|-------------|
-| `find_symbol` | Find where a type, method, or property is defined |
+| `find_symbol` | Find where a type, method, or property is defined. `match`: `exact` (default), `prefix`, `camelhump`, or `substring` — see [Fuzzy search](#fuzzy-search) |
 | `find_references` | All usages of a symbol across the solution |
 | `find_implementations` | Types that implement an interface or derive from a base class |
 | `find_callers` | All methods that call a specific method, including calls through an interface or base member (`Via`: direct / interface / base / implementation, plus `ViaSymbol`) |
@@ -59,7 +59,27 @@ will not match `OrderService.Get`.
 
 When a bare name matches several distinct symbols, tools return an `AmbiguousMatch` error
 listing the candidates rather than silently picking one. Overloads, partial declarations,
-and per-target-framework duplicates count as one symbol, not an ambiguity.
+and per-target-framework duplicates count as one symbol, not an ambiguity. Each candidate's
+`File` and `Line` can be passed straight back as `file`/`line`.
+
+### Fuzzy search
+
+`find_symbol` matches the exact name by default. When you only know part of it, set
+`match`:
+
+| `match` | Finds | Example for `GetByIdAsync` |
+|---------|-------|----------------------------|
+| `exact` | The name itself (case-sensitive) | `GetByIdAsync` |
+| `prefix` | + names starting with the text | `getby` |
+| `camelhump` | + names whose humps start with the query's humps, anchored on the first | `GBIA`, `gbia`, `GetByAsync` |
+| `substring` | + names containing the text anywhere | `IdAsync` |
+
+Each mode includes the tighter ones. Results are ranked exact > prefix > camelhump >
+substring, then types before members, then by project and qualified name, and each
+carries its `Match` tier. A qualifier still matches exactly — `OrderService.Cre` with
+`prefix` finds only `OrderService.CreateOrderAsync`. The search runs as a predicate over
+each project's declaration table (names only, no binding), so it costs about as much as
+an exact lookup.
 
 ### Errors
 
@@ -69,7 +89,7 @@ and has no references".
 
 | Code | Meaning |
 |------|---------|
-| `SymbolNotFound` | No symbol by that name. Check spelling, or search with `find_symbol`. |
+| `SymbolNotFound` | No symbol by that name. `DidYouMean` lists up to five close names (typos, prefixes, camel humps) when there are any. |
 | `AmbiguousMatch` | Several distinct symbols match. `Candidates` lists them; re-query fully qualified, or pass `file`/`line`. |
 | `WrongSymbolKind` | Resolved, but to the wrong kind (e.g. a method where a type was required). |
 | `FileNotFound` | The path is not part of any project in the solution. |

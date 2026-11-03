@@ -57,6 +57,133 @@ internal static class SymbolResolver
     }
 
     /// <summary>
+    /// Fuzzy declaration search for find_symbol: every type and member whose simple name
+    /// matches within <paramref name="mode"/>, ranked exact &gt; prefix &gt; camel-hump &gt;
+    /// substring, then types before members, then by project and qualified name. Runs the
+    /// matcher as a predicate over each compilation's declaration table — names only, no
+    /// binding — so its cost is one pass over declared names per project. A qualifier
+    /// ("OrderService.Get") must match the containing symbol on segment boundaries.
+    /// </summary>
+    public static async Task<IReadOnlyList<(ISymbol Symbol, MatchTier Tier)>> SearchAsync(
+        WorkspaceManager workspace,
+        string query,
+        MatchMode mode,
+        string? kindFilter = null,
+        CancellationToken ct = default)
+    {
+        var normalized = NormalizeRequestedName(query);
+        if (normalized.Length == 0) return [];
+
+        var simpleName = GetSimpleName(normalized);
+        var qualifier = normalized.Length == simpleName.Length
+            ? null
+            : normalized[..(normalized.Length - simpleName.Length - 1)];
+
+        var results = new List<(ISymbol Symbol, MatchTier Tier)>();
+        var seen = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+
+        foreach (var compilation in await workspace.GetAllCompilationsAsync(ct))
+        {
+            var symbols = compilation.GetSymbolsWithName(
+                name => SymbolMatcher.Classify(name, simpleName, mode) != MatchTier.None,
+                SymbolFilter.TypeAndMember,
+                ct);
+
+            foreach (var symbol in symbols)
+            {
+                if (symbol.IsImplicitlyDeclared || !seen.Add(symbol)) continue;
+                if (kindFilter is not null && !MatchesKind(symbol, kindFilter)) continue;
+                if (qualifier is not null && !MatchesContainer(symbol, qualifier)) continue;
+
+                results.Add((symbol, SymbolMatcher.Classify(symbol.Name, simpleName, mode)));
+            }
+        }
+
+        return results
+            .OrderBy(r => r.Tier)
+            .ThenBy(r => KindRank(r.Symbol))
+            .ThenBy(r => r.Symbol.ContainingAssembly?.Name, StringComparer.Ordinal)
+            .ThenBy(r => BuildQualifiedName(r.Symbol), StringComparer.Ordinal)
+            .ToList();
+    }
+
+    /// <summary>
+    /// Up to <paramref name="max"/> declared names close to one that matched nothing: a
+    /// prefix/camel-hump/substring hit, a name the query contains, or a small typo
+    /// (edit distance ≤ a quarter of the length). Same declaration-table pass as
+    /// <see cref="SearchAsync"/>, so a miss costs about as much as a fuzzy search.
+    /// </summary>
+    public static async Task<IReadOnlyList<ISymbol>> SuggestAsync(
+        WorkspaceManager workspace,
+        string name,
+        string? kindFilter,
+        int max,
+        CancellationToken ct)
+    {
+        var simpleName = GetSimpleName(NormalizeRequestedName(name));
+        if (simpleName.Length < 2) return [];
+
+        var maxDistance = Math.Max(1, simpleName.Length / 4);
+        int Score(string candidate)
+        {
+            var tier = SymbolMatcher.Classify(candidate, simpleName, MatchMode.Substring);
+            if (tier != MatchTier.None) return (int)tier;
+            // A typo outranks a shorter name the query happens to contain.
+            var distance = SymbolMatcher.BoundedEditDistance(candidate, simpleName, maxDistance);
+            if (distance <= maxDistance) return 4 + distance;
+            return candidate.Length >= 4 && simpleName.Contains(candidate, StringComparison.OrdinalIgnoreCase)
+                ? 5 + maxDistance
+                : -1;
+        }
+
+        var scored = new List<(ISymbol Symbol, int Score)>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var compilation in await workspace.GetAllCompilationsAsync(ct))
+        {
+            foreach (var symbol in compilation.GetSymbolsWithName(n => Score(n) >= 0, SymbolFilter.TypeAndMember, ct))
+            {
+                if (symbol.IsImplicitlyDeclared) continue;
+                if (kindFilter is not null && !MatchesKind(symbol, kindFilter)) continue;
+                if (seen.Add(BuildQualifiedName(symbol)))
+                    scored.Add((symbol, Score(symbol.Name)));
+            }
+        }
+
+        return scored
+            .OrderBy(s => s.Score)
+            .ThenBy(s => KindRank(s.Symbol))
+            .ThenBy(s => BuildQualifiedName(s.Symbol), StringComparer.Ordinal)
+            .Take(max)
+            .Select(s => s.Symbol)
+            .ToList();
+    }
+
+    private static bool MatchesContainer(ISymbol symbol, string qualifier)
+    {
+        if (symbol.ContainingSymbol is not { } container
+            || container is INamespaceSymbol { IsGlobalNamespace: true })
+        {
+            return false;
+        }
+
+        var qualified = BuildQualifiedName(container);
+        return qualified.Equals(qualifier, StringComparison.Ordinal)
+            || qualified.EndsWith($".{qualifier}", StringComparison.Ordinal);
+    }
+
+    /// <summary>Types first, then members in rough order of how often they are searched for.</summary>
+    private static int KindRank(ISymbol symbol) => symbol switch
+    {
+        INamedTypeSymbol => 0,
+        IMethodSymbol => 1,
+        IPropertySymbol => 2,
+        IFieldSymbol => 3,
+        IEventSymbol => 4,
+        _ => 5
+    };
+
+    /// <summary>
     /// Strips a parameter list, generic arguments, and metadata arity markers so that
     /// "IRepository&lt;Order&gt;.GetByIdAsync(Guid, CancellationToken)" reduces to
     /// "IRepository.GetByIdAsync". Segment separators are preserved.
@@ -180,9 +307,13 @@ internal static class SymbolResolver
 
         if (symbols.Count == 0)
         {
+            var suggestions = await SuggestAsync(workspace, name, kindFilter, MaxSuggestions, ct);
             return SymbolResolution.Failure(new ErrorResponse(
                 ErrorCodes.SymbolNotFound,
-                $"No symbol named '{name}' exists in the solution. Check the spelling, or search with find_symbol."));
+                suggestions.Count > 0
+                    ? $"No symbol named '{name}' exists in the solution. DidYouMean lists close matches; otherwise search with find_symbol match='camelhump' or 'substring'."
+                    : $"No symbol named '{name}' exists in the solution. Check the spelling, or search with find_symbol match='camelhump' or 'substring'.",
+                DidYouMean: suggestions.Count > 0 ? [.. suggestions.Select(s => ToCandidate(workspace, s))] : null));
         }
 
         var narrowed = NarrowByLocation(symbols, file, line);
@@ -198,15 +329,7 @@ internal static class SymbolResolver
 
         var candidates = distinct
             .Take(MaxAmbiguityCandidates)
-            .Select(group =>
-            {
-                var location = GetLocation(group.First());
-                return new SymbolCandidate(
-                    Qualified: group.Key.Item1,
-                    Kind: group.Key.Item2,
-                    File: location is { } loc ? workspace.ToRelativePath(loc.File) : "unknown",
-                    Line: location?.Line ?? 0);
-            })
+            .Select(group => ToCandidate(workspace, group.First()))
             .ToList();
 
         return SymbolResolution.Failure(new ErrorResponse(
@@ -216,6 +339,17 @@ internal static class SymbolResolver
     }
 
     private const int MaxAmbiguityCandidates = 10;
+    private const int MaxSuggestions = 5;
+
+    private static SymbolCandidate ToCandidate(WorkspaceManager workspace, ISymbol symbol)
+    {
+        var location = GetLocation(symbol);
+        return new SymbolCandidate(
+            Qualified: BuildQualifiedName(symbol),
+            Kind: GetKindString(symbol),
+            File: location is { } loc ? workspace.ToRelativePath(loc.File) : "unknown",
+            Line: location?.Line ?? 0);
+    }
 
     /// <summary>
     /// Narrows candidates using an optional file path then line number. Falls back to the

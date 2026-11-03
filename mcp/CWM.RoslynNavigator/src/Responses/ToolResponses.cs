@@ -40,13 +40,27 @@ internal sealed record SymbolCandidate(string Qualified, string Kind, string Fil
 /// <summary>
 /// Structured failure. <see cref="Candidates"/> is populated for AmbiguousMatch so the
 /// caller can re-query with a fully-qualified name instead of guessing.
+/// <see cref="DidYouMean"/> is populated for SymbolNotFound with up to five close names.
 /// </summary>
 internal sealed record ErrorResponse(
     string Error,
     string Message,
-    List<SymbolCandidate>? Candidates = null);
+    List<SymbolCandidate>? Candidates = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<SymbolCandidate>? DidYouMean = null);
 
-internal sealed record SymbolLocation(string Name, string Kind, string File, int Line, string Namespace, bool IsGenerated);
+/// <summary>
+/// <see cref="Match"/> (exact / prefix / camelhump / substring) appears only for a fuzzy
+/// search, where results are ranked by it.
+/// </summary>
+internal sealed record SymbolLocation(
+    string Name,
+    string Kind,
+    string File,
+    int Line,
+    string Namespace,
+    bool IsGenerated,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Match = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ContainingType = null);
 
 internal sealed record SymbolSearchResult(List<SymbolLocation> Symbols, int Count, int TotalFound, bool Truncated, int Limit);
 

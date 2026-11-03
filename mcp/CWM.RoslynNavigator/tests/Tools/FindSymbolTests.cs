@@ -119,4 +119,100 @@ public class FindSymbolTests(TestSolutionFixture fixture)
 
         Assert.NotEmpty(result.Symbols);
     }
+
+    [Fact]
+    public async Task FindSymbol_PrefixMatch_RanksExactFirstThenPrefix()
+    {
+        var result = JsonSerializer.Deserialize<SymbolSearchResult>(
+            await FindSymbolTool.ExecuteAsync(fixture.WorkspaceManager, "Order", "type", match: "prefix",
+                ct: TestContext.Current.CancellationToken))!;
+
+        Assert.Equal("Order", result.Symbols[0].Name);
+        Assert.Equal("exact", result.Symbols[0].Match);
+        Assert.Contains(result.Symbols, s => s.Name == "OrderService" && s.Match == "prefix");
+        Assert.Contains(result.Symbols, s => s.Name == "OrderItem" && s.Match == "prefix");
+        Assert.DoesNotContain(result.Symbols, s => s.Name == "IOrderRepository");
+    }
+
+    [Theory]
+    [InlineData("GBIA")]
+    [InlineData("gbia")]
+    [InlineData("GetByAsync")]
+    public async Task FindSymbol_CamelHump_FindsMethodByHumps(string query)
+    {
+        var result = JsonSerializer.Deserialize<SymbolSearchResult>(
+            await FindSymbolTool.ExecuteAsync(fixture.WorkspaceManager, query, "method", match: "camelhump",
+                ct: TestContext.Current.CancellationToken))!;
+
+        Assert.Contains(result.Symbols, s => s.Name == "GetByIdAsync" && s.Match == "camelhump");
+    }
+
+    [Fact]
+    public async Task FindSymbol_Substring_FindsEverythingContainingTheText()
+    {
+        var result = JsonSerializer.Deserialize<SymbolSearchResult>(
+            await FindSymbolTool.ExecuteAsync(fixture.WorkspaceManager, "repository", match: "substring",
+                ct: TestContext.Current.CancellationToken))!;
+
+        Assert.Contains(result.Symbols, s => s.Name == "IOrderRepository");
+        Assert.Contains(result.Symbols, s => s.Name == "InMemoryProductRepository");
+        Assert.All(result.Symbols, s => Assert.Equal("substring", s.Match));
+    }
+
+    [Fact]
+    public async Task FindSymbol_FuzzyWithQualifier_KeepsQualifierExact()
+    {
+        var result = JsonSerializer.Deserialize<SymbolSearchResult>(
+            await FindSymbolTool.ExecuteAsync(fixture.WorkspaceManager, "OrderService.Cre", match: "prefix",
+                ct: TestContext.Current.CancellationToken))!;
+
+        var hit = Assert.Single(result.Symbols);
+        Assert.Equal("CreateOrderAsync", hit.Name);
+        Assert.Equal("OrderService", hit.ContainingType);
+    }
+
+    [Fact]
+    public async Task FindSymbol_FuzzyResults_AreCappedLikeExactOnes()
+    {
+        var result = JsonSerializer.Deserialize<SymbolSearchResult>(
+            await FindSymbolTool.ExecuteAsync(fixture.WorkspaceManager, "e", match: "substring", maxResults: 3,
+                ct: TestContext.Current.CancellationToken))!;
+
+        Assert.Equal(3, result.Count);
+        Assert.True(result.Truncated);
+        Assert.True(result.TotalFound > 3);
+    }
+
+    [Fact]
+    public async Task FindSymbol_UnknownMatchMode_ReturnsInvalidArgument()
+    {
+        var error = JsonSerializer.Deserialize<ErrorResponse>(
+            await FindSymbolTool.ExecuteAsync(fixture.WorkspaceManager, "Order", match: "regex",
+                ct: TestContext.Current.CancellationToken))!;
+
+        Assert.Equal(ErrorCodes.InvalidArgument, error.Error);
+    }
+
+    [Fact]
+    public async Task SymbolNotFound_Typo_SuggestsCloseNames()
+    {
+        var error = JsonSerializer.Deserialize<ErrorResponse>(
+            await FindReferencesTool.ExecuteAsync(fixture.WorkspaceManager, "OrderServce",
+                ct: TestContext.Current.CancellationToken))!;
+
+        Assert.Equal(ErrorCodes.SymbolNotFound, error.Error);
+        Assert.NotNull(error.DidYouMean);
+        Assert.InRange(error.DidYouMean.Count, 1, 5);
+        Assert.Equal("SampleApi.OrderService", error.DidYouMean[0].Qualified);
+    }
+
+    [Fact]
+    public async Task SymbolNotFound_NothingClose_OmitsSuggestions()
+    {
+        var json = await FindReferencesTool.ExecuteAsync(fixture.WorkspaceManager, "Zqxjkvw",
+            ct: TestContext.Current.CancellationToken);
+
+        Assert.Equal(ErrorCodes.SymbolNotFound, JsonSerializer.Deserialize<ErrorResponse>(json)!.Error);
+        Assert.DoesNotContain("DidYouMean", json);
+    }
 }
