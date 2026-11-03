@@ -412,7 +412,9 @@ Working across several solutions (e.g. microservices)? Repeat `--solution`, or a
 `--all-solutions` — see [Multiple Solutions](#multiple-solutions).
 
 Load tuning, rarely needed: `--load-parallelism N` sets how many MSBuild build hosts load
-the solution side by side (default: automatic; `1` = one host) — see [Scaling](#scaling).
+the solution side by side (default: automatic; `1` = one host), and `--all-target-frameworks`
+keeps every target framework of a multi-targeted project loaded instead of one — see
+[Scaling](#scaling).
 
 ### As a Local Tool (per-repo)
 
@@ -595,6 +597,21 @@ One strategy for every solution size:
   references 228 of its 257 projects) and jellyfin stay on one host. `--load-parallelism N`
   forces N hosts (`1` turns it off); the server logs a `Load profile` line after every load
   showing where the time went.
+- **One target framework per project.** MSBuild loads a multi-targeted project once per
+  target framework, so its files are parsed, compiled, held in memory, and found by every
+  search 2-5 times. After a load the server keeps one instance per project — the highest
+  plain `netX.Y` the SDK supports, else .NET with an OS suffix, .NET Core, .NET Standard,
+  .NET Framework, in that order — and drops the others, except an instance a kept project
+  references (a `netstandard2.0`-only consumer keeps the library's `netstandard2.0` build) or
+  one that compiles a source file the primary does not, such as a file behind a conditional
+  `Compile` item (per-framework generated files under `obj/` are ignored for this check);
+  those stay, with a `Secondary target framework kept` load diagnostic saying why.
+  `get_workspace_status` lists the drop as a load diagnostic. The trade-off: code inside
+  `#if` blocks for a dropped framework is not indexed. Measured on ABP: 690 → 271
+  projects, 15,212 → 6,207 documents, warm-up 4.5-5.0 s → 3.2-3.8 s, peak working set at
+  warm-up ~1,025 MB → ~870 MB; on eShop 35 → 28 projects, 1,293 → 673 documents. Ready
+  time is unchanged (every framework is still evaluated; pruning takes ~0.2 s on ABP).
+  Pass `--all-target-frameworks` to keep every instance.
 - **Background warm-up.** Every project then compiles in the background, one build per
   core, dependencies first. A reload cancels the warm-up of the snapshot it replaces.
 - **Queries never wait in line.** A tool that needs a compilation the warm-up has not

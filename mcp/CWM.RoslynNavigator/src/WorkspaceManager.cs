@@ -156,6 +156,12 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     internal int LoadParallelism { get; set; }
 
     /// <summary>
+    /// When set (<c>--all-target-frameworks</c>), every target framework of a multi-targeted
+    /// project stays loaded. By default only the primary one is kept (<see cref="TargetFrameworkPruner"/>).
+    /// </summary>
+    internal bool AllTargetFrameworks { get; set; }
+
+    /// <summary>
     /// Build hosts for a solution declaring <paramref name="projectCount"/> projects. Each host
     /// costs a process start and loads its group's shared references again, which only pays off
     /// once there are enough projects to keep every host busy.
@@ -417,6 +423,24 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             // A fresh clone's unbuilt in-solution analyzers would make every derived-type search throw.
             solution = UnresolvedAnalyzerReferences.Strip(solution, health);
             profile.Step("strip analyzers");
+
+            if (!AllTargetFrameworks)
+            {
+                var pruned = TargetFrameworkPruner.Prune(solution);
+                solution = pruned.Solution;
+                profile.Step("prune target frameworks");
+                if (pruned.Dropped > 0)
+                {
+                    health.RecordDiagnostic(WorkspaceDiagnosticKind.Warning,
+                        $"Loaded one target framework per multi-targeted project: {pruned.Dropped} duplicate per-framework " +
+                        "project instance(s) dropped. Code inside #if blocks for the dropped frameworks is not indexed; " +
+                        $"start the server with {WorkspaceOptions.AllTargetFrameworksFlag} to load every framework.");
+                    logger.LogInformation("Dropped {Count} secondary target-framework project instances.", pruned.Dropped);
+                }
+
+                foreach (var reason in pruned.KeptForCoverage)
+                    health.RecordDiagnostic(WorkspaceDiagnosticKind.Warning, $"Secondary target framework kept: {reason}");
+            }
 
             return new PendingLoad(
                 solutionPaths, workspace, solution, loaded, health, startedUtc, stampsAtStart, profile);
