@@ -472,7 +472,7 @@ The server resolves the solution file in this order:
 
 1. **Explicit `--solution` argument** — Pass a `.sln`/`.slnx` file path directly, or a directory to scan recursively. Repeatable — see [Multiple Solutions](#multiple-solutions)
 2. **Working directory scan** — If no argument, scans the current working directory recursively for solution files
-3. **MCP roots discovery** — On the first tool call, if no solution was found at startup, the server requests workspace roots from the MCP host (e.g., Claude Code) and scans those directories, loading a solution from **each** root that has one. This is a one-shot attempt — if no solution is found, it won't retry. This enables true zero-arg global tool operation.
+3. **MCP roots discovery** — On the first tool call, if no solution was found at startup, the server requests workspace roots from the MCP host (e.g., Claude Code) and scans those directories, loading a solution from **each** root that has one. If no root has a solution yet, it looks again on a later call after 30 s. When the host sends `notifications/roots/list_changed`, the next call rediscovers; a different set of solutions reloads in the background while the current one keeps answering. Roots never override a solution configured with `--solution` or found in the working directory. This enables true zero-arg global tool operation.
 4. **Deterministic selection** — Shallowest solution wins (BFS); within the same depth, alphabetical (case-insensitive) ordering is used. With `--all-solutions`, every solution found is loaded instead.
 
 ### Recursive Search

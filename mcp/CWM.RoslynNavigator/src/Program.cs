@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Server;
 
 // MSBuild locator MUST be called before any Roslyn types are loaded.
 // This resolves the MSBuild instance needed by MSBuildWorkspace.
@@ -87,6 +88,19 @@ builder.Services.AddMcpServer()
         return result;
     }));
 
+// A client whose roots change (a folder added to the workspace) says so; solutions discovered
+// from roots are then rediscovered on the next call.
+builder.Services.AddOptions<McpServerOptions>().Configure<WorkspaceManager>((options, workspace) =>
+    options.Handlers.NotificationHandlers =
+    [
+        .. options.Handlers.NotificationHandlers ?? [],
+        new(NotificationMethods.RootsListChangedNotification, (_, _) =>
+        {
+            workspace.OnRootsChanged();
+            return ValueTask.CompletedTask;
+        })
+    ]);
+
 // Discover solution paths: --solution is repeatable, --all-solutions loads every solution found.
 var solutionPaths = SolutionDiscovery.FindSolutionPaths(args);
 WorkspaceInitializer.SolutionPaths = solutionPaths;
@@ -96,6 +110,7 @@ var app = builder.Build();
 var workspaceManager = app.Services.GetRequiredService<WorkspaceManager>();
 workspaceManager.Services = app.Services;
 workspaceManager.DiscoverAllSolutions = SolutionDiscovery.IsAllSolutionsMode(args);
+workspaceManager.HasConfiguredSolutions = solutionPaths.Count > 0;
 
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 if (solutionPaths.Count > 0)

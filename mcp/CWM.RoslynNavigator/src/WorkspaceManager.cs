@@ -42,7 +42,11 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     private Task _structuralScan = Task.CompletedTask;
     private CancellationTokenSource? _warmUpCts;
     private Task _warmUp = Task.CompletedTask;
-    private int _rootsAttempted; // 0 = not tried, 1 = tried
+    // MCP roots discovery: pending until tried, and again whenever the client reports that
+    // its roots changed; retried after a cooldown while no root holds a solution.
+    private int _rootsDirty = 1;
+    private long _rootsRetryNotBeforeTicks = long.MaxValue;
+    private volatile bool _solutionsFromRoots;
     private long _lastRefreshTicks;
     private long _lastStructuralScanTicks;
     private long _lastErrorRetryTicks;
@@ -143,6 +147,13 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     /// root instead of the first. Set by Program.cs.
     /// </summary>
     internal bool DiscoverAllSolutions { get; set; }
+
+    /// <summary>
+    /// True when solutions were configured at startup (<c>--solution</c> or found in the working
+    /// directory). MCP roots are then never consulted, even before that load has started or
+    /// after it failed: roots discovery is the fallback for a server started without one.
+    /// </summary>
+    internal bool HasConfiguredSolutions { get; set; }
 
     /// <summary>
     /// How many times the solution has been loaded. Test seam for verifying that a
@@ -404,7 +415,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     /// whether this call started it. A change made while a reload runs is picked up by the
     /// first refresh after it completes.
     /// </summary>
-    private bool StartBackgroundReload(string reason)
+    private bool StartBackgroundReload(string reason, IReadOnlyList<string>? solutionPaths = null)
     {
         if (_solution is null || _disposed) return false;
         if (Interlocked.CompareExchange(ref _reloadRunning, 1, 0) != 0) return false;
@@ -415,7 +426,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         {
             try
             {
-                await LoadSolutionsAsync(_solutionPaths, _backgroundCts.Token);
+                await LoadSolutionsAsync(solutionPaths ?? _solutionPaths, _backgroundCts.Token);
             }
             catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
             {
@@ -760,6 +771,11 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
                 logger.LogWarning(ex, "Workspace refresh failed; will retry on a later call.");
             }
 
+            // Roots changed under a workspace that came from them: rediscover, and reload in
+            // the background if the solutions differ. This call still answers right away.
+            if (_solutionsFromRoots && TryClaimRootsDiscovery())
+                await DiscoverFromRootsAsync(ct);
+
             if (State == WorkspaceState.Ready) return null;
         }
 
@@ -773,10 +789,13 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             if (State == WorkspaceState.Ready) return null;
         }
 
-        // One-shot attempt to discover workspace from MCP roots
-        if (Interlocked.CompareExchange(ref _rootsAttempted, 1, 0) == 0)
+        // No solution configured (or the configured ones came from roots): discover from MCP roots.
+        if (State != WorkspaceState.Loading
+            && !HasConfiguredSolutions
+            && (_solutionPaths.Count == 0 || _solutionsFromRoots)
+            && TryClaimRootsDiscovery())
         {
-            await TryInitializeFromRootsAsync(ct);
+            await DiscoverFromRootsAsync(ct);
             if (State == WorkspaceState.Ready) return null;
         }
 
@@ -812,44 +831,107 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         return Interlocked.CompareExchange(ref _lastErrorRetryTicks, now, last) == last;
     }
 
-    private async Task TryInitializeFromRootsAsync(CancellationToken ct)
+    /// <summary>
+    /// The directories of the client's MCP roots. Test seam: replaces the roots request to the
+    /// connected client.
+    /// </summary>
+    internal Func<CancellationToken, Task<IReadOnlyList<string>>>? RootsProvider { get; set; }
+
+    /// <summary>
+    /// Called when the client sends <c>notifications/roots/list_changed</c>. The next tool call
+    /// rediscovers solutions from the new roots — unless the solutions were configured
+    /// explicitly (<c>--solution</c> or the working directory), which roots never override.
+    /// </summary>
+    public void OnRootsChanged()
     {
+        Volatile.Write(ref _rootsDirty, 1);
+        logger.LogInformation("MCP roots changed; solutions are rediscovered on the next call.");
+    }
+
+    /// <summary>
+    /// One caller at a time claims discovery: when it is pending (never tried, or roots
+    /// changed), or when an earlier attempt found no solution and its cooldown has passed.
+    /// </summary>
+    private bool TryClaimRootsDiscovery()
+    {
+        if (Interlocked.Exchange(ref _rootsDirty, 0) == 1) return true;
+
+        var retryAt = Interlocked.Read(ref _rootsRetryNotBeforeTicks);
+        return _solution is null
+            && clock.GetUtcNow().UtcTicks >= retryAt
+            && Interlocked.CompareExchange(ref _rootsRetryNotBeforeTicks, long.MaxValue, retryAt) == retryAt;
+    }
+
+    /// <summary>
+    /// Scans every MCP root for solutions — one per root, or all with <c>--all-solutions</c> —
+    /// so a multi-root workspace spanning several services loads them all into one workspace.
+    /// With no snapshot yet the call waits for the load; with one, a changed set of solutions
+    /// reloads in the background like any other reload.
+    /// </summary>
+    private async Task DiscoverFromRootsAsync(CancellationToken ct)
+    {
+        IReadOnlyList<string>? roots;
         try
         {
-            var server = Services?.GetService(typeof(McpServer)) as McpServer;
-            if (server is null) return;
-
-            var rootsResult = await server.RequestRootsAsync(new ListRootsRequestParams(), ct);
-
-            // A solution from EACH root (every solution per root with --all-solutions), so a
-            // multi-root workspace spanning several services loads them all into one workspace.
-            var solutionPaths = new List<string>();
-            foreach (var root in rootsResult.Roots)
-            {
-                if (!Uri.TryCreate(root.Uri, UriKind.Absolute, out var uri)) continue;
-                var localPath = uri.LocalPath;
-                if (!Directory.Exists(localPath)) continue;
-
-                foreach (var solutionPath in SolutionDiscovery.ScanDirectory(localPath, DiscoverAllSolutions))
-                {
-                    if (solutionPaths.Contains(solutionPath, PathComparison.Comparer)) continue;
-                    logger.LogInformation("Discovered solution from MCP roots: {SolutionPath}", solutionPath);
-                    solutionPaths.Add(solutionPath);
-                }
-            }
-
-            if (solutionPaths.Count > 0)
-            {
-                await LoadSolutionsAsync(solutionPaths, ct);
-                return;
-            }
-
-            logger.LogWarning("MCP roots available but no .sln/.slnx found in any root directory.");
+            roots = await RequestRootDirectoriesAsync(ct);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (ex is not OperationCanceledException)
         {
+            // Typically a client without roots support; only a roots change asks again.
             logger.LogWarning(ex, "Failed to discover workspace from MCP roots.");
+            return;
         }
+
+        if (roots is null) return;
+
+        var solutionPaths = new List<string>();
+        foreach (var root in roots)
+        {
+            if (!Directory.Exists(root)) continue;
+
+            foreach (var solutionPath in SolutionDiscovery.ScanDirectory(root, DiscoverAllSolutions))
+            {
+                if (solutionPaths.Contains(solutionPath, PathComparison.Comparer)) continue;
+                logger.LogInformation("Discovered solution from MCP roots: {SolutionPath}", solutionPath);
+                solutionPaths.Add(solutionPath);
+            }
+        }
+
+        if (solutionPaths.Count == 0)
+        {
+            // A solution may be created later (dotnet new sln); look again after a cooldown.
+            logger.LogWarning("MCP roots available but no .sln/.slnx found in any root directory.");
+            if (_solution is null)
+                Interlocked.Exchange(ref _rootsRetryNotBeforeTicks, clock.GetUtcNow().UtcTicks + ErrorRetryCooldownTicks);
+            return;
+        }
+
+        _solutionsFromRoots = true;
+        if (_solution is null)
+        {
+            await RunLoadAsync(solutionPaths).WaitAsync(ct);
+        }
+        else if (!solutionPaths.SequenceEqual(_solutionPaths, PathComparison.Comparer))
+        {
+            StartBackgroundReload("MCP roots changed", solutionPaths);
+        }
+    }
+
+    private async Task<IReadOnlyList<string>?> RequestRootDirectoriesAsync(CancellationToken ct)
+    {
+        if (RootsProvider is { } provider)
+            return await provider(ct);
+
+        if (Services?.GetService(typeof(McpServer)) is not McpServer server)
+            return null;
+
+        var result = await server.RequestRootsAsync(new ListRootsRequestParams(), ct);
+        return
+        [
+            .. result.Roots
+                .Select(root => Uri.TryCreate(root.Uri, UriKind.Absolute, out var uri) && uri.IsFile ? uri.LocalPath : null)
+                .OfType<string>()
+        ];
     }
 
     /// <summary>
