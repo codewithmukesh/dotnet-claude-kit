@@ -13,7 +13,7 @@ public static class FindCallersTool
     [McpServerTool(Name = "find_callers"), Description("Find all methods that call a specific method. Useful for impact analysis and understanding dependencies. Includes callers that reach it through dispatch: Via is 'direct', 'interface' (called through an interface member it implements — the usual DI case), 'base' (through a base member it overrides), or 'implementation' (through an implementation/override of it), with ViaSymbol naming the member actually called. Each caller carries IsGenerated so generated call sites can be skipped.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Method to find callers for. Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified. Qualify when the name is reused across types.")] string methodName,
+        [Description("Method to find callers for. Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified. Qualify when the name is reused across types. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).")] string methodName,
         [Description("Optional: containing class name to disambiguate")] string? className = null,
         [Description("Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 50,
         CancellationToken ct = default)
@@ -26,9 +26,7 @@ public static class FindCallersTool
             return Serialize(Paging.Empty<CallerInfo>(maxResults));
 
         // A className hint is just a qualifier — fold it in rather than resolving twice.
-        var lookupName = className is not null && !methodName.Contains('.')
-            ? $"{className}.{methodName}"
-            : methodName;
+        var lookupName = SymbolResolver.Qualify(methodName, className);
 
         var resolved = await SymbolResolver.ResolveOrErrorAsync(workspace, lookupName, ct: ct);
         if (resolved.Failed) return resolved.Error;

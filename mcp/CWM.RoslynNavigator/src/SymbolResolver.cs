@@ -27,6 +27,9 @@ internal static class SymbolResolver
         var solution = workspace.GetSolution();
         if (solution is null) return [];
 
+        if (IsSymbolId(name))
+            return await FindSymbolsByIdAsync(workspace, name.Trim(), kindFilter, ct);
+
         var normalized = NormalizeRequestedName(name);
         if (normalized.Length == 0) return [];
 
@@ -55,6 +58,70 @@ internal static class SymbolResolver
 
         return results.Distinct(SymbolEqualityComparer.Default).ToList();
     }
+
+    /// <summary>
+    /// True for a documentation-comment ID ("T:SampleDomain.Order",
+    /// "M:SampleDomain.IOrderRepository.GetByIdAsync(System.Guid,System.Threading.CancellationToken)").
+    /// The "X:" prefix cannot start a C# name, so every tool's name parameter accepts an ID
+    /// without a separate argument and without any risk of misreading a name as one.
+    /// </summary>
+    public static bool IsSymbolId(string? name)
+    {
+        var trimmed = name.AsSpan().Trim();
+        return trimmed.Length > 2 && trimmed[1] == ':' && "NTFPME".Contains(trimmed[0]);
+    }
+
+    /// <summary>
+    /// A stable, unambiguous ID for <paramref name="symbol"/> — distinguishes overloads and
+    /// survives edits elsewhere in the file, unlike file/line. Null for symbols with no
+    /// documentation-comment ID (locals, parameters, lambdas, local functions).
+    /// </summary>
+    public static string? GetSymbolId(ISymbol symbol)
+    {
+        var definition = symbol.OriginalDefinition;
+        var hasId = definition switch
+        {
+            IMethodSymbol m => m.MethodKind is not (MethodKind.LocalFunction or MethodKind.AnonymousFunction),
+            INamespaceSymbol or INamedTypeSymbol or IPropertySymbol or IFieldSymbol or IEventSymbol => true,
+            _ => false
+        };
+        return hasId ? DocumentationCommentId.CreateDeclarationId(definition) : null;
+    }
+
+    /// <summary>
+    /// Resolves an ID against every project compilation. A declaration ID names one symbol
+    /// (one overload); a reference ID (generic instantiations) is the fallback. Source
+    /// declarations win over metadata copies of the same symbol seen through references.
+    /// </summary>
+    private static async Task<IReadOnlyList<ISymbol>> FindSymbolsByIdAsync(
+        WorkspaceManager workspace, string id, string? kindFilter, CancellationToken ct)
+    {
+        var results = new List<ISymbol>();
+
+        foreach (var compilation in await workspace.GetAllCompilationsAsync(ct))
+        {
+            var symbols = DocumentationCommentId.GetSymbolsForDeclarationId(id, compilation);
+            if (symbols.IsDefaultOrEmpty)
+                symbols = DocumentationCommentId.GetSymbolsForReferenceId(id, compilation);
+
+            foreach (var symbol in symbols)
+            {
+                if (kindFilter is null || MatchesKind(symbol, kindFilter))
+                    results.Add(symbol);
+            }
+        }
+
+        var distinct = results.Distinct(SymbolEqualityComparer.Default).ToList();
+        var inSource = distinct.Where(s => s.Locations.Any(l => l.IsInSource)).ToList();
+        return inSource.Count > 0 ? inSource : distinct.Take(1).ToList();
+    }
+
+    /// <summary>
+    /// Folds an optional container hint into a name ("Order" + "Cancel" → "Order.Cancel").
+    /// Left alone when the name is already qualified or is a symbol ID.
+    /// </summary>
+    public static string Qualify(string name, string? container) =>
+        container is null || name.Contains('.') || IsSymbolId(name) ? name : $"{container}.{name}";
 
     /// <summary>
     /// Fuzzy declaration search for find_symbol: every type and member whose simple name
@@ -348,7 +415,8 @@ internal static class SymbolResolver
             Qualified: BuildQualifiedName(symbol),
             Kind: GetKindString(symbol),
             File: location is { } loc ? workspace.ToRelativePath(loc.File) : "unknown",
-            Line: location?.Line ?? 0);
+            Line: location?.Line ?? 0,
+            SymbolId: GetSymbolId(symbol));
     }
 
     /// <summary>

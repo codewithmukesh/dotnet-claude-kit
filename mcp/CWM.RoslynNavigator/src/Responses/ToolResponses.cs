@@ -34,8 +34,16 @@ internal static class ErrorCodes
     public const string InvalidArgument = "InvalidArgument";
 }
 
-/// <summary>One of several symbols a qualified name could have meant.</summary>
-internal sealed record SymbolCandidate(string Qualified, string Kind, string File, int Line);
+/// <summary>
+/// One of several symbols a qualified name could have meant. <see cref="SymbolId"/> can be
+/// passed back as the name to pick exactly this one.
+/// </summary>
+internal sealed record SymbolCandidate(
+    string Qualified,
+    string Kind,
+    string File,
+    int Line,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SymbolId = null);
 
 /// <summary>
 /// Structured failure. <see cref="Candidates"/> is populated for AmbiguousMatch so the
@@ -60,7 +68,8 @@ internal sealed record SymbolLocation(
     string Namespace,
     bool IsGenerated,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Match = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ContainingType = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ContainingType = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SymbolId = null);
 
 internal sealed record SymbolSearchResult(List<SymbolLocation> Symbols, int Count, int TotalFound, bool Truncated, int Limit);
 
@@ -376,6 +385,35 @@ internal sealed record StackTraceResult(
     int Limit,
     int SolutionFrames,
     int? FirstSolutionFrame);
+
+// Position lookup
+/// <summary>
+/// The symbol at a file position. <see cref="Token"/>/<see cref="Line"/>/<see cref="Column"/>
+/// echo what was actually resolved, so a caller can confirm it hit the identifier it meant.
+/// Type fields: <see cref="DeclaredType"/> is the symbol's own type (a local's, a property's,
+/// a method's return type) with <see cref="DeclaredNullability"/>; <see cref="ExpressionType"/>
+/// is the compiler's type for the expression at the position, with its flow-state nullability.
+/// </summary>
+internal sealed record SymbolAtResult(
+    string Token,
+    int Line,
+    int Column,
+    string Name,
+    string Kind,
+    string Signature,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ContainingType,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Namespace,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SymbolId,
+    bool IsDeclaration,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? DeclaredType,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? DeclaredNullability,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ExpressionType,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ExpressionNullability,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ConvertedType,
+    string DefinitionFile,
+    int DefinitionLine,
+    bool IsGenerated,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Assembly = null);
 
 // Symbol source
 internal sealed record SymbolSourceResult(

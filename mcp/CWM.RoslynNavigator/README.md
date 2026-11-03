@@ -40,6 +40,7 @@ CWM.RoslynNavigator is a Model Context Protocol (MCP) server that provides Claud
 | `resolve_stack_trace` | Map an exception stack trace onto the solution — undoes async/lambda/local-function rewrites, marks which frames are yours |
 | `analyze_change_impact` | Blast radius of changing one symbol: references by project and file, implementations and overrides that must move with it, transitive callers (interface/base dispatch included, counted in `IndirectCallers`), risk rating |
 | `get_token_savings` | Tokens this server has saved in this repository, with a per-tool leaderboard. Opt-in — see [Token savings](#token-savings) |
+| `get_symbol_at` | The symbol at a file position — pass the identifier `text` (or a `column`) on a `line`. Kind, signature, containing type, definition, `SymbolId`, and declared/expression types with nullability |
 | `get_workspace_status` | What is loaded and how completely: solutions, project/document counts, warm-up progress, snapshot version, and every project that loaded or compiled incompletely — see [Workspace health](#workspace-health) |
 
 ### Symbol names
@@ -51,6 +52,19 @@ CreateOrderAsync                              # bare — may be ambiguous
 OrderService.CreateOrderAsync                 # type-qualified
 MyApp.Orders.OrderService.CreateOrderAsync    # fully qualified
 ```
+
+A fourth form names one symbol exactly, overload included — a **SymbolId**, the
+documentation-comment ID that `find_symbol`, `get_symbol_at`, and `AmbiguousMatch`
+candidates return:
+
+```
+M:MyApp.Orders.OrderService.CreateOrderAsync(System.String,System.Threading.CancellationToken)
+T:MyApp.Orders.OrderService
+```
+
+Pass it wherever a name goes; it is resolved centrally, so every symbol-taking tool
+accepts it. The `X:` prefix cannot begin a C# name, so it never collides with one. Roslyn
+may append `~ReturnType` to method IDs; both forms resolve.
 
 Parameter lists, generic arguments, and metadata arity are ignored, so
 `IRepository<Order>.GetByIdAsync(Guid, CancellationToken)` resolves the same as
@@ -515,7 +529,7 @@ WorkspaceInitializer.cs → BackgroundService triggers workspace load on startup
 SolutionDiscovery.cs    → Auto-detect .sln/.slnx from args or working directory
 SolutionFileReader.cs   → List a solution's projects (multi-solution dedupe and membership)
 SymbolResolver.cs       → Cross-project symbol resolution with disambiguation
-Tools/                  → MCP tool implementations (24 read-only tools)
+Tools/                  → MCP tool implementations (25 read-only tools)
 Responses/              → Token-optimized JSON response DTOs
 Telemetry/              → Opt-in local measurement, behind one call-tool filter
 

@@ -13,7 +13,7 @@ public static class FindOverridesTool
     [McpServerTool(Name = "find_overrides"), Description("Find all overrides of a virtual or abstract method across the solution. Useful for understanding polymorphic behavior. Each result carries IsGenerated so generated overrides can be skipped.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("The virtual or abstract method name to find overrides for")] string methodName,
+        [Description("The virtual or abstract method name to find overrides for. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).")] string methodName,
         [Description("Optional: containing class name to disambiguate")] string? className = null,
         [Description("Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 50,
         CancellationToken ct = default)
@@ -25,9 +25,7 @@ public static class FindOverridesTool
         if (solution is null)
             return Serialize(Paging.Empty<OverrideInfo>(maxResults));
 
-        var lookupName = className is not null && !methodName.Contains('.')
-            ? $"{className}.{methodName}"
-            : methodName;
+        var lookupName = SymbolResolver.Qualify(methodName, className);
 
         var resolved = await SymbolResolver.ResolveOrErrorAsync(workspace, lookupName, ct: ct);
         if (resolved.Failed) return resolved.Error;

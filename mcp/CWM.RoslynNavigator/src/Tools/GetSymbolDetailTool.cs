@@ -12,16 +12,14 @@ public static class GetSymbolDetailTool
     [McpServerTool(Name = "get_symbol_detail"), Description("Get detailed information about a symbol including full signature, parameters, return type, modifiers, and XML documentation. Perfect for understanding APIs without reading the whole file.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Symbol name (type, method, property). Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified.")] string symbolName,
+        [Description("Symbol name (type, method, property). Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).")] string symbolName,
         [Description("Optional: containing type name for methods/properties")] string? containingType = null,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
         if (notReady is not null) return notReady;
 
-        var lookupName = containingType is not null && !symbolName.Contains('.')
-            ? $"{containingType}.{symbolName}"
-            : symbolName;
+        var lookupName = SymbolResolver.Qualify(symbolName, containingType);
 
         var resolved = await SymbolResolver.ResolveOrErrorAsync(workspace, lookupName, ct: ct);
         if (resolved.Failed) return resolved.Error;

@@ -11,7 +11,7 @@
     {
       "name": "dotnet-claude-kit",
       "source": "./",
-      "description": "52 skills (incl. 17 slash-command workflows), 11 agents, 10 rules, 7 templates, 24-tool Roslyn MCP server for .NET 10 / C# 14",
+      "description": "52 skills (incl. 17 slash-command workflows), 11 agents, 10 rules, 7 templates, 25-tool Roslyn MCP server for .NET 10 / C# 14",
       "version": "0.14.0",
       "license": "MIT",
       "keywords": [
