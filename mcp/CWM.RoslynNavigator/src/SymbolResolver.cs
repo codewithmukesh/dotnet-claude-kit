@@ -36,27 +36,36 @@ internal static class SymbolResolver
         var simpleName = GetSimpleName(normalized);
         var isQualified = normalized.Length != simpleName.Length;
 
-        var results = new List<ISymbol>();
-
         // Compiles any project not yet built concurrently, in project order, so a cold
         // lookup costs the slowest build rather than the sum of them.
-        foreach (var compilation in await workspace.GetAllCompilationsAsync(ct))
-        {
-            var symbols = compilation.GetSymbolsWithName(simpleName, SymbolFilter.All, ct);
+        var compilations = await workspace.GetAllCompilationsAsync(ct);
 
-            foreach (var symbol in symbols)
+        // Every symbol tool resolves its name here first, and on a large solution the
+        // declaration-table lookups add up (ABP, 690 projects: ~8 ms per call), so they run in
+        // parallel and are merged in project order — the result is the same as a sequential scan.
+        var perCompilation = new List<ISymbol>[compilations.Count];
+        Parallel.For(
+            0,
+            compilations.Count,
+            new ParallelOptions { CancellationToken = ct },
+            i =>
             {
-                if (kindFilter is not null && !MatchesKind(symbol, kindFilter))
-                    continue;
+                var matches = new List<ISymbol>();
+                foreach (var symbol in compilations[i].GetSymbolsWithName(simpleName, SymbolFilter.All, ct))
+                {
+                    if (kindFilter is not null && !MatchesKind(symbol, kindFilter))
+                        continue;
 
-                if (isQualified && !MatchesQualifiedName(symbol, normalized))
-                    continue;
+                    if (isQualified && !MatchesQualifiedName(symbol, normalized))
+                        continue;
 
-                results.Add(symbol);
-            }
-        }
+                    matches.Add(symbol);
+                }
 
-        return results.Distinct(SymbolEqualityComparer.Default).ToList();
+                perCompilation[i] = matches;
+            });
+
+        return perCompilation.SelectMany(m => m).Distinct(SymbolEqualityComparer.Default).ToList();
     }
 
     /// <summary>

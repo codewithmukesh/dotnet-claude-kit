@@ -118,4 +118,22 @@ public class SymbolResolverTests(TestSolutionFixture fixture)
         Assert.NotNull(symbol);
         Assert.Equal("IProductRepository", symbol.ContainingType.Name);
     }
+
+    [Fact]
+    public async Task FindSymbolsByNameAsync_NameInSeveralProjects_ReturnsThemInProjectOrder()
+    {
+        // Arrange — the lookup runs per compilation in parallel; the merge must not reorder.
+        var expected = new List<Microsoft.CodeAnalysis.ISymbol>();
+        foreach (var compilation in await fixture.WorkspaceManager.GetAllCompilationsAsync(TestContext.Current.CancellationToken))
+            expected.AddRange(compilation.GetSymbolsWithName("GetByIdAsync", Microsoft.CodeAnalysis.SymbolFilter.All, TestContext.Current.CancellationToken));
+
+        // Act
+        var symbols = await SymbolResolver.FindSymbolsByNameAsync(fixture.WorkspaceManager, "GetByIdAsync", ct: TestContext.Current.CancellationToken);
+
+        // Assert
+        Assert.True(symbols.Count >= 3, "IOrderRepository and both repositories declare it");
+        Assert.Equal(
+            expected.Distinct(Microsoft.CodeAnalysis.SymbolEqualityComparer.Default).Select(s => s.ToDisplayString()),
+            symbols.Select(s => s.ToDisplayString()));
+    }
 }
