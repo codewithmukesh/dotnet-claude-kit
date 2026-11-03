@@ -362,4 +362,5 @@ internal sealed record DiRegistrationsResult(
     int Count,
     int TotalFound,
     bool Truncated,
-    int Limit);
+    int Limit,
+    string? Note = null);
