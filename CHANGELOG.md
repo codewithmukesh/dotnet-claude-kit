@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] — 2026-08-07
+
+Completes the token-savings measurement: the in-session number now has a cross-repository aggregate behind it, and the one estimated input has a way to be measured.
+
+### Added
+- **`CWM.RoslynNavigator.Stats` CLI** — aggregates savings across every repository, with a tool leaderboard, separate miss-rate figures, and table / `--json` / `--markdown` output.
+- **Transcript mining** — real measured token spend and adoption rate, read from Claude Code transcripts. Adoption needs no opt-in, so it is available even in repositories where telemetry was never enabled.
+- **`stats calibrate`** — derives the bytes-per-token divisor from exact `count_tokens` results, with a seeded sample so a run can be reproduced and checked. Manual, and never invoked by the server, which stays offline.
+- **`/token-report` skill (16 → 17 slash commands)** — runs both surfaces and states the three caveats that must accompany any quoted figure.
+
+### Changed
+- **The repository join reads `cwd` from transcript line content** instead of decoding the transcript directory name. The design flagged that decode as its most fragile part, and correctly: the encoding is lossy, and `dotnet-claude-kit` cannot be recovered from `C--Users-...-dotnet-claude-kit` because its hyphens are indistinguishable from path separators. The decode survives only as a fallback.
+- **Adoption excludes repositories where the server was never used**, since including them would drag the aggregate down for reasons unrelated to the tools, and counts only Read/Grep/Glob calls that demonstrably targeted C#. That biases adoption upward, which the report discloses.
+- **Reports distinguish "no data" from "data exists and the server was never invoked"** — very different findings that a single empty report would conflate.
+- The Stats CLI mirrors the server's record type rather than referencing it, so a JSONL reader does not pull in the Roslyn workspace stack. A contract test round-trips a real server record through the mirror so the duplication cannot drift.
+
+## [0.13.0] — 2026-08-07
+
+Measures the kit's central claim instead of asserting it.
+
+### Added
+- **`get_token_savings` MCP tool (22 → 23)** in CWM.RoslynNavigator 0.11.0 — reports tokens saved in the current repository with a per-tool leaderboard and separate zero-result, not-ready, and error counts.
+- **Opt-in local telemetry** (`CWM_ROSLYN_TELEMETRY=on`, off by default). Nothing is transmitted — there is no network call anywhere in the collection path, no identity, and no cross-machine correlation. Records are appended under `%LOCALAPPDATA%`, outside the repository, so there is nothing to gitignore and no way to commit usage data by accident.
+
+### Changed
+- **The savings baseline is the file-read floor**, not a hardcoded per-tool constant: the on-disk size of the source files each answer was actually derived from. Three rules keep it conservative and all three push the number down — a file counts once per session (without the tool it would have been read once and stayed in context), paths deduplicate within a call, and no call may claim more than the repository contains. Errors, zero-result calls, and calls made while the workspace was loading contribute nothing.
+- **The bytes-per-token divisor is an uncalibrated estimate (3.5)** and every report says so, returning `DivisorCalibrated: false`. Calibration against measured token counts is deliberately deferred rather than quietly assumed.
+- Collection hangs off a **single MCP call-tool filter** rather than a line in each of the 22 tool methods — verified available in the pinned SDK 1.4.1, resolving the design's open question. Every tool is measured including ones added later, with no per-tool line to forget.
+- `get_public_api` and `get_type_hierarchy` now report the resolved type's `File` and `Line`. Useful independently, and it closes the only gap where a tool could not contribute a baseline.
+
 ## [0.12.0] — 2026-08-07
 
 Roslyn Navigator correctness release. Symbol resolution, response contracts, and workspace reload behaviour are corrected, and two tools are added: stack trace resolution and change impact analysis.

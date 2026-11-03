@@ -141,6 +141,15 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     public string? SolutionDirectory =>
         _solutionPath is null ? null : Path.GetDirectoryName(_solutionPath);
 
+    /// <summary>Path of the loaded solution file, or null before one is discovered.</summary>
+    public string? SolutionFilePath => _solutionPath;
+
+    /// <summary>
+    /// Absolute paths of every document in the solution, captured at load. Used to size the
+    /// repository without re-walking the tree.
+    /// </summary>
+    internal IReadOnlyCollection<string> KnownDocumentPaths => _knownDocumentPaths.Keys.ToList();
+
     /// <summary>
     /// Trims an absolute file path to one relative to the solution directory, forward-slashed,
     /// for token-efficient MCP responses. Falls back to the forward-slashed input when the path

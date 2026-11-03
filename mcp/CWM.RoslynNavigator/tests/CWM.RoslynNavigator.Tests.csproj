@@ -23,6 +23,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\src\CWM.RoslynNavigator.csproj" />
+    <ProjectReference Include="..\stats\CWM.RoslynNavigator.Stats.csproj" />
   </ItemGroup>
 
   <!-- TestData is loaded by Roslyn at runtime, not compiled as part of this project -->

@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="src/CWM.RoslynNavigator.csproj" />
+  <Project Path="stats/CWM.RoslynNavigator.Stats.csproj" />
   <Folder Name="/tests/">
     <Project Path="tests/CWM.RoslynNavigator.Tests.csproj" />
   </Folder>
