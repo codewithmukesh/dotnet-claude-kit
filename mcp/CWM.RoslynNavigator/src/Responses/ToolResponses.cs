@@ -153,7 +153,9 @@ internal sealed record LoadDiagnosticInfo(
 /// What the server has loaded and how completely. <see cref="Healthy"/> is false when any
 /// project loaded or compiled incompletely, or the workspace reported a load failure — the
 /// case in which an empty answer from another tool may be a false negative.
-/// Count/TotalFound describe <see cref="IncompleteProjects"/>.
+/// Count/TotalFound describe <see cref="IncompleteProjects"/>. <see cref="Reloading"/> is true while a
+/// background reload builds the next snapshot (answers meanwhile come from the current one);
+/// <see cref="LastReloadError"/> is set when the last reload failed and the previous snapshot was kept.
 /// </summary>
 internal sealed record WorkspaceStatusResult(
     string State,
@@ -171,7 +173,10 @@ internal sealed record WorkspaceStatusResult(
     List<LoadDiagnosticInfo> LoadDiagnostics,
     int LoadDiagnosticCount,
     bool Truncated,
-    int Limit);
+    int Limit,
+    bool Reloading = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ReloadReason = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? LastReloadError = null);
 
 /// <summary>
 /// <see cref="Via"/> is "direct" when the call binds to the requested method itself, or

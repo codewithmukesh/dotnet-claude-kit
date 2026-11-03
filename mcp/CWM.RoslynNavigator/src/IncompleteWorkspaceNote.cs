@@ -43,16 +43,21 @@ internal static class IncompleteWorkspaceNote
         return $"{problems.Count} project(s) loaded incompletely or not at all ({names}{more}); this empty result may be missing matches from them. Call get_workspace_status for details.";
     }
 
-    /// <summary>Applies the warning to the text payload of a tool result, if it is empty.</summary>
+    /// <summary>
+    /// Applies the warnings to the text payload of a tool result: the incomplete-workspace
+    /// warning when the result is empty, and the staleness warning (a reload in flight or a
+    /// failed one, see <see cref="WorkspaceManager.StalenessWarning"/>) to every result.
+    /// </summary>
     public static CallToolResult Apply(CallToolResult result, WorkspaceManager workspace)
     {
         if (result.IsError == true || result.Content is not { Count: > 0 } content) return result;
         if (content[0] is not TextContentBlock text) return result;
 
-        var warning = BuildWarning(workspace);
-        if (warning is null) return result;
+        var stale = workspace.StalenessWarning;
+        var incomplete = BuildWarning(workspace);
+        if (stale is null && incomplete is null) return result;
 
-        var annotated = Annotate(text.Text, warning);
+        var annotated = Annotate(text.Text, incomplete, stale);
         if (ReferenceEquals(annotated, text.Text)) return result;
 
         content[0] = new TextContentBlock { Text = annotated };
@@ -63,7 +68,15 @@ internal static class IncompleteWorkspaceNote
     /// Returns <paramref name="json"/> with the warning added when it is an empty result,
     /// otherwise the same string instance.
     /// </summary>
-    public static string Annotate(string json, string warning)
+    public static string Annotate(string json, string warning) => Annotate(json, warning, null);
+
+    /// <summary>
+    /// Returns <paramref name="json"/> with <paramref name="emptyWarning"/> added when it is an
+    /// empty result and <paramref name="anyWarning"/> added regardless, joined into the one
+    /// <c>WorkspaceWarning</c> property; otherwise the same string instance. Not-ready status
+    /// responses and already-annotated results are never changed.
+    /// </summary>
+    public static string Annotate(string json, string? emptyWarning, string? anyWarning)
     {
         JsonObject? root;
         try
@@ -75,17 +88,22 @@ internal static class IncompleteWorkspaceNote
             return json;
         }
 
-        if (root is null || !IsEmptyResult(root)) return json;
+        if (root is null
+            || root.ContainsKey(nameof(StatusResponse.State))
+            || root.ContainsKey(PropertyName))
+            return json;
 
-        root[PropertyName] = warning;
+        List<string> warnings = [];
+        if (anyWarning is not null) warnings.Add(anyWarning);
+        if (emptyWarning is not null && IsEmptyResult(root)) warnings.Add(emptyWarning);
+        if (warnings.Count == 0) return json;
+
+        root[PropertyName] = string.Join(" ", warnings);
         return root.ToJsonString();
     }
 
     private static bool IsEmptyResult(JsonObject root)
     {
-        if (root.ContainsKey(nameof(StatusResponse.State)) || root.ContainsKey(PropertyName))
-            return false;
-
         if (root.TryGetPropertyValue(nameof(ErrorResponse.Error), out var error))
         {
             var code = error?.GetValueKind() == JsonValueKind.String ? error.GetValue<string>() : null;

@@ -50,6 +50,7 @@ public sealed class MultiSolutionReloadTests : IDisposable
 
         _clock.Advance(TimeSpan.FromSeconds(10));
         await _workspace.RefreshChangedDocumentsAsync(ct);
+        await _workspace.WaitForReloadAsync(); // reloads build the next snapshot in the background
 
         Assert.Equal(loadsAfterInitial + 1, _workspace.LoadCount);
         Assert.Equal(WorkspaceState.Ready, _workspace.State);

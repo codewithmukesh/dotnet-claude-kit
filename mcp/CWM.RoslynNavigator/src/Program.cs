@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using ModelContextProtocol.Protocol;
+using ModelContextProtocol.Server;
 
 // MSBuild locator MUST be called before any Roslyn types are loaded.
 // This resolves the MSBuild instance needed by MSBuildWorkspace.
@@ -41,10 +42,13 @@ builder.Services.AddMcpServer()
     .WithRequestFilters(filters => filters
     // An empty answer from a partially loaded workspace says so (see IncompleteWorkspaceNote).
     // Done here, once, so no tool's response shape changes and new tools are covered.
+    // The same filter leases the current workspace for the call, so a background reload that
+    // swaps in a new snapshot meanwhile disposes the old workspace only once the call is done.
     .AddCallToolFilter(next => async (context, ct) =>
     {
-        var result = await next(context, ct);
         var workspace = context.Services?.GetService<WorkspaceManager>();
+        using var lease = workspace?.AcquireSnapshotLease();
+        var result = await next(context, ct);
         return workspace is null || context.Params?.Name == "get_workspace_status"
             ? result
             : IncompleteWorkspaceNote.Apply(result, workspace);
@@ -84,6 +88,19 @@ builder.Services.AddMcpServer()
         return result;
     }));
 
+// A client whose roots change (a folder added to the workspace) says so; solutions discovered
+// from roots are then rediscovered on the next call.
+builder.Services.AddOptions<McpServerOptions>().Configure<WorkspaceManager>((options, workspace) =>
+    options.Handlers.NotificationHandlers =
+    [
+        .. options.Handlers.NotificationHandlers ?? [],
+        new(NotificationMethods.RootsListChangedNotification, (_, _) =>
+        {
+            workspace.OnRootsChanged();
+            return ValueTask.CompletedTask;
+        })
+    ]);
+
 // Discover solution paths: --solution is repeatable, --all-solutions loads every solution found.
 var solutionPaths = SolutionDiscovery.FindSolutionPaths(args);
 WorkspaceInitializer.SolutionPaths = solutionPaths;
@@ -93,6 +110,7 @@ var app = builder.Build();
 var workspaceManager = app.Services.GetRequiredService<WorkspaceManager>();
 workspaceManager.Services = app.Services;
 workspaceManager.DiscoverAllSolutions = SolutionDiscovery.IsAllSolutionsMode(args);
+workspaceManager.HasConfiguredSolutions = solutionPaths.Count > 0;
 
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
 if (solutionPaths.Count > 0)

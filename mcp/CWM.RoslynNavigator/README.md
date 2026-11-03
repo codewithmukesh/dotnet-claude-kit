@@ -157,8 +157,9 @@ project, the issues found:
 - an analyzer or source generator file that does not exist
 
 It also carries the raw `LoadDiagnostics`, background warm-up progress (`WarmUp`:
-`Compiled` of `Total`), and `SnapshotVersion`, which increments on every reload or
-in-place document refresh.
+`Compiled` of `Total`), `SnapshotVersion`, which increments on every reload or
+in-place document refresh, and `Reloading` / `ReloadReason` / `LastReloadError` for
+background reloads (see [Scaling](#scaling)).
 
 When the workspace is incomplete, any tool result that comes back **empty** — `TotalFound`
 (or `Count`) of 0, or a `SymbolNotFound` / `FileNotFound` error — gains a `WorkspaceWarning`
@@ -471,7 +472,7 @@ The server resolves the solution file in this order:
 
 1. **Explicit `--solution` argument** — Pass a `.sln`/`.slnx` file path directly, or a directory to scan recursively. Repeatable — see [Multiple Solutions](#multiple-solutions)
 2. **Working directory scan** — If no argument, scans the current working directory recursively for solution files
-3. **MCP roots discovery** — On the first tool call, if no solution was found at startup, the server requests workspace roots from the MCP host (e.g., Claude Code) and scans those directories, loading a solution from **each** root that has one. This is a one-shot attempt — if no solution is found, it won't retry. This enables true zero-arg global tool operation.
+3. **MCP roots discovery** — On the first tool call, if no solution was found at startup, the server requests workspace roots from the MCP host (e.g., Claude Code) and scans those directories, loading a solution from **each** root that has one. If no root has a solution yet, it looks again on a later call after 30 s. When the host sends `notifications/roots/list_changed`, the next call rediscovers; a different set of solutions reloads in the background while the current one keeps answering. Roots never override a solution configured with `--solution` or found in the working directory. This enables true zero-arg global tool operation.
 4. **Deterministic selection** — Shallowest solution wins (BFS); within the same depth, alphabetical (case-insensitive) ordering is used. With `--all-solutions`, every solution found is loaded instead.
 
 ### Recursive Search
@@ -527,8 +528,11 @@ returns callers from every service.
   can be passed straight back to file-addressed tools.
 - **Failures** — a solution file that cannot be read is reported in `Solutions[].Error`; the
   others still load. A project that fails to load is logged and skipped, as within one solution.
-- **Reloads** — a changed `.csproj` or `Directory.*` file (checked next to each solution)
-  reloads **all** configured solutions. A new source file is added in place to the project
+- **Reloads** — a changed solution file, `.csproj`, or shared build file reloads **all**
+  configured solutions. Shared build files are `Directory.Build.props`/`.targets`,
+  `Directory.Packages.props`, `global.json`, and `NuGet.config` in any directory from each
+  project or solution up to the file-system root — so `src/Directory.Build.props` or one above
+  the solution folder counts, as it does for MSBuild. A new source file is added in place to the project
   that owns it, in whichever solution; it causes a reload only when that project customizes
   its compile items (see [Scaling](#scaling)).
 - **Limits** — names must still be unique enough to resolve: if two services both define
@@ -578,16 +582,26 @@ One strategy for every solution size:
 - **Changes are found cheaply.** At most every 5 s, a tool call lists each directory that
   holds documents (one listing instead of one `stat` per file): edited files are re-read,
   deleted files are removed, and new `.cs` files beside existing ones are picked up. New files
-  in new folders are found by a background walk every 60 s.
+  in new folders are found by a background walk every 60 s, which never descends into a
+  project's `bin/`/`obj/`, dot-folders, `node_modules`, another project's folder, or a symlink or
+  junction (a link pointing back up the tree would otherwise loop).
 - **New files skip the reload.** A new file is added in place to the project whose folder
   is its deepest ancestor, when that project compiles through the SDK default glob — no
   `<Compile Include/Remove>`, default items left on, no unfollowed imports in the project or
   its `Directory.Build.*` files. Otherwise the solution reloads so MSBuild can decide. Files
   under `bin/`, `obj/`, or dot-folders are ignored, and a file the project excluded is
   remembered so it never triggers a second reload.
-- **Build-file changes still reload in-band.** A changed `.csproj` or `Directory.*` file
-  reloads every solution on the next call; that call waits for the open (not the
-  compilation, which warms in the background).
+- **Reloads never take the workspace offline.** A changed solution, `.csproj`, or shared build
+  file (`Directory.Build.*`, `Directory.Packages.props`, `global.json`, `NuGet.config`, in any
+  folder from a project up to the root) reloads every solution in the background: the next workspace is opened beside the current
+  one while every tool call keeps answering from the last good snapshot, then swapped in
+  atomically. Only the very first load returns `Loading`. Answers given during a reload carry
+  a `WorkspaceWarning` saying they come from the previous snapshot, and
+  `get_workspace_status` reports `Reloading` and the `ReloadReason`. Calls that notice the
+  same change concurrently share one reload; a build file saved again while a reload runs is
+  picked up by the next one. A reload that fails (e.g. an unparseable solution file) keeps the
+  previous snapshot, is reported as `LastReloadError` (and `Healthy: false`), and is retried
+  after 30 s. The replaced workspace is disposed as soon as the last call still using it ends.
 
 ## Troubleshooting
 

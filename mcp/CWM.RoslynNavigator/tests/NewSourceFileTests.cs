@@ -106,6 +106,7 @@ public sealed class NewSourceFileTests : IDisposable
 
         _clock.Advance(PastCooldown);
         await _workspace.RefreshChangedDocumentsAsync(ct);
+        await _workspace.WaitForReloadAsync(); // reloads build the next snapshot in the background
 
         Assert.Equal(loads + 1, _workspace.LoadCount);
         Assert.Single(await SymbolResolver.FindSymbolsByNameAsync(_workspace, "AuditLogZq", ct: ct));
