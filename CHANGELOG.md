@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Performance
+Measured on a 39-project, 3,750-document solution (warm workspace, second call):
+
+| Tool | Before | After |
+|---|---|---|
+| `find_dead_code` (default) | 22.8s | 2.1s |
+| `get_test_coverage_map` | 10.0s | 0.04s |
+| `detect_circular_dependencies` (types) | 14.4s | 0.1s |
+| `detect_antipatterns` | 2.1s | 0.6s |
+| `get_endpoint_map` / `get_di_registrations` | 0.66s / 0.57s | 0.08s / 0.09s |
+| `resolve_stack_trace` (90 frames) | 47ms | 3ms |
+
+- **Scan tools walk declarations only.** `GetDeclaredSymbol` on every node forced Roslyn to bind every method body just to find types and members
+- **Dead-code pre-filter is one pass.** It used to run `IndexOf` over every file's text for every candidate (quadratic); now it uses a single identifier index with the same rule
+- **Test projects are detected from metadata references** instead of compiling every project (22s → 9ms cold)
+- Anti-pattern, endpoint, and DI scans run files in parallel with deterministic output order; stack traces resolve each distinct method once
+- `get_test_coverage_map` no longer counts anonymous types and tuples as untested production types, which had deflated the percentage
+- The navigator's own test suite shares one solution fixture (~26s → ~15s)
+
 ### Fixed
 - **`hooks/pre-bash-guard.sh` now matches command words, not command text** — the guard grepped the raw command string, so it blocked commands that merely *mentioned* a destructive one: a `grep` searching for `rm -rf`, a `#` comment describing an old cleanup, `git log --grep='git reset --hard'`, `echo`ing docs about force push, and any heredoc script body containing the phrase. It now splits the command on `;`, `&&`, `||`, `|`, newlines and grouping, and matches only each segment's command word — taken after stripping `VAR=value` assignments, `sudo`/`env`/`command`/`nohup`, and any leading path, so `/bin/rm` still reads as `rm`
   - Quoted strings, comments, and heredoc bodies are data and never trigger a rule
