@@ -9,7 +9,7 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class GetDiagnosticsTool
 {
-    [McpServerTool(Name = "get_diagnostics"), Description("Get compiler diagnostics (errors, warnings) scoped to a file, project, or the entire solution. Does not run NuGet analyzers. Results are ordered errors-first; per-severity totals are always reported.")]
+    [McpServerTool(Name = "get_diagnostics"), Description("Get compiler diagnostics (errors, warnings) scoped to a file, project, or the entire solution. File scope takes a suffix path ('./' prefixes and backslashes accepted): a path matching no document returns a FileNotFound error rather than an empty result, and a path matching several files returns diagnostics for all of them, each tagged with its File. Does not run NuGet analyzers. Results are ordered errors-first; per-severity totals are always reported.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
         [Description("Scope: 'file', 'project', or 'solution'")] string scope = "solution",
@@ -25,6 +25,18 @@ public static class GetDiagnosticsTool
         if (solution is null)
             return JsonSerializer.Serialize(new DiagnosticsResult(
                 [], 0, 0, 0, 0, 0, false, Math.Max(1, maxResults)));
+
+        HashSet<string>? fileScopePaths = null;
+
+        if (scope.Equals("file", StringComparison.OrdinalIgnoreCase) && path is not null)
+        {
+            var documents = DocumentResolver.FindDocuments(solution, path);
+            if (documents.Count == 0)
+                return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.FileNotFound,
+                    $"File '{path}' is not part of any project in the solution."));
+
+            fileScopePaths = documents.Select(d => d.FilePath!).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        }
 
         var matched = new List<(Diagnostic Diagnostic, DiagnosticInfo Info)>();
 
@@ -44,10 +56,10 @@ public static class GetDiagnosticsTool
                 if (!MatchesSeverityFilter(diag.Severity, severityFilter))
                     continue;
 
-                if (scope == "file" && path is not null)
+                if (fileScopePaths is not null)
                 {
-                    var diagPath = diag.Location.GetLineSpan().Path;
-                    if (diagPath is null || !diagPath.EndsWith(path, StringComparison.OrdinalIgnoreCase))
+                    var diagPath = diag.Location.SourceTree?.FilePath;
+                    if (diagPath is null || !fileScopePaths.Contains(diagPath))
                         continue;
                 }
 
@@ -85,15 +97,21 @@ public static class GetDiagnosticsTool
         if (path is null)
             return await workspace.GetAllCompilationsAsync(ct);
 
-        var document = solution.Projects
-            .SelectMany(p => p.Documents)
-            .FirstOrDefault(d => d.FilePath?.EndsWith(path, StringComparison.OrdinalIgnoreCase) == true);
+        // Every matched file's project, once each: a bare name like 'Program.cs' can live in several.
+        var projectIds = DocumentResolver.FindDocuments(solution, path)
+            .Select(d => d.Project.Id)
+            .Distinct()
+            .ToList();
 
-        if (document is null)
-            return [];
+        var compilations = new List<Compilation>();
+        foreach (var projectId in projectIds)
+        {
+            var compilation = await workspace.GetCompilationAsync(projectId, ct);
+            if (compilation is not null)
+                compilations.Add(compilation);
+        }
 
-        var compilation = await workspace.GetCompilationAsync(document.Project.Id, ct);
-        return compilation is not null ? [compilation] : [];
+        return compilations;
     }
 
     private static async Task<IReadOnlyList<Compilation>> GetCompilationsForProject(

@@ -32,6 +32,38 @@ public class GetDiagnosticsTests(TestSolutionFixture fixture) : IClassFixture<Te
         Assert.NotNull(result);
     }
 
+    [Theory]
+    [InlineData("Missing.cs")]
+    [InlineData("./SampleApi/Missing.cs")]
+    public async Task GetDiagnostics_FileScope_UnmatchedPath_ReturnsFileNotFound(string path)
+    {
+        var json = await GetDiagnosticsTool.ExecuteAsync(
+            fixture.WorkspaceManager,
+            scope: "file",
+            path: path,
+            ct: TestContext.Current.CancellationToken);
+        var error = JsonSerializer.Deserialize<ErrorResponse>(json)!;
+
+        Assert.Equal(ErrorCodes.FileNotFound, error.Error);
+    }
+
+    [Theory]
+    [InlineData("./SampleApi/ProductService.cs")]
+    [InlineData(".\\SampleApi\\ProductService.cs")]
+    public async Task GetDiagnostics_FileScope_DotSlashAndBackslashPaths_Resolve(string path)
+    {
+        var json = await GetDiagnosticsTool.ExecuteAsync(
+            fixture.WorkspaceManager,
+            scope: "file",
+            path: path,
+            ct: TestContext.Current.CancellationToken);
+
+        using var doc = JsonDocument.Parse(json);
+        Assert.False(doc.RootElement.TryGetProperty("Error", out _));
+        var result = JsonSerializer.Deserialize<DiagnosticsResult>(json)!;
+        Assert.All(result.Diagnostics, d => Assert.EndsWith("SampleApi/ProductService.cs", d.File));
+    }
+
     [Fact]
     public async Task GetDiagnostics_SeverityFilter_Error_FiltersCorrectly()
     {

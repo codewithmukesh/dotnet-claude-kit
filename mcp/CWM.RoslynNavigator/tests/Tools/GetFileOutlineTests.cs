@@ -54,6 +54,18 @@ public class GetFileOutlineTests(TestSolutionFixture fixture) : IClassFixture<Te
         Assert.True(result.TotalFound > 1);
     }
 
+    [Theory]
+    [InlineData("./SampleApi/OrderService.cs")]
+    [InlineData(".\\SampleApi\\OrderService.cs")]
+    public async Task GetFileOutline_DotSlashAndBackslashPaths_Resolve(string path)
+    {
+        var json = await GetFileOutlineTool.ExecuteAsync(
+            fixture.WorkspaceManager, path, ct: TestContext.Current.CancellationToken);
+        var result = JsonSerializer.Deserialize<FileOutlineResult>(json)!;
+
+        Assert.Equal("SampleApi/OrderService.cs", result.File);
+    }
+
     [Fact]
     public async Task GetFileOutline_UnknownFile_ReturnsFileNotFound()
     {
