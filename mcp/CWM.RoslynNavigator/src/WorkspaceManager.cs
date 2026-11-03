@@ -342,8 +342,11 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             foreach (var additional in solutionPaths.Skip(1))
                 loaded.Add(await AddSolutionProjectsAsync(workspace, additional, ct));
 
+            // A fresh clone's unbuilt in-solution analyzers would make every derived-type search throw.
+            var solution = UnresolvedAnalyzerReferences.Strip(workspace.CurrentSolution, health);
+
             return new PendingLoad(
-                solutionPaths, workspace, workspace.CurrentSolution, loaded, health, startedUtc, stampsAtStart);
+                solutionPaths, workspace, solution, loaded, health, startedUtc, stampsAtStart);
         }
         catch
         {

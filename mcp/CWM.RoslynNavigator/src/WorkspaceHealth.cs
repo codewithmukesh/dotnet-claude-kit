@@ -34,6 +34,7 @@ internal sealed class WorkspaceHealth(TimeProvider clock)
 {
     private readonly ConcurrentQueue<LoadDiagnostic> _diagnostics = new();
     private readonly ConcurrentDictionary<ProjectId, string> _compileProblems = new();
+    private readonly ConcurrentDictionary<ProjectId, IReadOnlyList<string>> _removedAnalyzers = new();
     private readonly Lock _gate = new();
     private int _compiled;
     private int _total;
@@ -50,6 +51,16 @@ internal sealed class WorkspaceHealth(TimeProvider clock)
     {
         _diagnostics.Enqueue(new LoadDiagnostic(
             kind == WorkspaceDiagnosticKind.Failure ? "failure" : "warning", message, null));
+        Interlocked.Increment(ref _revision);
+    }
+
+    /// <summary>
+    /// Records analyzer/generator paths that did not exist at load and were removed from the
+    /// project (see <see cref="UnresolvedAnalyzerReferences"/>), so they are still reported.
+    /// </summary>
+    public void RecordRemovedAnalyzers(ProjectId projectId, IReadOnlyList<string> paths)
+    {
+        _removedAnalyzers[projectId] = paths;
         Interlocked.Increment(ref _revision);
     }
 
@@ -167,6 +178,12 @@ internal sealed class WorkspaceHealth(TimeProvider clock)
 
             if (_compileProblems.TryGetValue(project.Id, out var compileProblem))
                 issues.Add(compileProblem);
+
+            if (_removedAnalyzers.TryGetValue(project.Id, out var removed))
+            {
+                foreach (var analyzerPath in removed)
+                    issues.Add($"analyzer/generator not found: {Path.GetFileName(analyzerPath)} (not built yet? build that project, or the solution, to load it)");
+            }
 
             foreach (var reference in project.AnalyzerReferences)
             {

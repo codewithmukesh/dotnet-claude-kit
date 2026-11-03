@@ -156,6 +156,14 @@ project, the issues found:
 - compilation threw, or the core library is unresolved (references missing — run `dotnet restore`)
 - an analyzer or source generator file that does not exist
 
+The last case is common on a fresh clone that was restored but not built: a project that
+references an in-solution analyzer project (`OutputItemType="Analyzer"`) points at a DLL
+that is not there yet. Roslyn cannot index such a reference, and implementation and
+derived-type searches used to fail with `Unexpected value 'UnresolvedAnalyzerReference'`.
+The server now drops those references when it loads (they contribute nothing to a
+compilation anyway) and lists them here, so every tool works on a fresh clone. Build the
+analyzer project to get its generated code.
+
 It also carries the raw `LoadDiagnostics`, background warm-up progress (`WarmUp`:
 `Compiled` of `Total`), `SnapshotVersion`, which increments on every reload or
 in-place document refresh, and `Reloading` / `ReloadReason` / `LastReloadError` for
