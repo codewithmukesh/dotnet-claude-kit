@@ -54,7 +54,8 @@ public static class FindImplementationsTool
             }
         }
 
-        return Serialize(Paging.Apply(all, maxResults));
+        // A multi-targeted project can declare each implementation once per target framework.
+        return Serialize(Paging.Apply(all, maxResults, i => (i.Type, i.File, i.Line)));
     }
 
     private static string Serialize(Paging.Page<ImplementationInfo> page) =>

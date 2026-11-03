@@ -83,6 +83,10 @@ public static class GetDiagnosticsTool
             }
         }
 
+        // A file compiled once per target framework reports the same diagnostic once per
+        // framework; count it once.
+        matched = Paging.Distinct(matched, m => (m.Info.Id, m.Info.File, m.Info.Line, m.Info.Message));
+
         var errors = matched.Count(m => m.Diagnostic.Severity == DiagnosticSeverity.Error);
         var warnings = matched.Count(m => m.Diagnostic.Severity == DiagnosticSeverity.Warning);
         var info = matched.Count(m => m.Diagnostic.Severity == DiagnosticSeverity.Info);

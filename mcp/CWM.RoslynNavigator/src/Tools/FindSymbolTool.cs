@@ -28,18 +28,25 @@ public static class FindSymbolTool
         }
 
         var generated = new GeneratedCodeIndex(workspace);
+        var flavors = new TargetFrameworkFlavors(workspace.GetSolution()!);
 
-        List<SymbolLocation> all;
+        IEnumerable<(SymbolLocation, ProjectId?)> found;
         if (mode == MatchMode.Exact)
         {
             var symbols = await SymbolResolver.FindSymbolsByNameAsync(workspace, name, kind, ct);
-            all = [.. symbols.Select(s => ToLocation(workspace, generated, s, null, ct))];
+            found = symbols.Select(s => (ToLocation(workspace, generated, s, null, ct), flavors.ProjectOf(s)));
         }
         else
         {
             var ranked = await SymbolResolver.SearchAsync(workspace, name, mode, kind, ct);
-            all = [.. ranked.Select(r => ToLocation(workspace, generated, r.Symbol, TierName(r.Tier), ct))];
+            found = ranked.Select(r => (ToLocation(workspace, generated, r.Symbol, TierName(r.Tier), ct), flavors.ProjectOf(r.Symbol)));
         }
+
+        // A multi-targeted project declares each symbol once per target framework.
+        var all = flavors.Merge(
+            found,
+            s => (s.File, s.Line, s.Kind, s.Name, s.ContainingType),
+            (s, tfms) => s with { TargetFrameworks = tfms });
 
         var page = Paging.Apply(all, maxResults);
 

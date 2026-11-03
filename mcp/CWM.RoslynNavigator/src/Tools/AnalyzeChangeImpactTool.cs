@@ -48,21 +48,30 @@ public static class AnalyzeChangeImpactTool
 
         var references = await SymbolFinder.FindReferencesAsync(symbol, solution, ct);
 
+        // Each source position counts once: Roslyn reports it once per project that compiles
+        // the file (every target framework of a multi-targeted project), and those flavors
+        // are one project to the person making the change.
+        var seenPositions = new HashSet<(string?, int)>();
+
         foreach (var reference in references)
         {
             foreach (var location in reference.Locations)
             {
                 ct.ThrowIfCancellationRequested();
 
+                if (!seenPositions.Add((location.Location.SourceTree?.FilePath, location.Location.SourceSpan.Start)))
+                    continue;
+
                 var document = location.Document;
                 var project = document.Project;
                 var isTest = testProjects.Contains(project.Id);
+                var projectName = ProjectDisplayName(project);
 
                 directReferences++;
                 if (isTest) testReferences++;
 
-                var projectEntry = perProject.GetValueOrDefault(project.Name);
-                perProject[project.Name] = (projectEntry.Count + 1, isTest);
+                var projectEntry = perProject.GetValueOrDefault(projectName);
+                perProject[projectName] = (projectEntry.Count + 1, isTest);
 
                 var path = document.FilePath is { } p ? workspace.ToRelativePath(p) : "unknown";
                 var fileEntry = perFile.GetValueOrDefault(path);
@@ -142,31 +151,35 @@ public static class AnalyzeChangeImpactTool
         {
             case INamedTypeSymbol { TypeKind: TypeKind.Interface } iface:
                 implementations = (await SymbolFinder.FindImplementationsAsync(
-                    iface, solution, cancellationToken: ct)).Count();
+                    iface, solution, cancellationToken: ct)).DistinctBy(DeclarationKey).Count();
                 break;
 
             case INamedTypeSymbol type:
                 overrides = (await SymbolFinder.FindDerivedClassesAsync(
-                    type, solution, cancellationToken: ct)).Count();
+                    type, solution, cancellationToken: ct)).DistinctBy(DeclarationKey).Count();
                 break;
 
             case IMethodSymbol or IPropertySymbol or IEventSymbol:
                 if (symbol.ContainingType is { TypeKind: TypeKind.Interface })
                 {
                     implementations = (await SymbolFinder.FindImplementationsAsync(
-                        symbol, solution, cancellationToken: ct)).Count();
+                        symbol, solution, cancellationToken: ct)).DistinctBy(DeclarationKey).Count();
                 }
 
                 if (symbol.IsVirtual || symbol.IsAbstract || symbol.IsOverride)
                 {
                     overrides = (await SymbolFinder.FindOverridesAsync(
-                        symbol, solution, cancellationToken: ct)).Count();
+                        symbol, solution, cancellationToken: ct)).DistinctBy(DeclarationKey).Count();
                 }
                 break;
         }
 
         return (implementations, overrides);
     }
+
+    /// <summary>A declaration once, however many target-framework flavors compile it.</summary>
+    private static (string?, int) DeclarationKey(ISymbol symbol) =>
+        SymbolResolver.GetLocation(symbol) is { } location ? (location.File, location.Line) : (symbol.ToDisplayString(), 0);
 
     /// <summary>
     /// Breadth-first walk up the call graph. Visited symbols are tracked across levels so
@@ -183,6 +196,8 @@ public static class AnalyzeChangeImpactTool
     {
         var visited = new HashSet<ISymbol>(SymbolEqualityComparer.Default) { root };
         var ordered = new List<string>();
+        // Target-framework flavors of one caller are distinct symbols with one declaration.
+        var listed = new HashSet<(string?, int)> { DeclarationKey(root) };
         var frontier = new List<ISymbol> { root };
         var indirect = 0;
 
@@ -200,6 +215,7 @@ public static class AnalyzeChangeImpactTool
                 foreach (var caller in callers.OrderBy(c => c.IsDirect ? 0 : 1))
                 {
                     if (!visited.Add(caller.CallingSymbol)) continue;
+                    if (!listed.Add(DeclarationKey(caller.CallingSymbol))) continue;
 
                     if (!caller.IsDirect) indirect++;
                     ordered.Add(SymbolResolver.BuildQualifiedName(caller.CallingSymbol));
@@ -211,6 +227,13 @@ public static class AnalyzeChangeImpactTool
         }
 
         return (ordered, indirect);
+    }
+
+    /// <summary>"Lib(net8.0)" → "Lib": target-framework flavors of one csproj are one project here.</summary>
+    private static string ProjectDisplayName(Project project)
+    {
+        var open = project.Name.LastIndexOf('(');
+        return open > 0 && project.Name.EndsWith(')') ? project.Name[..open] : project.Name;
     }
 
     private static HashSet<ProjectId> BuildTestProjectSet(

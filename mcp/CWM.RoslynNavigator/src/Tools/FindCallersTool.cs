@@ -63,7 +63,9 @@ public static class FindCallersTool
             }
         }
 
-        return Serialize(Paging.Apply(all, maxResults));
+        // Callers are already one per symbol and route; this also folds per-framework copies of
+        // a caller declared in a multi-targeted project whose display strings differ.
+        return Serialize(Paging.Apply(all, maxResults, c => (c.File, c.Line, c.Method, c.Via, c.ViaSymbol)));
     }
 
     private static string Serialize(Paging.Page<CallerInfo> page) =>

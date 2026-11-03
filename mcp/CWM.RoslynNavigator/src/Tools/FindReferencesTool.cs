@@ -37,48 +37,58 @@ public static class FindReferencesTool
         var symbol = resolved.Symbol;
 
         var references = await SymbolFinder.FindReferencesAsync(symbol, solution, ct);
-        var totalFound = references.Sum(r => r.Locations.Count());
+
+        // One entry per source position. Roslyn reports a location once per project that
+        // compiles the file — every target framework of a multi-targeted project — and once
+        // per cascaded definition, so the raw count overstates the real usages many times.
+        // Positions are collected first (cheap) and snippets built only for the page.
+        var flavors = new TargetFrameworkFlavors(solution);
+        var unique = flavors.Merge(
+            references
+                .SelectMany(r => r.Locations)
+                .Select(l => (Found: new FoundLocation(l, l.Location.SourceTree?.FilePath ?? "", l.Location.SourceSpan.Start, null), (ProjectId?)l.Document.Project.Id)),
+            f => (f.Path, f.Position),
+            (f, tfms) => f with { TargetFrameworks = tfms });
 
         var generated = new GeneratedCodeIndex(workspace);
         var textCache = new Dictionary<DocumentId, Microsoft.CodeAnalysis.Text.SourceText>();
         var results = new List<RefLocation>();
-        var capped = false;
 
-        foreach (var reference in references)
+        foreach (var found in unique.Take(limit))
         {
-            foreach (var location in reference.Locations)
+            var location = found.Location;
+            var lineSpan = location.Location.GetLineSpan();
+            var document = solution.GetDocument(location.Document.Id);
+            var snippet = "";
+            if (document is not null)
             {
-                if (results.Count >= limit) { capped = true; break; }
-
-                var lineSpan = location.Location.GetLineSpan();
-                var document = solution.GetDocument(location.Document.Id);
-                var snippet = "";
-                if (document is not null)
+                if (!textCache.TryGetValue(document.Id, out var text))
                 {
-                    if (!textCache.TryGetValue(document.Id, out var text))
-                    {
-                        text = await document.GetTextAsync(ct);
-                        textCache[document.Id] = text;
-                    }
-                    var refLine = text.Lines[lineSpan.StartLinePosition.Line];
-                    snippet = refLine.ToString().Trim();
+                    text = await document.GetTextAsync(ct);
+                    textCache[document.Id] = text;
                 }
-
-                results.Add(new RefLocation(
-                    File: workspace.ToRelativePath(lineSpan.Path),
-                    Line: lineSpan.StartLinePosition.Line + 1,
-                    Snippet: snippet,
-                    Kind: ClassifyReferenceKind(location, ct),
-                    IsGenerated: generated.IsGenerated(location.Location.SourceTree, ct)));
+                var refLine = text.Lines[lineSpan.StartLinePosition.Line];
+                snippet = refLine.ToString().Trim();
             }
-            if (capped) break;
+
+            results.Add(new RefLocation(
+                File: workspace.ToRelativePath(lineSpan.Path),
+                Line: lineSpan.StartLinePosition.Line + 1,
+                Snippet: snippet,
+                Kind: ClassifyReferenceKind(location, ct),
+                IsGenerated: generated.IsGenerated(location.Location.SourceTree, ct),
+                TargetFrameworks: found.TargetFrameworks));
         }
 
-        // Snippets are built lazily as locations stream in, so this tool caps in the loop
-        // rather than via Paging — the contract it reports is identical.
         return JsonSerializer.Serialize(new ReferencesResult(
-            results, results.Count, totalFound, totalFound > results.Count, limit));
+            results, results.Count, unique.Count, unique.Count > results.Count, limit));
     }
+
+    private sealed record FoundLocation(
+        Microsoft.CodeAnalysis.FindSymbols.ReferenceLocation Location,
+        string Path,
+        int Position,
+        List<string>? TargetFrameworks);
 
     private static string ClassifyReferenceKind(
         Microsoft.CodeAnalysis.FindSymbols.ReferenceLocation location,

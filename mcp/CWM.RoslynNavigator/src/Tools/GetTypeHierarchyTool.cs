@@ -50,22 +50,25 @@ public static class GetTypeHierarchyTool
 
         // Get derived types. FindDerivedClassesAsync only walks class inheritance, so for
         // interfaces we combine derived interfaces with implementing types instead.
-        var allDerived = new List<string>();
+        var allDerived = new List<INamedTypeSymbol>();
         if (typeSymbol.TypeKind == TypeKind.Interface)
         {
             var derivedInterfaces = await SymbolFinder.FindDerivedInterfacesAsync(typeSymbol, solution, cancellationToken: ct);
             var implementations = await SymbolFinder.FindImplementationsAsync(typeSymbol, solution, cancellationToken: ct);
-            allDerived.AddRange(derivedInterfaces
-                .Concat(implementations)
-                .Select(d => d.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)));
+            allDerived.AddRange(derivedInterfaces.Concat(implementations));
         }
         else
         {
-            var derived = await SymbolFinder.FindDerivedClassesAsync(typeSymbol, solution, cancellationToken: ct);
-            allDerived.AddRange(derived.Select(d => d.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)));
+            allDerived.AddRange(await SymbolFinder.FindDerivedClassesAsync(typeSymbol, solution, cancellationToken: ct));
         }
 
-        var page = Paging.Apply(allDerived, maxResults);
+        // Each flavor of a multi-targeted project reports its own copy of a derived type:
+        // same declaration ID, same declaring file.
+        var page = Paging.Apply(
+            Paging.Distinct(allDerived, d => (SymbolResolver.GetSymbolId(d), SymbolResolver.GetLocation(d)))
+                .Select(d => d.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat))
+                .ToList(),
+            maxResults);
         var location = SymbolResolver.GetLocation(typeSymbol);
 
         return JsonSerializer.Serialize(new TypeHierarchyResult(

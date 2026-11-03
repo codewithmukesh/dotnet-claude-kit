@@ -24,10 +24,10 @@ internal static class CallerDispatch
     /// </summary>
     public static (string Via, string? ViaSymbol) Classify(ISymbol target, SymbolCallerInfo caller)
     {
-        if (caller.IsDirect)
+        var called = caller.CalledSymbol;
+        if (caller.IsDirect || IsSameDeclaration(called, target))
             return (Direct, null);
 
-        var called = caller.CalledSymbol;
         var via = called.ContainingType?.TypeKind == TypeKind.Interface
             ? Interface
             : IsOverriddenBy(called, target)
@@ -37,6 +37,22 @@ internal static class CallerDispatch
         var container = called.ContainingType?.Name;
         return (via, container is null ? called.Name : $"{container}.{called.Name}");
     }
+
+    /// <summary>
+    /// The same declaration, including its copy in another target-framework flavor of a
+    /// multi-targeted project: a different symbol to Roslyn, the same method to the caller.
+    /// (When Roslyn cascades through linked flavors it also reports some calls to the target
+    /// itself as indirect.) Compared by declaring span rather than by signature, which differs
+    /// between flavors whenever one of them failed to resolve a parameter type.
+    /// </summary>
+    public static bool IsSameDeclaration(ISymbol a, ISymbol b) =>
+        SymbolEqualityComparer.Default.Equals(a, b)
+        || a.Kind == b.Kind
+            && a.Name == b.Name
+            && a.DeclaringSyntaxReferences.FirstOrDefault() is { } left
+            && b.DeclaringSyntaxReferences.FirstOrDefault() is { } right
+            && left.Span == right.Span
+            && string.Equals(left.SyntaxTree.FilePath, right.SyntaxTree.FilePath, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>True when <paramref name="target"/> overrides <paramref name="candidate"/>, at any depth.</summary>
     private static bool IsOverriddenBy(ISymbol candidate, ISymbol target)

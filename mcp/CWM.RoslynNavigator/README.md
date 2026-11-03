@@ -135,6 +135,16 @@ caps by characters instead (`maxChars`, default 8000, with a `Truncated` flag).
 `get_diagnostics` orders errors first and always includes per-severity totals, so a
 capped response never hides the important picture.
 
+### Multi-targeted projects
+
+MSBuildWorkspace loads a multi-targeted csproj once per target framework, so Roslyn finds
+every source location once per framework. Results are merged by location before counting
+and capping, so `TotalFound` counts distinct locations and a duplicate never uses up
+`maxResults`. `find_symbol` and `find_references` add `TargetFrameworks` to an entry only
+when it exists in some, not all, of its project's frameworks (code under `#if NET8_0`).
+`analyze_change_impact` counts a csproj once in `AffectedProjects`, and
+`detect_antipatterns`, `get_diagnostics`, and `get_test_coverage_map` count each file once.
+
 ### Generated code
 
 `find_symbol`, `find_references`, `find_callers`, `find_implementations`, and

@@ -51,7 +51,8 @@ public static class FindOverridesTool
             }
         }
 
-        return Serialize(Paging.Apply(all, maxResults));
+        // A multi-targeted project declares each override once per target framework.
+        return Serialize(Paging.Apply(all, maxResults, o => (o.ContainingType, o.Method, o.File, o.Line)));
     }
 
     private static string Serialize(Paging.Page<OverrideInfo> page) =>

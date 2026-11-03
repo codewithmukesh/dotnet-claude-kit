@@ -69,11 +69,19 @@ internal sealed record SymbolLocation(
     bool IsGenerated,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Match = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ContainingType = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SymbolId = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SymbolId = null,
+    // Set only when the symbol exists in some, not all, of a multi-targeted project's frameworks.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<string>? TargetFrameworks = null);
 
 internal sealed record SymbolSearchResult(List<SymbolLocation> Symbols, int Count, int TotalFound, bool Truncated, int Limit);
 
-internal sealed record ReferenceLocation(string File, int Line, string Snippet, string Kind, bool IsGenerated);
+internal sealed record ReferenceLocation(
+    string File,
+    int Line,
+    string Snippet,
+    string Kind,
+    bool IsGenerated,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<string>? TargetFrameworks = null);
 
 internal sealed record ReferencesResult(List<ReferenceLocation> References, int Count, int TotalFound, bool Truncated, int Limit);
 

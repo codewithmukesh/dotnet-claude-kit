@@ -64,6 +64,7 @@ public static class DetectAntiPatternsTool
         var suppressions = SuppressionSet.Load(workspace.SolutionDirectory);
 
         var accumulator = new ScanAccumulator();
+        var seenFiles = new Dictionary<string, HashSet<(string, int, string, string)>>(StringComparer.OrdinalIgnoreCase);
         var projects = GetFilteredProjects(solution, projectFilter);
 
         foreach (var project in projects)
@@ -94,12 +95,25 @@ public static class DetectAntiPatternsTool
                     return ValueTask.CompletedTask;
                 });
 
-            foreach (var scan in scans)
+            for (var i = 0; i < scans.Length; i++)
             {
-                accumulator.CountFile(scan.Kind);
+                // A multi-targeted project compiles each file once per framework. The file is
+                // counted once and a finding reported once; a later framework adds only what
+                // the earlier ones did not find (code under #if, or an API one framework lacks).
+                var path = trees[i].FilePath ?? "";
+                var firstSeen = !seenFiles.TryGetValue(path, out var known);
+                if (firstSeen)
+                {
+                    seenFiles[path] = known = [];
+                    accumulator.CountFile(scans[i].Kind);
+                }
 
-                foreach (var finding in scan.Findings)
-                    accumulator.Add(finding.Violation, scan.Kind, finding.RelativePath, finding.Suppressed);
+                foreach (var finding in scans[i].Findings)
+                {
+                    var v = finding.Violation;
+                    if (known.Add((v.Id, v.Line, v.Message, v.Snippet)) || firstSeen)
+                        accumulator.Add(v, scans[i].Kind, finding.RelativePath, finding.Suppressed);
+                }
             }
         }
 
