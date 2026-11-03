@@ -38,7 +38,7 @@ public static class GetSymbolAtTool
         var paths = documents.Select(d => d.FilePath!).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         if (paths.Count > 1)
         {
-            return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.AmbiguousMatch,
+            return ToolJson.Serialize(new ErrorResponse(ErrorCodes.AmbiguousMatch,
                 $"'{file}' matches {paths.Count} files. Pass a longer path.",
                 [.. paths.Take(10).Select(p => new SymbolCandidate(workspace.ToRelativePath(p), "file", workspace.ToRelativePath(p), 0))]));
         }
@@ -69,7 +69,7 @@ public static class GetSymbolAtTool
                 $"'{found.Text}' at {line}:{found.GetLocation().GetLineSpan().StartLinePosition.Character + 1} does not bind to a symbol (keyword, literal, or unresolved name).");
         }
 
-        return JsonSerializer.Serialize(Describe(workspace, semanticModel, found, symbol, ct));
+        return ToolJson.Serialize(Describe(workspace, semanticModel, found, symbol, ct));
     }
 
     /// <summary>
@@ -226,5 +226,5 @@ public static class GetSymbolAtTool
     };
 
     private static string Error(string code, string message) =>
-        JsonSerializer.Serialize(new ErrorResponse(code, message));
+        ToolJson.Serialize(new ErrorResponse(code, message));
 }

@@ -22,7 +22,7 @@ public static class GetTypeHierarchyTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new TypeHierarchyResult([], [], [], 0, false, Math.Max(1, maxResults)));
+            return ToolJson.Serialize(new TypeHierarchyResult([], [], [], 0, false, Math.Max(1, maxResults)));
 
         var resolved = await SymbolResolver.ResolveOrErrorAsync(workspace, typeName, ct: ct);
         if (resolved.Failed) return resolved.Error;
@@ -30,7 +30,7 @@ public static class GetTypeHierarchyTool
         var symbol = resolved.Symbol;
 
         if (symbol is not INamedTypeSymbol typeSymbol)
-            return JsonSerializer.Serialize(new ErrorResponse(
+            return ToolJson.Serialize(new ErrorResponse(
                 ErrorCodes.WrongSymbolKind,
                 $"'{typeName}' resolved to a {SymbolResolver.GetKindString(symbol)}, not a type."));
 
@@ -50,25 +50,28 @@ public static class GetTypeHierarchyTool
 
         // Get derived types. FindDerivedClassesAsync only walks class inheritance, so for
         // interfaces we combine derived interfaces with implementing types instead.
-        var allDerived = new List<string>();
+        var allDerived = new List<INamedTypeSymbol>();
         if (typeSymbol.TypeKind == TypeKind.Interface)
         {
             var derivedInterfaces = await SymbolFinder.FindDerivedInterfacesAsync(typeSymbol, solution, cancellationToken: ct);
             var implementations = await SymbolFinder.FindImplementationsAsync(typeSymbol, solution, cancellationToken: ct);
-            allDerived.AddRange(derivedInterfaces
-                .Concat(implementations)
-                .Select(d => d.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)));
+            allDerived.AddRange(derivedInterfaces.Concat(implementations));
         }
         else
         {
-            var derived = await SymbolFinder.FindDerivedClassesAsync(typeSymbol, solution, cancellationToken: ct);
-            allDerived.AddRange(derived.Select(d => d.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)));
+            allDerived.AddRange(await SymbolFinder.FindDerivedClassesAsync(typeSymbol, solution, cancellationToken: ct));
         }
 
-        var page = Paging.Apply(allDerived, maxResults);
+        // Each flavor of a multi-targeted project reports its own copy of a derived type:
+        // same declaration ID, same declaring file.
+        var page = Paging.Apply(
+            Paging.Distinct(allDerived, d => (SymbolResolver.GetSymbolId(d), SymbolResolver.GetLocation(d)))
+                .Select(d => d.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat))
+                .ToList(),
+            maxResults);
         var location = SymbolResolver.GetLocation(typeSymbol);
 
-        return JsonSerializer.Serialize(new TypeHierarchyResult(
+        return ToolJson.Serialize(new TypeHierarchyResult(
             baseTypes, interfaces, page.Items, page.TotalFound, page.Truncated, page.Limit,
             File: location is { } loc ? workspace.ToRelativePath(loc.File) : null,
             Line: location?.Line ?? 0));

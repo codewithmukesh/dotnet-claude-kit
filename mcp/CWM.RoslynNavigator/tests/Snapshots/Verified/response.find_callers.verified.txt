@@ -5,7 +5,6 @@
       "ContainingType": "OrderService",
       "File": "SampleApi/OrderService.cs",
       "Line": 29,
-      "IsGenerated": false,
       "Via": "direct"
     },
     {
@@ -13,7 +12,6 @@
       "ContainingType": "CachedOrderRepository",
       "File": "SampleInfrastructure/CachedOrderRepository.cs",
       "Line": 12,
-      "IsGenerated": false,
       "Via": "direct"
     },
     {
@@ -21,7 +19,6 @@
       "ContainingType": "OrderService",
       "File": "SampleApi/OrderService.cs",
       "Line": 17,
-      "IsGenerated": false,
       "Via": "direct"
     }
   ],

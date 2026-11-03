@@ -10,7 +10,7 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class FindImplementationsTool
 {
-    [McpServerTool(Name = "find_implementations"), Description("Find all types that implement an interface or derive from a base class. Each result carries IsGenerated so generated implementations can be skipped.")]
+    [McpServerTool(Name = "find_implementations"), Description("Find all types that implement an interface or derive from a base class. A generated implementation carries IsGenerated: true (omitted when false) so it can be skipped.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
         [Description("The interface or base class name to find implementations for. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).")] string interfaceName,
@@ -30,7 +30,7 @@ public static class FindImplementationsTool
         var symbol = resolved.Symbol;
 
         if (symbol is not INamedTypeSymbol typeSymbol)
-            return JsonSerializer.Serialize(new ErrorResponse(
+            return ToolJson.Serialize(new ErrorResponse(
                 ErrorCodes.WrongSymbolKind,
                 $"'{interfaceName}' resolved to a {SymbolResolver.GetKindString(symbol)}, not an interface or class."));
 
@@ -54,10 +54,11 @@ public static class FindImplementationsTool
             }
         }
 
-        return Serialize(Paging.Apply(all, maxResults));
+        // A multi-targeted project can declare each implementation once per target framework.
+        return Serialize(Paging.Apply(all, maxResults, i => (i.Type, i.File, i.Line)));
     }
 
     private static string Serialize(Paging.Page<ImplementationInfo> page) =>
-        JsonSerializer.Serialize(new ImplementationsResult(
+        ToolJson.Serialize(new ImplementationsResult(
             page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit));
 }

@@ -66,18 +66,31 @@ internal sealed record SymbolLocation(
     string File,
     int Line,
     string Namespace,
-    bool IsGenerated,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool IsGenerated,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Match = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ContainingType = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SymbolId = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SymbolId = null,
+    // Set only when the symbol exists in some, not all, of a multi-targeted project's frameworks.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<string>? TargetFrameworks = null);
 
 internal sealed record SymbolSearchResult(List<SymbolLocation> Symbols, int Count, int TotalFound, bool Truncated, int Limit);
 
-internal sealed record ReferenceLocation(string File, int Line, string Snippet, string Kind, bool IsGenerated);
+internal sealed record ReferenceLocation(
+    string File,
+    int Line,
+    string Snippet,
+    string Kind,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool IsGenerated,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<string>? TargetFrameworks = null);
 
 internal sealed record ReferencesResult(List<ReferenceLocation> References, int Count, int TotalFound, bool Truncated, int Limit);
 
-internal sealed record ImplementationInfo(string Type, string File, int Line, bool IsGenerated);
+internal sealed record ImplementationInfo(
+    string Type,
+    string File,
+    int Line,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool IsGenerated);
+
 
 internal sealed record ImplementationsResult(List<ImplementationInfo> Implementations, int Count, int TotalFound, bool Truncated, int Limit);
 
@@ -91,14 +104,20 @@ internal sealed record TypeHierarchyResult(
     string? File = null,
     int Line = 0);
 
+/// <summary>
+/// One csproj. A multi-targeted csproj is one entry listing every framework, although Roslyn
+/// loads it once per framework. <see cref="References"/> lists the projects its csproj
+/// references directly (not the transitive closure Roslyn compiles against), omitted when
+/// none; <see cref="ReferencedBy"/> appears only for a project-filtered query.
+/// </summary>
 internal sealed record ProjectInfo(
     string Name,
     string Path,
-    string TargetFramework,
-    List<string> References,
+    List<string> TargetFrameworks,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<string>? References = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<string>? ReferencedBy = null,
     // Multi-solution only: the solution(s) declaring this project. Omitted for one solution.
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? Solutions = null);
-
 /// <summary>A loaded solution as reported by get_project_graph when several are loaded.</summary>
 internal sealed record SolutionSummary(
     string Name,
@@ -108,13 +127,39 @@ internal sealed record SolutionSummary(
 
 /// <summary>
 /// <see cref="Solution"/> is the primary solution's file name (unchanged for one solution).
-/// <see cref="Solutions"/> appears only when several solutions are loaded.
+/// <see cref="Solutions"/> appears only when several solutions are loaded. Count/TotalFound
+/// describe <see cref="Projects"/>, one entry per csproj.
 /// </summary>
 internal sealed record ProjectGraphResult(
     string Solution,
     List<ProjectInfo> Projects,
+    int Count,
+    int TotalFound,
+    bool Truncated,
+    int Limit,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<SolutionSummary>? Solutions = null);
 
+/// <summary>Projects whose longest chain of project references below them is <see cref="Depth"/> long.</summary>
+internal sealed record ProjectLayer(int Depth, int Count, List<string> Examples);
+
+/// <summary>A count per name: projects per framework, per top-level folder, or references to a project.</summary>
+internal sealed record NamedCount(string Name, int Count);
+
+/// <summary>
+/// get_project_graph with summary=true: the shape of a large solution without listing it.
+/// Layers run from depth 0 (references no other project) upward; MostReferenced counts
+/// incoming direct project references.
+/// </summary>
+internal sealed record ProjectGraphSummaryResult(
+    string Solution,
+    int Projects,
+    int TestProjects,
+    int MultiTargeted,
+    List<NamedCount> TargetFrameworks,
+    List<NamedCount> Folders,
+    List<ProjectLayer> Layers,
+    List<NamedCount> MostReferenced,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<SolutionSummary>? Solutions = null);
 internal sealed record MemberInfo(string Kind, string Signature, string Accessibility);
 
 internal sealed record PublicApiResult(
@@ -188,13 +233,18 @@ internal sealed record CallerInfo(
     string ContainingType,
     string File,
     int Line,
-    bool IsGenerated,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool IsGenerated,
     string Via = "direct",
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ViaSymbol = null);
 
 internal sealed record CallersResult(List<CallerInfo> Callers, int Count, int TotalFound, bool Truncated, int Limit);
 
-internal sealed record OverrideInfo(string Method, string ContainingType, string File, int Line, bool IsGenerated);
+internal sealed record OverrideInfo(
+    string Method,
+    string ContainingType,
+    string File,
+    int Line,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool IsGenerated);
 
 internal sealed record OverridesResult(List<OverrideInfo> Overrides, int Count, int TotalFound, bool Truncated, int Limit);
 
@@ -212,18 +262,25 @@ internal sealed record SymbolDetail(
     string File,
     int Line);
 
+/// <summary>
+/// One finding. Fields equal to the finding's rule (see <see cref="AntiPatternRule"/>) are
+/// omitted: Severity, Message, and Suggestion appear only when they differ from the rule's.
+/// Confidence is omitted when "high" and SourceKind when "production".
+/// </summary>
 internal sealed record AntiPatternInfo(
     string Id,
-    string Severity,
-    string Message,
     string File,
     int Line,
     string Snippet,
-    string Suggestion,
-    string Confidence = "high",
-    string? Member = null,
-    string SourceKind = "production");
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Member = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Message = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Suggestion = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Severity = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Confidence = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SourceKind = null);
 
+/// <summary>What one detector id means, stated once instead of on every finding.</summary>
+internal sealed record AntiPatternRule(string Id, string Severity, string Message, string Suggestion);
 /// <summary>Per-detector counts, complete even when the violation list is truncated.</summary>
 internal sealed record AntiPatternIdSummary(
     string Id,
@@ -255,7 +312,25 @@ internal sealed record AntiPatternsResult(
     int TotalFound,
     bool Truncated,
     int Limit,
-    AntiPatternSummary? Summary = null);
+    AntiPatternSummary? Summary = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<AntiPatternRule>? Rules = null)
+{
+    /// <summary>Each finding with its rule's values filled back in for the omitted fields.</summary>
+    public List<AntiPatternInfo> Expand()
+    {
+        var rules = (Rules ?? []).ToDictionary(r => r.Id, StringComparer.Ordinal);
+        return [.. Violations.Select(v => rules.TryGetValue(v.Id, out var rule)
+            ? v with
+            {
+                Message = v.Message ?? rule.Message,
+                Suggestion = v.Suggestion ?? rule.Suggestion,
+                Severity = v.Severity ?? rule.Severity,
+                Confidence = v.Confidence ?? "high",
+                SourceKind = v.SourceKind ?? "production",
+            }
+            : v with { Confidence = v.Confidence ?? "high", SourceKind = v.SourceKind ?? "production" })];
+    }
+}
 
 // Dead code detection
 internal sealed record DeadCodeInfo(
@@ -417,7 +492,7 @@ internal sealed record SymbolAtResult(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ConvertedType,
     string DefinitionFile,
     int DefinitionLine,
-    bool IsGenerated,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool IsGenerated,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Assembly = null);
 
 // Rename preview

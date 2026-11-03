@@ -9,6 +9,5 @@
   "SymbolId": "T:SampleApi.OrderService",
   "IsDeclaration": true,
   "DefinitionFile": "SampleApi/OrderService.cs",
-  "DefinitionLine": 8,
-  "IsGenerated": false
+  "DefinitionLine": 8
 }

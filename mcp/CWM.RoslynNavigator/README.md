@@ -26,7 +26,7 @@ CWM.RoslynNavigator is a Model Context Protocol (MCP) server that provides Claud
 | `get_type_hierarchy` | Inheritance chain, interfaces, and derived types |
 | `get_public_api` | Public members of a type without reading the full file |
 | `get_symbol_detail` | Full signature, parameters, return type, and XML docs |
-| `get_project_graph` | Solution project dependency tree; with several solutions loaded, also which solution(s) each project belongs to |
+| `get_project_graph` | Solution project dependency graph: one entry per csproj (solution-relative path, target frameworks, direct project references), paged at 100. `summary: true` returns counts, frameworks, folders, dependency layers, and the most-referenced projects; `project: "Name"` returns the matches with `ReferencedBy`. With several solutions loaded, also which solution(s) each project belongs to |
 | `get_dependency_graph` | Call dependency graph for a method |
 | `get_diagnostics` | Compiler and analyzer warnings/errors |
 | `get_test_coverage_map` | Heuristic test coverage by naming convention |
@@ -38,7 +38,7 @@ CWM.RoslynNavigator is a Model Context Protocol (MCP) server that provides Claud
 | `get_endpoint_map` | ASP.NET Core route inventory: Minimal APIs (MapGroup-composed) + controllers, with auth posture per endpoint |
 | `get_di_registrations` | DI registration map with duplicate detection and captive-dependency (singleton→scoped) risk flags |
 | `resolve_stack_trace` | Map an exception stack trace onto the solution — undoes async/lambda/local-function rewrites, marks which frames are yours |
-| `analyze_change_impact` | Blast radius of changing one symbol: references by project and file, implementations and overrides that must move with it, transitive callers (interface/base dispatch included, counted in `IndirectCallers`), risk rating |
+| `analyze_change_impact` | Blast radius of changing one symbol: references by project and file (for a member: calls to it and through the interface/base member it implements, not calls to sibling implementations), implementations and overrides that must move with it, transitive callers (interface/base dispatch included, counted in `IndirectCallers`; the walk is bounded and sets `Truncated` if it stops early), risk rating |
 | `get_token_savings` | Tokens this server has saved in this repository, with a per-tool leaderboard. Opt-in — see [Token savings](#token-savings) |
 | `get_symbol_at` | The symbol at a file position — pass the identifier `text` (or a `column`) on a `line`. Kind, signature, containing type, definition, `SymbolId`, and declared/expression types with nullability |
 | `preview_rename` | What a semantic rename **would** change — per-line old/new text across implementations, overrides and call sites, plus compiler errors it would introduce. Never writes to disk or the workspace — see [Rename preview](#rename-preview) |
@@ -129,16 +129,34 @@ Defaults: 50 for symbol/list tools (`find_symbol`, `find_references`,
 `find_implementations`, `find_callers`, `find_overrides`, `find_dead_code`,
 `get_public_api`, `get_type_hierarchy`, `get_test_coverage_map`,
 `resolve_stack_trace`, `analyze_change_impact`), 100 for `detect_antipatterns`,
-`get_diagnostics`, `get_endpoint_map`, `get_di_registrations`, `get_nuget_packages`, and
-`get_dependency_graph` nodes, 200 for `get_file_outline` members. `get_symbol_source`
+`get_diagnostics`, `get_endpoint_map`, `get_di_registrations`, `get_nuget_packages`,
+`get_project_graph` projects, and `get_dependency_graph` nodes, 200 for `get_file_outline` members. `get_symbol_source`
 caps by characters instead (`maxChars`, default 8000, with a `Truncated` flag).
 `get_diagnostics` orders errors first and always includes per-severity totals, so a
 capped response never hides the important picture.
 
+### Response encoding
+
+Every byte of a response is a token the agent pays for. Responses omit null fields and
+`IsGenerated: false`, and write apostrophes and non-ASCII characters as themselves rather
+than `'`-style escapes. A missing optional field means null (or false).
+
+### Multi-targeted projects
+
+MSBuildWorkspace loads a multi-targeted csproj once per target framework, so Roslyn finds
+every source location once per framework. Results are merged by location before counting
+and capping, so `TotalFound` counts distinct locations and a duplicate never uses up
+`maxResults`. `find_symbol` and `find_references` add `TargetFrameworks` to an entry only
+when it exists in some, not all, of its project's frameworks (code under `#if NET8_0`).
+`get_project_graph` lists a multi-targeted csproj once with all its `TargetFrameworks`,
+`analyze_change_impact` counts it once in `AffectedProjects`, and
+`detect_antipatterns`, `get_diagnostics`, and `get_test_coverage_map` count each file once.
+
 ### Generated code
 
 `find_symbol`, `find_references`, `find_callers`, `find_implementations`, and
-`find_overrides` mark each result with `IsGenerated`, so an agent does not follow a hit
+`find_overrides` mark a result in generated code with `IsGenerated: true` (omitted when
+false), so an agent does not follow a hit
 into a `.g.cs` file that the next build overwrites. Detection uses file conventions
 (`.g.cs`, `.Designer.cs`, `obj/`), an `<auto-generated>` header, and Roslyn's
 `IsImplicitlyDeclared` for compiler-synthesized members.
@@ -311,9 +329,13 @@ xUnit `[Fact]` is not a defect, so that detector runs on production only.
 `detect_antipatterns` takes `scope`: `production` (default) or `all`. The response
 summary always reports the file counts per kind, so nothing is silently skipped.
 
+To keep the response small, `Rules` states each reported detector's `Severity`, `Message`,
+and `Suggestion` once; a violation carries its own only where it differs from its rule.
+A violation omits `Confidence` when it is `high` and `SourceKind` when it is `production`.
+
 ### Confidence levels
 
-Findings carry `confidence`:
+Findings carry `confidence` (omitted in the response when `high`):
 
 - **`high`** — wrong regardless of context. Safe to grade and to act on directly.
 - **`medium`** — suspicious, but with legitimate uses the detector cannot rule out:

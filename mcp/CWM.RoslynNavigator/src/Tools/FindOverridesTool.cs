@@ -10,7 +10,7 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class FindOverridesTool
 {
-    [McpServerTool(Name = "find_overrides"), Description("Find all overrides of a virtual or abstract method across the solution. Useful for understanding polymorphic behavior. Each result carries IsGenerated so generated overrides can be skipped.")]
+    [McpServerTool(Name = "find_overrides"), Description("Find all overrides of a virtual or abstract method across the solution. Useful for understanding polymorphic behavior. A generated override carries IsGenerated: true (omitted when false) so it can be skipped.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
         [Description("The virtual or abstract method name to find overrides for. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).")] string methodName,
@@ -51,10 +51,11 @@ public static class FindOverridesTool
             }
         }
 
-        return Serialize(Paging.Apply(all, maxResults));
+        // A multi-targeted project declares each override once per target framework.
+        return Serialize(Paging.Apply(all, maxResults, o => (o.ContainingType, o.Method, o.File, o.Line)));
     }
 
     private static string Serialize(Paging.Page<OverrideInfo> page) =>
-        JsonSerializer.Serialize(new OverridesResult(
+        ToolJson.Serialize(new OverridesResult(
             page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit));
 }

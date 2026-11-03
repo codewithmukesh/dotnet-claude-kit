@@ -146,7 +146,7 @@ public sealed class MultiSolutionTests(MultiSolutionFixture fixture) : IClassFix
 
     private async Task<ProjectGraphResult> GetProjectGraphAsync()
     {
-        var json = await GetProjectGraphTool.ExecuteAsync(Workspace, TestContext.Current.CancellationToken);
+        var json = await GetProjectGraphTool.ExecuteAsync(Workspace, ct: TestContext.Current.CancellationToken);
         return JsonSerializer.Deserialize<ProjectGraphResult>(json)!;
     }
 }

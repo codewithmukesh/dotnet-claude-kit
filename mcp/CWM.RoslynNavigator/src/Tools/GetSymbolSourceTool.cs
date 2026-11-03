@@ -40,12 +40,12 @@ public static class GetSymbolSourceTool
 
         var syntaxRef = symbol.DeclaringSyntaxReferences.FirstOrDefault();
         if (syntaxRef is null)
-            return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.NoSource,
+            return ToolJson.Serialize(new ErrorResponse(ErrorCodes.NoSource,
                 $"'{symbolName}' has no source in this solution (metadata symbol)."));
 
         var node = (await syntaxRef.GetSyntaxAsync(ct)).FirstAncestorOrSelf<MemberDeclarationSyntax>();
         if (node is null)
-            return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.NoSource,
+            return ToolJson.Serialize(new ErrorResponse(ErrorCodes.NoSource,
                 $"'{symbolName}' does not map to a member declaration."));
 
         maxChars = Math.Clamp(maxChars, MinChars, MaxChars);
@@ -61,7 +61,7 @@ public static class GetSymbolSourceTool
         var lineSpan = node.GetLocation().GetLineSpan();
         var filePath = node.SyntaxTree.FilePath is { } p ? workspace.ToRelativePath(p) : "unknown";
 
-        return JsonSerializer.Serialize(new SymbolSourceResult(
+        return ToolJson.Serialize(new SymbolSourceResult(
             Name: symbol.Name,
             Kind: SymbolResolver.GetKindString(symbol),
             File: filePath,

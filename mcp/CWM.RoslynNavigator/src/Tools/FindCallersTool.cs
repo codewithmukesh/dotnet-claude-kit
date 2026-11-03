@@ -10,7 +10,7 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class FindCallersTool
 {
-    [McpServerTool(Name = "find_callers"), Description("Find all methods that call a specific method. Useful for impact analysis and understanding dependencies. Includes callers that reach it through dispatch: Via is 'direct', 'interface' (called through an interface member it implements — the usual DI case), 'base' (through a base member it overrides), or 'implementation' (through an implementation/override of it), with ViaSymbol naming the member actually called. Each caller carries IsGenerated so generated call sites can be skipped.")]
+    [McpServerTool(Name = "find_callers"), Description("Find all methods that call a specific method. Useful for impact analysis and understanding dependencies. Includes callers that reach it through dispatch: Via is 'direct', 'interface' (called through an interface member it implements — the usual DI case), 'base' (through a base member it overrides), or 'implementation' (through an implementation/override of it), with ViaSymbol naming the member actually called. A caller in generated code carries IsGenerated: true (omitted when false) so it can be skipped.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
         [Description("Method to find callers for. Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified. Qualify when the name is reused across types. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).")] string methodName,
@@ -63,10 +63,12 @@ public static class FindCallersTool
             }
         }
 
-        return Serialize(Paging.Apply(all, maxResults));
+        // Callers are already one per symbol and route; this also folds per-framework copies of
+        // a caller declared in a multi-targeted project whose display strings differ.
+        return Serialize(Paging.Apply(all, maxResults, c => (c.File, c.Line, c.Method, c.Via, c.ViaSymbol)));
     }
 
     private static string Serialize(Paging.Page<CallerInfo> page) =>
-        JsonSerializer.Serialize(new CallersResult(
+        ToolJson.Serialize(new CallersResult(
             page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit));
 }

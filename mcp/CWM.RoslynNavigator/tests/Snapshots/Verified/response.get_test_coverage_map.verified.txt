@@ -3,14 +3,12 @@
     {
       "Type": "AuditableProduct",
       "File": "SampleDomain/BaseEntity.cs",
-      "HasTests": false,
-      "TestFile": null
+      "HasTests": false
     },
     {
       "Type": "BaseEntity",
       "File": "SampleDomain/BaseEntity.cs",
-      "HasTests": false,
-      "TestFile": null
+      "HasTests": false
     },
     {
       "Type": "Order",
@@ -21,20 +19,17 @@
     {
       "Type": "OrderItem",
       "File": "SampleDomain/OrderItem.cs",
-      "HasTests": false,
-      "TestFile": null
+      "HasTests": false
     },
     {
       "Type": "Product",
       "File": "SampleDomain/Product.cs",
-      "HasTests": false,
-      "TestFile": null
+      "HasTests": false
     },
     {
       "Type": "UnusedHelper",
       "File": "SampleDomain/UnusedHelper.cs",
-      "HasTests": false,
-      "TestFile": null
+      "HasTests": false
     }
   ],
   "TotalTypes": 6,

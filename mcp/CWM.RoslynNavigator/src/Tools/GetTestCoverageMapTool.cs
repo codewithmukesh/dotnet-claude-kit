@@ -36,7 +36,7 @@ public static class GetTestCoverageMapTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new TestCoverageMapResult([], 0, 0, 0));
+            return ToolJson.Serialize(new TestCoverageMapResult([], 0, 0, 0));
 
         // Identify test projects vs production projects
         var testProjects = new List<Project>();
@@ -68,6 +68,7 @@ public static class GetTestCoverageMapTool
         var testTypeFiles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         var testMethodCount = 0;
         var testClassCount = 0;
+        var seenTestFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         foreach (var testProject in testProjects)
         {
@@ -80,6 +81,10 @@ public static class GetTestCoverageMapTool
 
             foreach (var tree in compilation.SyntaxTrees)
             {
+                // A multi-targeted test project compiles each file once per framework.
+                if (!seenTestFiles.Add(tree.FilePath ?? ""))
+                    continue;
+
                 var semanticModel = compilation.GetSemanticModel(tree);
                 var root = await tree.GetRootAsync(ct);
 
@@ -109,6 +114,7 @@ public static class GetTestCoverageMapTool
         // Check each production type for matching test class
         var coverage = new List<TestCoverageEntry>();
         var totalTypes = 0;
+        var countedTypes = new HashSet<(string?, int, string)>();
         var testedTypes = 0;
 
         foreach (var project in productionProjects)
@@ -137,6 +143,11 @@ public static class GetTestCoverageMapTool
                     if (typeSymbol.IsAbstract && typeSymbol.TypeKind == TypeKind.Class
                         && typeSymbol.GetMembers().All(m => m.IsAbstract || m.IsImplicitlyDeclared)) continue;
 
+                    // One type per declaration, not per target-framework flavor of its project.
+                    var declared = SymbolResolver.GetLocation(typeSymbol);
+                    if (!countedTypes.Add((declared?.File, declared?.Line ?? 0, typeSymbol.Name)))
+                        continue;
+
                     totalTypes++;
 
                     var typeName = typeSymbol.Name;
@@ -163,7 +174,7 @@ public static class GetTestCoverageMapTool
         var notApplicableReason = DetermineNotApplicableReason(
             percentage, testMethodCount, totalTypes, usesIntegrationHarness);
 
-        return JsonSerializer.Serialize(new TestCoverageMapResult(
+        return ToolJson.Serialize(new TestCoverageMapResult(
             coverage,
             totalTypes,
             testedTypes,

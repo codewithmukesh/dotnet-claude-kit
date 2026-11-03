@@ -21,14 +21,14 @@ public static class ResolveStackTraceTool
         if (notReady is not null) return notReady;
 
         if (string.IsNullOrWhiteSpace(stackTrace))
-            return JsonSerializer.Serialize(new ErrorResponse(
+            return ToolJson.Serialize(new ErrorResponse(
                 ErrorCodes.InvalidArgument, "stackTrace is empty."));
 
         var header = StackTraceParser.ParseHeader(stackTrace);
         var parsed = StackTraceParser.ParseFrames(stackTrace);
 
         if (parsed.Count == 0)
-            return JsonSerializer.Serialize(new ErrorResponse(
+            return ToolJson.Serialize(new ErrorResponse(
                 ErrorCodes.InvalidArgument,
                 "No stack frames found. Expected lines of the form 'at Namespace.Type.Method(...)'."));
 
@@ -61,7 +61,7 @@ public static class ResolveStackTraceTool
         var solutionFrames = resolved.Count(f => f.InSolution);
         var firstSolutionFrame = resolved.FirstOrDefault(f => f.InSolution)?.Index;
 
-        return JsonSerializer.Serialize(new StackTraceResult(
+        return ToolJson.Serialize(new StackTraceResult(
             ExceptionType: header?.ExceptionType,
             Message: header?.Message,
             Frames: page.Items,

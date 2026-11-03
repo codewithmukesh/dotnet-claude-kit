@@ -92,4 +92,48 @@ public class GetDiagnosticsTests(TestSolutionFixture fixture)
         // SampleDomain should have clean compilations (no intentional issues)
         Assert.NotNull(result);
     }
+
+    [Fact]
+    public async Task GetDiagnostics_FileScope_MatchesSolutionScopeForEveryFile()
+    {
+        // Arrange — file scope answers from the file's semantic model (or, for files that
+        // can carry compilation-end diagnostics, from the compilation); it must agree with the
+        // solution-wide answer filtered to that file.
+        var ct = TestContext.Current.CancellationToken;
+        var all = JsonSerializer.Deserialize<DiagnosticsResult>(await GetDiagnosticsTool.ExecuteAsync(
+            fixture.WorkspaceManager, scope: "solution", maxResults: 10_000, ct: ct))!;
+        var files = fixture.WorkspaceManager.GetSolution()!.Projects
+            .SelectMany(p => p.Documents)
+            .Select(d => fixture.WorkspaceManager.ToRelativePath(d.FilePath!))
+            .Where(p => !p.Contains("/obj/", StringComparison.Ordinal))
+            .Distinct()
+            .ToList();
+
+        foreach (var file in files)
+        {
+            // Act
+            var single = JsonSerializer.Deserialize<DiagnosticsResult>(await GetDiagnosticsTool.ExecuteAsync(
+                fixture.WorkspaceManager, scope: "file", path: file, maxResults: 10_000, ct: ct))!;
+
+            // Assert
+            Assert.Equal(
+                all.Diagnostics.Where(d => d.File == file).Select(d => $"{d.Id}:{d.Line}:{d.Message}").Order(),
+                single.Diagnostics.Select(d => $"{d.Id}:{d.Line}:{d.Message}").Order());
+        }
+    }
+
+    [Theory]
+    [InlineData("class C { private int _unused; }", true)]
+    [InlineData("class C { internal event System.Action? Changed; }", true)]
+    [InlineData("class C { static void Main() { } }", true)]
+    [InlineData("System.Console.WriteLine();", true)]
+    [InlineData("class C { public int Value; protected int Other; private const int K = 1; }", false)]
+    [InlineData("class C { void M() { var unused = 1; } }", false)]
+    public void NeedsCompilationDiagnostics_Declarations_FlagsOnlyCompilationEndShapes(string source, bool expected)
+    {
+        var root = Microsoft.CodeAnalysis.CSharp.CSharpSyntaxTree.ParseText(source, cancellationToken: TestContext.Current.CancellationToken)
+            .GetRoot(TestContext.Current.CancellationToken);
+
+        Assert.Equal(expected, GetDiagnosticsTool.NeedsCompilationDiagnostics(root));
+    }
 }

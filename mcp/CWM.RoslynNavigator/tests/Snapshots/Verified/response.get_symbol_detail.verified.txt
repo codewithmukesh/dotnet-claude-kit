@@ -8,21 +8,17 @@
   "Parameters": [
     {
       "Name": "ct",
-      "Type": "System.Threading.CancellationToken",
-      "DefaultValue": null
+      "Type": "System.Threading.CancellationToken"
     },
     {
       "Name": "customerId",
-      "Type": "string",
-      "DefaultValue": null
+      "Type": "string"
     },
     {
       "Name": "items",
-      "Type": "System.Collections.Generic.List<SampleDomain.OrderItem>",
-      "DefaultValue": null
+      "Type": "System.Collections.Generic.List<SampleDomain.OrderItem>"
     }
   ],
-  "XmlDoc": null,
   "File": "SampleApi/OrderService.cs",
   "Line": 22
 }

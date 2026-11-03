@@ -133,6 +133,14 @@ static async Task<int> CallAsync(CommandLine command, CancellationToken ct)
     if (command.Flag("warm")) _ = await session.WaitForWarmAsync(TimeSpan.FromMinutes(20), ct);
     var result = await session.CallAsync(tool, arguments, TimeSpan.FromSeconds(command.Number("timeout-s", 300)), ct);
     Console.WriteLine($"{tool}: {result.Status} in {result.ElapsedMs:0} ms, {result.Bytes} bytes");
+    // --repeat N: the same call N more times, for warm timings out of process.
+    for (var i = 0; i < (int)command.Number("repeat", 0); i++)
+    {
+        var again = await session.CallAsync(tool, arguments, TimeSpan.FromSeconds(command.Number("timeout-s", 300)), ct);
+        Console.WriteLine($"  repeat {i + 1}: {again.Status} in {again.ElapsedMs:0} ms");
+    }
+
+    if (command.Flag("quiet")) return 0;
     Console.WriteLine(result.Payload ?? result.ErrorMessage);
     if (!result.Answered)
     {
@@ -175,6 +183,8 @@ static int Help()
                  [--warm-skip-s 60] [--warm-timeout-min 20] [--grep-head-limit 250] [--prefill-tps 10000]
                  [--after <label>] [--skip-existing]
           report --in <results/yyyy-MM-dd> [--after <label>]
+          call   --corpus <def.json> --corpus-root <dir> --server <label=path> --tool <name>
+                 [--args <json> | --args-file <file>] [--warm] [--repeat N] [--quiet] [--timeout-s 300]
 
         A server path ending in .dll runs under the dotnet host; anything else runs directly.
         """);

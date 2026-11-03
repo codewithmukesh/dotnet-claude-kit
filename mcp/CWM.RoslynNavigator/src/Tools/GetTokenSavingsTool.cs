@@ -22,7 +22,7 @@ public static class GetTokenSavingsTool
 
         if (telemetry is null || !telemetry.Enabled)
         {
-            return Task.FromResult(JsonSerializer.Serialize(new TokenSavingsResult(
+            return Task.FromResult(ToolJson.Serialize(new TokenSavingsResult(
                 Enabled: false,
                 Message: $"Telemetry is off. Set {TelemetryOptions.EnvironmentVariable}=on and restart the server to collect. Nothing is ever transmitted — records are written to this machine only.",
                 0, 0, 0, 0, 0, 0, 0, 0, 0, [], null)));
@@ -32,7 +32,7 @@ public static class GetTokenSavingsTool
 
         if (records.Count == 0)
         {
-            return Task.FromResult(JsonSerializer.Serialize(new TokenSavingsResult(
+            return Task.FromResult(ToolJson.Serialize(new TokenSavingsResult(
                 Enabled: true,
                 Message: "Telemetry is on but no calls have been recorded yet for this repository.",
                 0, 0, 0, 0, 0, RepoTokens(workspace), 0, 0, 0, [], Method())));
@@ -67,7 +67,7 @@ public static class GetTokenSavingsTool
             ByTool: byTool,
             Method: Method());
 
-        return Task.FromResult(JsonSerializer.Serialize(result));
+        return Task.FromResult(ToolJson.Serialize(result));
     }
 
     /// <summary>

@@ -36,8 +36,15 @@ internal sealed class NameOccurrenceIndex
     }
 
     /// <summary>Indexes one tree. Callers add each tree once.</summary>
-    public void Add(SyntaxTree tree, SourceText text)
+    public void Add(SyntaxTree tree, SourceText text) => Record(tree, Find(text), text);
+
+    /// <summary>
+    /// The indexed names <paramref name="text"/> contains as whole identifiers. Reads only, so
+    /// several texts can be scanned in parallel and recorded afterwards with <see cref="Record"/>.
+    /// </summary>
+    public List<string> Find(SourceText text)
     {
+        var found = new List<string>();
         var length = text.Length;
         var buffer = ArrayPool<char>.Shared.Rent(Math.Max(1, length));
 
@@ -60,13 +67,22 @@ internal sealed class NameOccurrenceIndex
                     i++;
 
                 if (_names.TryGetValue(span[start..i], out var name))
-                    Record(name, tree);
+                    found.Add(name);
             }
         }
         finally
         {
             ArrayPool<char>.Shared.Return(buffer);
         }
+
+        return found;
+    }
+
+    /// <summary>Records what <see cref="Find"/> returned for <paramref name="tree"/>. Not thread-safe.</summary>
+    public void Record(SyntaxTree tree, List<string> names, SourceText text)
+    {
+        foreach (var name in names)
+            Record(name, tree);
 
         if (_irregularNames.Count > 0)
             _irregularTexts.Add((tree, text.ToString()));
@@ -94,6 +110,25 @@ internal sealed class NameOccurrenceIndex
             _seen[name] = (tree, false);
         else if (!seen.InMultipleTrees && seen.First != tree)
             _seen[name] = (seen.First, true);
+    }
+
+    /// <summary>Start positions of <paramref name="name"/> in <paramref name="text"/> as a whole identifier token.</summary>
+    internal static IEnumerable<int> IdentifierPositions(string text, string name)
+    {
+        if (name.Length == 0) yield break;
+
+        var index = 0;
+        while ((index = text.IndexOf(name, index, StringComparison.Ordinal)) >= 0)
+        {
+            var afterIndex = index + name.Length;
+            if ((index == 0 || !IsIdentifierChar(text[index - 1]))
+                && (afterIndex >= text.Length || !IsIdentifierChar(text[afterIndex])))
+            {
+                yield return index;
+            }
+
+            index += 1;
+        }
     }
 
     /// <summary>

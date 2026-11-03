@@ -20,13 +20,13 @@ internal static class ArgumentChecks
         if (allowed.Any(option => string.Equals(option, value, StringComparison.OrdinalIgnoreCase)))
             return null;
 
-        return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.InvalidArgument,
+        return ToolJson.Serialize(new ErrorResponse(ErrorCodes.InvalidArgument,
             $"Unknown {parameter} '{value}'. Use {string.Join(", ", allowed.Select(a => $"'{a}'"))}."));
     }
 
     /// <summary>Serialized FileNotFound error for a file filter that matches no document.</summary>
     public static string FileFilterMatchesNothing(string file) =>
-        JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.FileNotFound,
+        ToolJson.Serialize(new ErrorResponse(ErrorCodes.FileNotFound,
             $"No document path in the solution contains '{file}'."));
 
     /// <summary>
@@ -45,7 +45,7 @@ internal static class ArgumentChecks
             return null;
 
         var names = solution.Projects.Select(p => p.Name).Distinct(StringComparer.Ordinal).Order(StringComparer.Ordinal);
-        return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.InvalidArgument,
+        return ToolJson.Serialize(new ErrorResponse(ErrorCodes.InvalidArgument,
             $"No project named '{name}'. Projects: {string.Join(", ", names)}."));
     }
 }

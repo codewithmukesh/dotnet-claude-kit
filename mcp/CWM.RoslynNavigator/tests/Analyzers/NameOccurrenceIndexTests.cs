@@ -80,4 +80,17 @@ public class NameOccurrenceIndexTests
         // ...but the comment in tree 1 does mention Ship.
         Assert.True(index.AppearsOutside("Ship", trees[0]));
     }
+
+    [Fact]
+    public void IdentifierPositions_NameInsideLongerIdentifiers_ReturnsWholeTokensOnly()
+    {
+        // Arrange
+        const string text = "Ship(); ShipLater(); _Ship; Ship_; x.Ship;";
+
+        // Act
+        var positions = NameOccurrenceIndex.IdentifierPositions(text, "Ship").ToList();
+
+        // Assert
+        Assert.Equal([0, text.IndexOf("x.Ship", StringComparison.Ordinal) + 2], positions);
+    }
 }

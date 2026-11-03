@@ -1,7 +1,10 @@
 using System.ComponentModel;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using CWM.RoslynNavigator.Responses;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using ModelContextProtocol.Server;
 
 namespace CWM.RoslynNavigator.Tools;
@@ -27,7 +30,7 @@ public static class GetDiagnosticsTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new DiagnosticsResult(
+            return ToolJson.Serialize(new DiagnosticsResult(
                 [], 0, 0, 0, 0, 0, false, Math.Max(1, maxResults)));
 
         HashSet<string>? fileScopePaths = null;
@@ -36,7 +39,7 @@ public static class GetDiagnosticsTool
         {
             var documents = DocumentResolver.FindDocuments(solution, path);
             if (documents.Count == 0)
-                return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.FileNotFound,
+                return ToolJson.Serialize(new ErrorResponse(ErrorCodes.FileNotFound,
                     $"File '{path}' is not part of any project in the solution."));
 
             fileScopePaths = documents.Select(d => d.FilePath!).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -50,38 +53,37 @@ public static class GetDiagnosticsTool
 
         var matched = new List<(Diagnostic Diagnostic, DiagnosticInfo Info)>();
 
-        var compilations = scope.ToLowerInvariant() switch
+        var diagnostics = scope.ToLowerInvariant() switch
         {
-            "file" => await GetCompilationsForFile(workspace, solution, path, ct),
-            "project" => await GetCompilationsForProject(workspace, solution, path, ct),
-            _ => await workspace.GetAllCompilationsAsync(ct)
+            "file" when path is not null => await GetFileDiagnosticsAsync(workspace, solution, path, ct),
+            "file" => AllOf(await workspace.GetAllCompilationsAsync(ct), ct),
+            "project" => AllOf(await GetCompilationsForProject(workspace, solution, path, ct), ct),
+            _ => AllOf(await workspace.GetAllCompilationsAsync(ct), ct)
         };
 
-        foreach (var compilation in compilations)
+        foreach (var diag in diagnostics)
         {
-            var diags = compilation.GetDiagnostics(ct);
+            if (!MatchesSeverityFilter(diag.Severity, severityFilter))
+                continue;
 
-            foreach (var diag in diags)
+            if (fileScopePaths is not null)
             {
-                if (!MatchesSeverityFilter(diag.Severity, severityFilter))
+                var diagPath = diag.Location.SourceTree?.FilePath;
+                if (diagPath is null || !fileScopePaths.Contains(diagPath))
                     continue;
-
-                if (fileScopePaths is not null)
-                {
-                    var diagPath = diag.Location.SourceTree?.FilePath;
-                    if (diagPath is null || !fileScopePaths.Contains(diagPath))
-                        continue;
-                }
-
-                var lineSpan = diag.Location.GetLineSpan();
-                matched.Add((diag, new DiagnosticInfo(
-                    Id: diag.Id,
-                    Severity: diag.Severity.ToString().ToLowerInvariant(),
-                    Message: diag.GetMessage(),
-                    File: lineSpan.Path is { } p ? workspace.ToRelativePath(p) : "unknown",
-                    Line: lineSpan.StartLinePosition.Line + 1)));
             }
+
+            var lineSpan = diag.Location.GetLineSpan();
+            matched.Add((diag, new DiagnosticInfo(
+                Id: diag.Id,
+                Severity: diag.Severity.ToString().ToLowerInvariant(),
+                Message: diag.GetMessage(),
+                File: lineSpan.Path is { } p ? workspace.ToRelativePath(p) : "unknown",
+                Line: lineSpan.StartLinePosition.Line + 1)));
         }
+        // A file compiled once per target framework reports the same diagnostic once per
+        // framework; count it once.
+        matched = Paging.Distinct(matched, m => (m.Info.Id, m.Info.File, m.Info.Line, m.Info.Message));
 
         var errors = matched.Count(m => m.Diagnostic.Severity == DiagnosticSeverity.Error);
         var warnings = matched.Count(m => m.Diagnostic.Severity == DiagnosticSeverity.Warning);
@@ -97,33 +99,78 @@ public static class GetDiagnosticsTool
 
         var page = Paging.Apply(ordered, maxResults);
 
-        return JsonSerializer.Serialize(new DiagnosticsResult(
+        return ToolJson.Serialize(new DiagnosticsResult(
             page.Items, page.Count, page.TotalFound, errors, warnings, info, page.Truncated, page.Limit));
     }
 
-    private static async Task<IReadOnlyList<Compilation>> GetCompilationsForFile(
-        WorkspaceManager workspace, Solution solution, string? path, CancellationToken ct)
+    private static readonly ConditionalWeakTable<Compilation, IReadOnlyList<Diagnostic>> CompilationDiagnostics = new();
+
+    /// <summary>
+    /// A compilation's full diagnostics, computed once per compilation instance. A compilation
+    /// never changes (an edit produces a new one), so a repeated question about the same
+    /// snapshot is answered without compiling every method body again.
+    /// </summary>
+    private static IReadOnlyList<Diagnostic> DiagnosticsOf(Compilation compilation, CancellationToken ct)
     {
-        if (path is null)
-            return await workspace.GetAllCompilationsAsync(ct);
+        ct.ThrowIfCancellationRequested();
+        if (CompilationDiagnostics.TryGetValue(compilation, out var cached))
+            return cached;
 
-        // Every matched file's project, once each: a bare name like 'Program.cs' can live in several.
-        var projectIds = DocumentResolver.FindDocuments(solution, path)
-            .Select(d => d.Project.Id)
-            .Distinct()
-            .ToList();
-
-        var compilations = new List<Compilation>();
-        foreach (var projectId in projectIds)
-        {
-            var compilation = await workspace.GetCompilationAsync(projectId, ct);
-            if (compilation is not null)
-                compilations.Add(compilation);
-        }
-
-        return compilations;
+        var computed = compilation.GetDiagnostics(ct);
+        return CompilationDiagnostics.GetValue(compilation, _ => computed);
     }
 
+    private static IEnumerable<Diagnostic> AllOf(IReadOnlyList<Compilation> compilations, CancellationToken ct) =>
+        compilations.SelectMany(c => DiagnosticsOf(c, ct));
+
+    /// <summary>
+    /// Diagnostics for every document matching <paramref name="path"/>. A file's own semantic
+    /// model reports its syntax, declaration and method-body diagnostics without compiling the
+    /// rest of its project — identical to the project's diagnostics for that file except for
+    /// the few the compiler can only report once the whole compilation is done (see
+    /// <see cref="NeedsCompilationDiagnostics"/>); those files use the compilation's.
+    /// </summary>
+    private static async Task<List<Diagnostic>> GetFileDiagnosticsAsync(
+        WorkspaceManager workspace, Solution solution, string path, CancellationToken ct)
+    {
+        var diagnostics = new List<Diagnostic>();
+
+        // Every matched file's project, once each: a bare name like 'Program.cs' can live in several.
+        foreach (var document in DocumentResolver.FindDocuments(solution, path))
+        {
+            var compilation = await workspace.GetCompilationAsync(document.Project.Id, ct);
+            if (compilation is null || await document.GetSyntaxTreeAsync(ct) is not { } tree)
+                continue;
+
+            if (NeedsCompilationDiagnostics(await tree.GetRootAsync(ct)))
+            {
+                diagnostics.AddRange(DiagnosticsOf(compilation, ct).Where(d => d.Location.SourceTree == tree));
+                continue;
+            }
+
+            diagnostics.AddRange(compilation.GetSemanticModel(tree).GetDiagnostics(cancellationToken: ct));
+        }
+
+        return diagnostics;
+    }
+
+    /// <summary>
+    /// Whether a file can carry a diagnostic only the finished compilation reports: unused or
+    /// unassigned fields and events (CS0169, CS0414, CS0649, CS0067 — whether a field is ever
+    /// read depends on every method body), or a duplicate entry point (CS0017). Only
+    /// non-public, non-protected field and event declarations, Main methods, and top-level
+    /// statements qualify; checked on syntax alone.
+    /// </summary>
+    internal static bool NeedsCompilationDiagnostics(SyntaxNode root) =>
+        root.DescendantNodes(n => n is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax or TypeDeclarationSyntax)
+            .Any(node => node switch
+            {
+                GlobalStatementSyntax => true,
+                MethodDeclarationSyntax method => method.Identifier.ValueText == "Main",
+                BaseFieldDeclarationSyntax field => !field.Modifiers.Any(m => m.IsKind(SyntaxKind.PublicKeyword) || m.IsKind(SyntaxKind.ProtectedKeyword))
+                    && !field.Modifiers.Any(m => m.IsKind(SyntaxKind.ConstKeyword)),
+                _ => false
+            });
     private static async Task<IReadOnlyList<Compilation>> GetCompilationsForProject(
         WorkspaceManager workspace, Solution solution, string? path, CancellationToken ct)
     {

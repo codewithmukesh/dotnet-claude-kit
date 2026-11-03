@@ -4,36 +4,31 @@
       "File": "SampleApi/OrderService.cs",
       "Line": 10,
       "Snippet": "private readonly IOrderRepository _repository;",
-      "Kind": "usage",
-      "IsGenerated": false
+      "Kind": "usage"
     },
     {
       "File": "SampleApi/OrderService.cs",
       "Line": 12,
       "Snippet": "public OrderService(IOrderRepository repository)",
-      "Kind": "parameter",
-      "IsGenerated": false
+      "Kind": "parameter"
     },
     {
       "File": "SampleInfrastructure/CachedOrderRepository.cs",
       "Line": 8,
       "Snippet": "public class CachedOrderRepository(IOrderRepository inner) : IOrderRepository",
-      "Kind": "inheritance",
-      "IsGenerated": false
+      "Kind": "inheritance"
     },
     {
       "File": "SampleInfrastructure/CachedOrderRepository.cs",
       "Line": 8,
       "Snippet": "public class CachedOrderRepository(IOrderRepository inner) : IOrderRepository",
-      "Kind": "parameter",
-      "IsGenerated": false
+      "Kind": "parameter"
     },
     {
       "File": "SampleInfrastructure/InMemoryOrderRepository.cs",
       "Line": 8,
       "Snippet": "public class InMemoryOrderRepository : IOrderRepository",
-      "Kind": "inheritance",
-      "IsGenerated": false
+      "Kind": "inheritance"
     }
   ],
   "Count": 5,
