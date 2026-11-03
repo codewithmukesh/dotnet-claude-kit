@@ -33,13 +33,20 @@ public static class GetFileOutlineTool
             return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.FileNotFound,
                 $"File '{filePath}' is not part of any project in the solution."));
 
-        if (matches.Count > 1)
+        // A multi-targeted project loads once per target framework, so one file can back several
+        // documents. Only distinct paths make a match ambiguous.
+        var distinctPaths = matches
+            .Select(m => m.FilePath!)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        if (distinctPaths.Count > 1)
             return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.AmbiguousMatch,
-                $"'{filePath}' matches {matches.Count} files. Re-query with a longer path.",
-                matches.Take(10)
-                    .Select(m =>
+                $"'{filePath}' matches {distinctPaths.Count} files. Re-query with a longer path.",
+                distinctPaths.Take(10)
+                    .Select(p =>
                     {
-                        var relative = workspace.ToRelativePath(m.FilePath!);
+                        var relative = workspace.ToRelativePath(p);
                         return new SymbolCandidate(relative, "file", relative, 1);
                     })
                     .ToList()));
