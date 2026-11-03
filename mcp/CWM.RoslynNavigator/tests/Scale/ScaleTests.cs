@@ -45,16 +45,13 @@ public sealed class ScaleTests(ScaleBaselineFixture fixture)
     private const int ResponseBytesCeiling = 128 * 1024;
 
     /// <summary>
-    /// Known super-linear tools and the growth exponent they are held to instead of 1.
-    /// find_dead_code runs a solution-wide SymbolFinder search per candidate that survives
-    /// the name pre-filter: candidates grow with N and each search walks N projects, so it is
-    /// O(N²) (measured: 471 ms at 50 projects, 1.3 s at 200, 9.3 s at 500). Held to quadratic
-    /// so anything worse still fails; drop the entry once it is indexed.
+    /// Known super-linear tools and the growth exponent they are held to instead of 1. Empty:
+    /// find_dead_code was here at 2.0 while it ran a solution-wide reference search per
+    /// candidate (471 ms at 50 projects, 1.3 s at 200, 9.3 s at 500); it now binds names in
+    /// each candidate's own file and is held to the linear budget like every other tool
+    /// (measured: 98 ms, 163 ms, 493 ms).
     /// </summary>
-    private static readonly Dictionary<string, double> KnownGrowthExponents = new(StringComparer.Ordinal)
-    {
-        ["find_dead_code"] = 2.0,
-    };
+    private static readonly Dictionary<string, double> KnownGrowthExponents = new(StringComparer.Ordinal);
 
     [Theory]
     [InlineData(200, 1_024L)]

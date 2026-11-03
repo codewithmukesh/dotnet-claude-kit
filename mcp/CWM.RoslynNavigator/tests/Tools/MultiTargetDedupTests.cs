@@ -161,4 +161,17 @@ public sealed class MultiTargetDedupTests(MultiTargetSolutionFixture fixture) : 
         Assert.Equal(["net10.0", "net8.0"], project.TargetFrameworks.Order());
         Assert.Equal(1, result.TotalFound);
     }
+
+    [Fact]
+    public async Task FindDeadCode_MultiTargeted_ReportsUnusedMemberOnce()
+    {
+        // Act — before, the second flavor's copy of the file counted as "another file naming
+        // it", which hid every candidate in a multi-targeted project.
+        var json = await FindDeadCodeTool.ExecuteAsync(Workspace, ct: Ct);
+
+        // Assert
+        var result = JsonSerializer.Deserialize<DeadCodeResult>(json)!;
+        Assert.Single(result.Symbols, s => s.Name == "NeverCalled");
+        Assert.DoesNotContain(result.Symbols, s => s.Name == "Decorate");
+    }
 }

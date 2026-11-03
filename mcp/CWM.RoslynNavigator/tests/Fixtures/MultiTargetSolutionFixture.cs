@@ -51,7 +51,11 @@ public sealed class MultiTargetSolutionFixture : IAsyncLifetime
 
             internal sealed class Reception(IGreeter greeter)
             {
-                public string Welcome() => greeter.Greet("guest");
+                public string Welcome() => Decorate(greeter.Greet("guest"));
+
+                private static string Decorate(string text) => $"*{text}*";
+
+                private static int NeverCalled() => 42;
 
                 public string Farewell() => greeter.Greet("friend") + " " + DateTime.Now;
             }

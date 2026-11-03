@@ -78,6 +78,13 @@ internal sealed class ReflectionIndex
         }
     }
 
+    /// <summary>Folds an index built over other trees (in parallel) into this one.</summary>
+    public void Merge(ReflectionIndex other)
+    {
+        _literalNames.UnionWith(other._literalNames);
+        AssemblyScanningDetected |= other.AssemblyScanningDetected;
+    }
+
     private void AddLiteral(string value)
     {
         if (value.Length == 0 || value.Length > 512) return;
