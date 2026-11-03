@@ -11,7 +11,7 @@ using ModelContextProtocol.Server;
 namespace CWM.RoslynNavigator;
 
 /// <summary>
-/// Manages the MSBuildWorkspace lifecycle: loading, on-demand refresh, and compilation caching.
+/// Manages the MSBuildWorkspace lifecycle: loading, compilation warm-up, and on-demand refresh.
 /// File watching is intentionally avoided — on Linux, recursive FileSystemWatcher creates
 /// one inotify watch per subdirectory, quickly exhausting the kernel limit for large solutions.
 /// Instead, documents are refreshed on demand when tools are invoked.
@@ -19,15 +19,11 @@ namespace CWM.RoslynNavigator;
 public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvider clock) : IDisposable
 {
     private const int LazyLoadThreshold = 50;
-    private const int MaxCachedCompilations = 30;
 
     private readonly SemaphoreSlim _writeLock = new(1, 1);
-    private readonly ConcurrentDictionary<ProjectId, Compilation> _compilationCache = new();
-    private readonly ConcurrentDictionary<ProjectId, long> _cacheAccessOrder = new();
     private readonly ConcurrentDictionary<DocumentId, DocumentInfo> _knownDocuments = new();
     private readonly ConcurrentDictionary<string, BuildFileInfo> _buildFiles = new();
     private readonly ConcurrentDictionary<string, byte> _knownDocumentPaths = new(StringComparer.OrdinalIgnoreCase);
-    private long _accessCounter;
     private int _loadCount;
     private readonly CancellationTokenSource _backgroundCts = new();
     private int _structuralScanRunning;
@@ -65,10 +61,6 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     /// </summary>
     internal bool DiscoverAllSolutions { get; set; }
 
-    /// <summary>
-    /// Number of compilations currently cached. Test seam for verifying reload eviction.
-    /// </summary>
-    internal int CachedCompilationCount => _compilationCache.Count;
 
     /// <summary>
     /// How many times the solution has been loaded. Test seam for verifying that a
@@ -103,12 +95,6 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             _solutionPaths = [.. solutionPaths];
             _rootDirectory = ComputeRootDirectory(solutionPaths);
             _errorMessage = null;
-
-            // A reload mints fresh ProjectIds, so every cached Compilation is keyed on a
-            // dead id. Clearing here (rather than at each call site) keeps the roots-discovery
-            // and error-retry paths from resurrecting stale entries.
-            _compilationCache.Clear();
-            _cacheAccessOrder.Clear();
 
             logger.LogInformation("Loading solution: {SolutionPath}", string.Join(", ", solutionPaths));
 
@@ -360,50 +346,15 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     }
 
     /// <summary>
-    /// Gets or creates a Compilation for the specified project. Thread-safe and cached.
+    /// Gets the Compilation for the specified project in the current solution snapshot.
+    /// Deliberately uncached here: the Solution already holds every compilation it has built
+    /// (Roslyn's compilation tracker keeps them alive), and after a document edit it forks
+    /// them incrementally — including for projects that reference the edited one. A second
+    /// cache keyed on ProjectId cannot tell snapshots apart, so it served dependents a
+    /// compilation built against the previous version of their dependency.
     /// </summary>
-    public async Task<Compilation?> GetCompilationAsync(ProjectId projectId, CancellationToken ct = default)
-    {
-        if (_compilationCache.TryGetValue(projectId, out var cached))
-        {
-            _cacheAccessOrder[projectId] = Interlocked.Increment(ref _accessCounter);
-            return cached;
-        }
-
-        var project = _solution?.GetProject(projectId);
-        if (project is null)
-            return null;
-
-        var compilation = await project.GetCompilationAsync(ct);
-        if (compilation is not null)
-        {
-            EvictIfNeeded();
-            _compilationCache[projectId] = compilation;
-            _cacheAccessOrder[projectId] = Interlocked.Increment(ref _accessCounter);
-        }
-
-        return compilation;
-    }
-
-    private void EvictIfNeeded()
-    {
-        if (!IsLazyLoading || _compilationCache.Count < MaxCachedCompilations)
-            return;
-
-        // Evict least-recently-used entries until under limit
-        var toEvict = _cacheAccessOrder
-            .OrderBy(kvp => kvp.Value)
-            .Take(_compilationCache.Count - MaxCachedCompilations + 1)
-            .Select(kvp => kvp.Key)
-            .ToList();
-
-        foreach (var projectId in toEvict)
-        {
-            _compilationCache.TryRemove(projectId, out _);
-            _cacheAccessOrder.TryRemove(projectId, out _);
-            logger.LogDebug("Evicted compilation cache for project {ProjectId}", projectId);
-        }
-    }
+    public Task<Compilation?> GetCompilationAsync(ProjectId projectId, CancellationToken ct = default) =>
+        _solution?.GetProject(projectId)?.GetCompilationAsync(ct) ?? Task.FromResult<Compilation?>(null);
 
     /// <summary>
     /// Gets compilations for all projects. Lazy-loaded on demand.
@@ -747,9 +698,6 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
                 var sourceText = Microsoft.CodeAnalysis.Text.SourceText.From(text);
                 _solution = _solution.WithDocumentText(docId, sourceText);
                 _knownDocuments[docId] = info;
-
-                _compilationCache.TryRemove(info.ProjectId, out _);
-                _cacheAccessOrder.TryRemove(info.ProjectId, out _);
 
                 logger.LogDebug("Refreshed changed document: {Path}", info.FilePath);
             }

@@ -458,14 +458,13 @@ returns callers from every service.
 
 **Cost.** Memory and load time scale with the number of *distinct* projects, not solutions —
 shared projects are free after the first. The [Scaling](#scaling) thresholds apply to the
-combined project count: past 50 projects compilations load lazily, and the 30-entry LRU
-compilation cache is shared across all solutions.
+combined project count: past 50 projects compilations load lazily.
 
 ## Architecture
 
 ```
 Program.cs              → MSBuildLocator → Host → MCP stdio transport
-WorkspaceManager.cs     → MSBuildWorkspace lifecycle, file watching, compilation caching
+WorkspaceManager.cs     → MSBuildWorkspace lifecycle, compilation warm-up, on-demand refresh
 WorkspaceInitializer.cs → BackgroundService triggers workspace load on startup
 SolutionDiscovery.cs    → Auto-detect .sln/.slnx from args or working directory
 SolutionFileReader.cs   → List a solution's projects (multi-solution dedupe and membership)
@@ -487,8 +486,8 @@ apart silently.
 | Solution Size | Strategy |
 |---|---|
 | Small (1-15 projects) | Load entire workspace on startup, warm compilations in parallel (4 concurrent) |
-| Large (15-50 projects) | Lazy-load compilations on first query per project with LRU cache (30 max) |
-| Enterprise (50+) | Lazy loading + LRU eviction + warn if query touches unloaded project |
+| Large (15-50 projects) | Same as small; compilations are held by the Roslyn solution snapshot, which forks them incrementally on edits |
+| Enterprise (50+) | No warm-up; compilations build on first query per project |
 
 ## Troubleshooting
 

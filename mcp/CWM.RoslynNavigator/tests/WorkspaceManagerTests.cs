@@ -59,48 +59,4 @@ public class WorkspaceManagerTests(TestSolutionFixture fixture) : IClassFixture<
 
         Assert.Null(result);
     }
-
-    [Fact]
-    public async Task LoadSolutionAsync_ReloadingSameSolution_DoesNotAccumulateStaleCompilations()
-    {
-        // A reload mints fresh ProjectIds. If the cache is not cleared, the old entries
-        // linger alongside the new ones and the count doubles.
-        TestSolutionFixture.RegisterMSBuild();
-        var ct = TestContext.Current.CancellationToken;
-
-        using var manager = new WorkspaceManager(
-            NullLoggerFactory.Instance.CreateLogger<WorkspaceManager>(),
-            TimeProvider.System);
-
-        await manager.LoadSolutionAsync(TestSolutionFixture.SampleSolutionPath, ct);
-        var afterFirstLoad = manager.CachedCompilationCount;
-
-        await manager.LoadSolutionAsync(TestSolutionFixture.SampleSolutionPath, ct);
-
-        Assert.Equal(3, afterFirstLoad);
-        Assert.Equal(afterFirstLoad, manager.CachedCompilationCount);
-    }
-
-    [Fact]
-    public async Task LoadSolutionAsync_ReloadingSameSolution_CachesOnlyLiveProjectIds()
-    {
-        TestSolutionFixture.RegisterMSBuild();
-        var ct = TestContext.Current.CancellationToken;
-
-        using var manager = new WorkspaceManager(
-            NullLoggerFactory.Instance.CreateLogger<WorkspaceManager>(),
-            TimeProvider.System);
-
-        await manager.LoadSolutionAsync(TestSolutionFixture.SampleSolutionPath, ct);
-        await manager.LoadSolutionAsync(TestSolutionFixture.SampleSolutionPath, ct);
-
-        var solution = manager.GetSolution()!;
-        foreach (var projectId in solution.ProjectIds)
-        {
-            Assert.NotNull(await manager.GetCompilationAsync(projectId, ct));
-        }
-
-        // Every cached entry belongs to the current solution — no orphans from the first load.
-        Assert.Equal(solution.ProjectIds.Count, manager.CachedCompilationCount);
-    }
 }
