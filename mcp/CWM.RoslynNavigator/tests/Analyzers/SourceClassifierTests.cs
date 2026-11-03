@@ -1,4 +1,5 @@
 using CWM.RoslynNavigator.Analyzers;
+using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
 namespace CWM.RoslynNavigator.Tests.Analyzers;
@@ -67,4 +68,33 @@ public class SourceClassifierTests
         Assert.Equal(
             SourceKind.Generated,
             Classify("tests/Api.Tests/obj/Debug/Api.g.cs", isTestProject: true));
+
+    private static Project CreateProject(string name, params Type[] referencedTypes)
+    {
+        using var workspace = new AdhocWorkspace();
+        return workspace.AddProject(ProjectInfo.Create(
+            ProjectId.CreateNewId(),
+            VersionStamp.Default,
+            name,
+            name,
+            LanguageNames.CSharp,
+            metadataReferences: referencedTypes
+                .Select(t => MetadataReference.CreateFromFile(t.Assembly.Location))));
+    }
+
+    [Fact]
+    public void IsTestProject_TestFrameworkMetadataReference_IsTestProject() =>
+        // xunit.v3.core.dll, referenced the way a package reference reaches the project.
+        Assert.True(SourceClassifier.IsTestProject(CreateProject("Widgets.Verification", typeof(object), typeof(FactAttribute))));
+
+    [Fact]
+    public void IsTestProject_NoTestFrameworkReference_IsNotTestProject() =>
+        Assert.False(SourceClassifier.IsTestProject(CreateProject("Widgets.Core", typeof(object))));
+
+    [Theory]
+    [InlineData("Widgets.Tests")]
+    [InlineData("Widgets.UnitTest")]
+    [InlineData("Widgets.Tests.Integration")]
+    public void IsTestProject_TestProjectName_IsTestProjectWithoutReferences(string name) =>
+        Assert.True(SourceClassifier.IsTestProject(CreateProject(name)));
 }

@@ -9,7 +9,8 @@ namespace CWM.RoslynNavigator.Tests.Tools;
 /// Navigation results flag generated source so callers do not try to edit a file
 /// that the next build will overwrite.
 /// </summary>
-public class GeneratedCodeFlagTests(TestSolutionFixture fixture) : IClassFixture<TestSolutionFixture>
+[Collection(SampleSolutionCollection.Name)]
+public class GeneratedCodeFlagTests(TestSolutionFixture fixture)
 {
     [Fact]
     public async Task FindSymbol_GeneratedType_IsFlagged()

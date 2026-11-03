@@ -66,54 +66,91 @@ public static class DetectAntiPatternsTool
             if (compilation is null)
                 continue;
 
-            var isTestProject = SourceClassifier.IsTestProject(project, compilation);
-            var trees = GetFilteredTrees(compilation, file);
+            var isTestProject = SourceClassifier.IsTestProject(project);
+            var trees = GetFilteredTrees(compilation, file).ToArray();
 
-            foreach (var tree in trees)
-            {
-                ct.ThrowIfCancellationRequested();
+            // Trees are scanned in parallel (detectors are stateless; each tree gets its own
+            // DetectionContext), then replayed into the accumulator in tree order so counts,
+            // ordering and truncation match a sequential scan exactly. Projects stay sequential
+            // so a lazily loaded workspace still holds one compilation at a time.
+            var scans = new TreeScan[trees.Length];
 
-                var relativePath = workspace.ToRelativePath(tree.FilePath ?? "");
-                var kind = SourceClassifier.Classify(tree, relativePath, isTestProject, ct);
-                accumulator.CountFile(kind);
-
-                // Generated code is never a finding — nobody hand-wrote it.
-                if (kind == SourceKind.Generated)
-                    continue;
-
-                if (!includeAllKinds && kind != SourceKind.Production)
-                    continue;
-
-                var applicable = Detectors.Where(d => d.AppliesTo.HasFlag(kind)).ToArray();
-                if (applicable.Length == 0)
-                    continue;
-
-                // One semantic model and one parsed root shared by every detector on this tree.
-                var semanticModel = applicable.Any(d => d.RequiresSemanticModel)
-                    ? compilation.GetSemanticModel(tree)
-                    : null;
-
-                var context = new DetectionContext(tree, semanticModel, kind, ct);
-
-                foreach (var detector in applicable)
+            await Parallel.ForEachAsync(
+                Enumerable.Range(0, trees.Length),
+                new ParallelOptions { CancellationToken = ct },
+                (index, token) =>
                 {
-                    foreach (var violation in detector.Detect(context))
-                    {
-                        if (violation.Severity < minSeverity)
-                            continue;
+                    scans[index] = ScanTree(
+                        compilation, trees[index], isTestProject, includeAllKinds, minSeverity,
+                        suppressions, workspace, token);
+                    return ValueTask.CompletedTask;
+                });
 
-                        accumulator.Add(
-                            violation,
-                            kind,
-                            workspace.ToRelativePath(violation.File),
-                            suppressions,
-                            context);
-                    }
-                }
+            foreach (var scan in scans)
+            {
+                accumulator.CountFile(scan.Kind);
+
+                foreach (var finding in scan.Findings)
+                    accumulator.Add(finding.Violation, scan.Kind, finding.RelativePath, finding.Suppressed);
             }
         }
 
         return JsonSerializer.Serialize(accumulator.Build(maxResults, minConfidence, suppressions));
+    }
+
+    private readonly record struct Finding(AntiPatternViolation Violation, string RelativePath, bool Suppressed);
+
+    private sealed record TreeScan(SourceKind Kind, List<Finding> Findings);
+
+    private static TreeScan ScanTree(
+        Compilation compilation,
+        SyntaxTree tree,
+        bool isTestProject,
+        bool includeAllKinds,
+        AntiPatternSeverity minSeverity,
+        SuppressionSet suppressions,
+        WorkspaceManager workspace,
+        CancellationToken ct)
+    {
+        var relativePath = workspace.ToRelativePath(tree.FilePath ?? "");
+        var kind = SourceClassifier.Classify(tree, relativePath, isTestProject, ct);
+        var findings = new List<Finding>();
+
+        // Generated code is never a finding — nobody hand-wrote it.
+        if (kind == SourceKind.Generated)
+            return new TreeScan(kind, findings);
+
+        if (!includeAllKinds && kind != SourceKind.Production)
+            return new TreeScan(kind, findings);
+
+        var applicable = Detectors.Where(d => d.AppliesTo.HasFlag(kind)).ToArray();
+        if (applicable.Length == 0)
+            return new TreeScan(kind, findings);
+
+        // One semantic model and one parsed root shared by every detector on this tree.
+        var semanticModel = applicable.Any(d => d.RequiresSemanticModel)
+            ? compilation.GetSemanticModel(tree)
+            : null;
+
+        var context = new DetectionContext(tree, semanticModel, kind, ct);
+
+        foreach (var detector in applicable)
+        {
+            foreach (var violation in detector.Detect(context))
+            {
+                if (violation.Severity < minSeverity)
+                    continue;
+
+                var violationPath = workspace.ToRelativePath(violation.File);
+                var suppressed = suppressions.IsDisabled(violation.Id)
+                    || suppressions.PathSuppressionReason(violation.Id, violationPath) is not null
+                    || context.IsSuppressedAt(violation.Id, violation.Line);
+
+                findings.Add(new Finding(violation, violationPath, suppressed));
+            }
+        }
+
+        return new TreeScan(kind, findings);
     }
 
     /// <summary>
@@ -150,14 +187,9 @@ public static class DetectAntiPatternsTool
             AntiPatternViolation violation,
             SourceKind kind,
             string relativePath,
-            SuppressionSet suppressions,
-            DetectionContext context)
+            bool suppressed)
         {
             var counts = Bucket(violation.Id);
-
-            var suppressed = suppressions.IsDisabled(violation.Id)
-                || suppressions.PathSuppressionReason(violation.Id, relativePath) is not null
-                || context.IsSuppressedAt(violation.Id, violation.Line);
 
             if (suppressed)
             {

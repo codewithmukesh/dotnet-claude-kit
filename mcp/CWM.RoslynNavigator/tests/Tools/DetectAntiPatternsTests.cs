@@ -5,7 +5,8 @@ using CWM.RoslynNavigator.Tools;
 
 namespace CWM.RoslynNavigator.Tests.Tools;
 
-public class DetectAntiPatternsTests(TestSolutionFixture fixture) : IClassFixture<TestSolutionFixture>
+[Collection(SampleSolutionCollection.Name)]
+public class DetectAntiPatternsTests(TestSolutionFixture fixture)
 {
     private async Task<AntiPatternsResult> RunAsync(
         string? file = null,

@@ -5,7 +5,8 @@ using CWM.RoslynNavigator.Tools;
 
 namespace CWM.RoslynNavigator.Tests.Tools;
 
-public class GetProjectGraphTests(TestSolutionFixture fixture) : IClassFixture<TestSolutionFixture>
+[Collection(SampleSolutionCollection.Name)]
+public class GetProjectGraphTests(TestSolutionFixture fixture)
 {
     [Fact]
     public async Task GetProjectGraph_ReturnsAllProjects()

@@ -4,7 +4,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 
 namespace CWM.RoslynNavigator.Tests;
 
-public class WorkspaceManagerTests(TestSolutionFixture fixture) : IClassFixture<TestSolutionFixture>
+[Collection(SampleSolutionCollection.Name)]
+public class WorkspaceManagerTests(TestSolutionFixture fixture)
 {
     [Fact]
     public void State_ShouldBeReady_AfterLoading()

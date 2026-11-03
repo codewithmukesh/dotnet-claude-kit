@@ -5,7 +5,8 @@ using CWM.RoslynNavigator.Tools;
 
 namespace CWM.RoslynNavigator.Tests.Tools;
 
-public class GetNugetPackagesTests(TestSolutionFixture fixture) : IClassFixture<TestSolutionFixture>
+[Collection(SampleSolutionCollection.Name)]
+public class GetNugetPackagesTests(TestSolutionFixture fixture)
 {
     [Fact]
     public async Task GetNugetPackages_ReturnsAllProjectsWithTfm()

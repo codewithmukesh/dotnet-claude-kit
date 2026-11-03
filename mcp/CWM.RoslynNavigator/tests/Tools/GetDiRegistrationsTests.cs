@@ -8,7 +8,8 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace CWM.RoslynNavigator.Tests.Tools;
 
-public class GetDiRegistrationsTests(TestSolutionFixture fixture) : IClassFixture<TestSolutionFixture>
+[Collection(SampleSolutionCollection.Name)]
+public class GetDiRegistrationsTests(TestSolutionFixture fixture)
 {
     private static List<DiRegistration> Analyze(string source)
     {

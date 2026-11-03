@@ -34,11 +34,23 @@ public static class ResolveStackTraceTool
 
         var resolved = new List<StackFrameInfo>();
 
+        // Recursive and retried code repeats the same method many times in one trace;
+        // resolve each distinct name once.
+        var symbolsByName = new Dictionary<string, ISymbol?>(StringComparer.Ordinal);
+
         for (var i = 0; i < parsed.Count; i++)
         {
             ct.ThrowIfCancellationRequested();
 
-            var frame = await ResolveFrameAsync(workspace, parsed[i], i, ct);
+            var qualifiedName = parsed[i].QualifiedName;
+            if (!symbolsByName.TryGetValue(qualifiedName, out var symbol))
+            {
+                var symbols = await SymbolResolver.FindSymbolsByNameAsync(workspace, qualifiedName, ct: ct);
+                symbol = symbols.FirstOrDefault();
+                symbolsByName[qualifiedName] = symbol;
+            }
+
+            var frame = await ResolveFrameAsync(workspace, parsed[i], symbol, i, ct);
 
             if (solutionOnly && !frame.InSolution) continue;
 
@@ -64,15 +76,12 @@ public static class ResolveStackTraceTool
     private static async Task<StackFrameInfo> ResolveFrameAsync(
         WorkspaceManager workspace,
         StackTraceParser.ParsedFrame frame,
+        ISymbol? symbol,
         int index,
         CancellationToken ct)
     {
-        var symbols = await SymbolResolver.FindSymbolsByNameAsync(
-            workspace, frame.QualifiedName, ct: ct);
-
         // Only source declarations are indexed, so anything that resolves is the user's
         // own code; framework frames fall through with InSolution false.
-        var symbol = symbols.FirstOrDefault();
         if (symbol is null)
         {
             return new StackFrameInfo(

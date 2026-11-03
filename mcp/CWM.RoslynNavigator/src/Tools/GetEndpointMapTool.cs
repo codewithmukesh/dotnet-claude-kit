@@ -38,27 +38,33 @@ public static class GetEndpointMapTool
         if (solution is null)
             return Serialize(Paging.Empty<EndpointEntry>(maxResults));
 
-        var all = new List<EndpointEntry>();
         var seenFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var documents = solution.Projects
+            .SelectMany(p => p.Documents)
+            .Where(d => d.FilePath is not null && seenFiles.Add(d.FilePath))
+            .Where(d => file is null || d.FilePath!.Contains(file, StringComparison.OrdinalIgnoreCase))
+            .ToArray();
 
-        foreach (var document in solution.Projects.SelectMany(p => p.Documents))
-        {
-            ct.ThrowIfCancellationRequested();
+        // Files are analysed in parallel into per-document slots and flattened in document
+        // order, so the result and its truncation match a sequential pass.
+        var perDocument = new List<EndpointEntry>[documents.Length];
 
-            if (document.FilePath is null || !seenFiles.Add(document.FilePath))
-                continue;
-
-            if (file is not null && !document.FilePath.Contains(file, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            var root = await document.GetSyntaxRootAsync(ct);
-            if (root is null) continue;
-
-            foreach (var endpoint in AnalyzeRoot(root, document.FilePath))
+        await Parallel.ForEachAsync(
+            Enumerable.Range(0, documents.Length),
+            new ParallelOptions { CancellationToken = ct },
+            async (index, token) =>
             {
-                all.Add(endpoint with { File = workspace.ToRelativePath(endpoint.File) });
-            }
-        }
+                var document = documents[index];
+                var root = await document.GetSyntaxRootAsync(token);
+
+                perDocument[index] = root is null
+                    ? []
+                    : AnalyzeRoot(root, document.FilePath!)
+                        .Select(endpoint => endpoint with { File = workspace.ToRelativePath(endpoint.File) })
+                        .ToList();
+            });
+
+        var all = perDocument.SelectMany(entries => entries).ToList();
 
         return Serialize(Paging.Apply(all, maxResults));
     }

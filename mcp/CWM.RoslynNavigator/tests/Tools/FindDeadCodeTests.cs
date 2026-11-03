@@ -5,7 +5,8 @@ using CWM.RoslynNavigator.Tools;
 
 namespace CWM.RoslynNavigator.Tests.Tools;
 
-public class FindDeadCodeTests(TestSolutionFixture fixture) : IClassFixture<TestSolutionFixture>
+[Collection(SampleSolutionCollection.Name)]
+public class FindDeadCodeTests(TestSolutionFixture fixture)
 {
     [Fact]
     public async Task FindDeadCode_Solution_FindsUnusedTypes()
@@ -18,6 +19,29 @@ public class FindDeadCodeTests(TestSolutionFixture fixture) : IClassFixture<Test
         // UnusedHelper is intentionally unreferenced
         Assert.True(result.Count > 0, "Expected at least one dead code symbol");
         Assert.Contains(result.Symbols, s => s.Name == "UnusedHelper");
+    }
+
+    [Fact]
+    public async Task FindDeadCode_Solution_ReturnsExactlyTheKnownDeadSymbolsInOrder()
+    {
+        // Pins the full result so walk and pre-filter optimisations cannot drift it.
+        var json = await FindDeadCodeTool.ExecuteAsync(
+            fixture.WorkspaceManager, scope: "solution", maxResults: 1000,
+            ct: TestContext.Current.CancellationToken);
+        var result = JsonSerializer.Deserialize<DeadCodeResult>(json)!;
+
+        Assert.Equal(
+            [
+                "class UnusedHelper SampleDomain/UnusedHelper.cs:7 high",
+                "method UnusedHelper.DoNothing SampleDomain/UnusedHelper.cs:9 high",
+                "method UnusedHelper.FormatUnused SampleDomain/UnusedHelper.cs:14 high",
+                "class LegacyPricingPlugin SampleInfrastructure/ReflectionBound.cs:8 low",
+                "class TrulyUnusedCalculator SampleInfrastructure/ReflectionBound.cs:17 high",
+            ],
+            result.Symbols.Select(s =>
+                $"{s.Kind} {(s.ContainingType is null ? "" : s.ContainingType + ".")}{s.Name} {s.File}:{s.Line} {s.Confidence}"));
+        Assert.Equal(5, result.TotalFound);
+        Assert.Equal(0, result.ConventionFiltered);
     }
 
     [Fact]

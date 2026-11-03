@@ -5,7 +5,8 @@ using CWM.RoslynNavigator.Tools;
 
 namespace CWM.RoslynNavigator.Tests.Tools;
 
-public class GetTestCoverageMapTests(TestSolutionFixture fixture) : IClassFixture<TestSolutionFixture>
+[Collection(SampleSolutionCollection.Name)]
+public class GetTestCoverageMapTests(TestSolutionFixture fixture)
 {
     [Fact]
     public async Task GetTestCoverageMap_ReturnsResults()
@@ -16,6 +17,30 @@ public class GetTestCoverageMapTests(TestSolutionFixture fixture) : IClassFixtur
         var result = JsonSerializer.Deserialize<TestCoverageMapResult>(json)!;
 
         Assert.True(result.TotalTypes > 0, "Expected production types to be found");
+    }
+
+    [Fact]
+    public async Task GetTestCoverageMap_Solution_ListsEveryProductionTypeInDeclarationOrder()
+    {
+        // Pins the full result so declaration-walk optimisations cannot drift it.
+        var json = await GetTestCoverageMapTool.ExecuteAsync(
+            fixture.WorkspaceManager, maxResults: 1000,
+            ct: TestContext.Current.CancellationToken);
+        var result = JsonSerializer.Deserialize<TestCoverageMapResult>(json)!;
+
+        Assert.Equal(
+            [
+                "BaseEntity", "AuditableProduct", "Order", "OrderItem", "Product", "UnusedHelper",
+                "CachedOrderRepository", "InMemoryOrderRepository", "InMemoryProductRepository",
+                "LegacyPricingPlugin", "TrulyUnusedCalculator", "PluginLoader", "AntiPatternExamples",
+                "CustomerWorkflowTests", "DbSet", "FakeDbContext", "FakeDatabaseFacade", "FakeChangeTracker",
+                "Customer", "CustomerNote", "FalsePositiveExamples", "AuditMiddleware", "DomainOutcome",
+                "HttpContext", "FakeHostLifetime", "OrderService", "OrderServiceTests", "ProductService",
+            ],
+            result.Coverage.Select(e => e.Type));
+        Assert.Equal(28, result.TotalTypes);
+        Assert.Equal(0, result.TestClassCount);
+        Assert.Equal(0, result.TestMethodCount);
     }
 
     [Fact]

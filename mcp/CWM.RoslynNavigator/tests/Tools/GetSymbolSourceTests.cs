@@ -5,7 +5,8 @@ using CWM.RoslynNavigator.Tools;
 
 namespace CWM.RoslynNavigator.Tests.Tools;
 
-public class GetSymbolSourceTests(TestSolutionFixture fixture) : IClassFixture<TestSolutionFixture>
+[Collection(SampleSolutionCollection.Name)]
+public class GetSymbolSourceTests(TestSolutionFixture fixture)
 {
     [Fact]
     public async Task GetSymbolSource_Method_ReturnsFullBodyWithLines()

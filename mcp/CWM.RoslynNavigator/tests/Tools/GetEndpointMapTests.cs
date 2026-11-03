@@ -6,7 +6,8 @@ using Microsoft.CodeAnalysis.CSharp;
 
 namespace CWM.RoslynNavigator.Tests.Tools;
 
-public class GetEndpointMapTests(TestSolutionFixture fixture) : IClassFixture<TestSolutionFixture>
+[Collection(SampleSolutionCollection.Name)]
+public class GetEndpointMapTests(TestSolutionFixture fixture)
 {
     private static List<EndpointEntry> Analyze(string source)
     {

@@ -10,8 +10,8 @@ namespace CWM.RoslynNavigator.Tests.Tools;
 /// naive detector reports. These tests are the contract that keeps health-check output
 /// trustworthy enough to grade directly.
 /// </summary>
+[Collection(SampleSolutionCollection.Name)]
 public class DetectAntiPatternsFalsePositiveTests(TestSolutionFixture fixture)
-    : IClassFixture<TestSolutionFixture>
 {
     private async Task<AntiPatternsResult> RunAsync(
         string? file = null,

@@ -5,7 +5,8 @@ using CWM.RoslynNavigator.Tools;
 
 namespace CWM.RoslynNavigator.Tests.Tools;
 
-public class FindReferencesTests(TestSolutionFixture fixture) : IClassFixture<TestSolutionFixture>
+[Collection(SampleSolutionCollection.Name)]
+public class FindReferencesTests(TestSolutionFixture fixture)
 {
     [Fact]
     public async Task FindReferences_CrossProjectInterface_ReturnsMultipleReferences()

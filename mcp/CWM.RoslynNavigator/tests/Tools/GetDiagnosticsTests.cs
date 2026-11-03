@@ -5,7 +5,8 @@ using CWM.RoslynNavigator.Tools;
 
 namespace CWM.RoslynNavigator.Tests.Tools;
 
-public class GetDiagnosticsTests(TestSolutionFixture fixture) : IClassFixture<TestSolutionFixture>
+[Collection(SampleSolutionCollection.Name)]
+public class GetDiagnosticsTests(TestSolutionFixture fixture)
 {
     [Fact]
     public async Task GetDiagnostics_SolutionScope_ReturnsDiagnostics()

@@ -5,7 +5,8 @@ using CWM.RoslynNavigator.Tools;
 
 namespace CWM.RoslynNavigator.Tests.Tools;
 
-public class FindCallersTests(TestSolutionFixture fixture) : IClassFixture<TestSolutionFixture>
+[Collection(SampleSolutionCollection.Name)]
+public class FindCallersTests(TestSolutionFixture fixture)
 {
     [Fact]
     public async Task FindCallers_MethodCalledFromService_ReturnsCallers()
