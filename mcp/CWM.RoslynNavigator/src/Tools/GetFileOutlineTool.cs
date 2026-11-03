@@ -15,7 +15,7 @@ public static class GetFileOutlineTool
     [McpServerTool(Name = "get_file_outline"), Description("Get a token-cheap skeleton of one source file: namespace, types, and member signatures with line numbers — no bodies, no usings. Use before reading a file to decide which lines are worth reading. Nested types are included up to 3 levels deep.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("File path (suffix match, e.g. 'OrderService.cs' or 'Services/OrderService.cs')")] string filePath,
+        [Description("File path (suffix match on directory boundaries, e.g. 'OrderService.cs' or 'Services/OrderService.cs'; './' prefixes and backslashes are accepted). Returns AmbiguousMatch with candidates if several files match.")] string filePath,
         [Description("Maximum members to return across all types. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 200,
         CancellationToken ct = default)
     {
@@ -27,13 +27,24 @@ public static class GetFileOutlineTool
             return JsonSerializer.Serialize(new FileOutlineResult(
                 "unknown", null, 0, [], 0, 0, false, Math.Max(1, maxResults)));
 
-        var document = solution.Projects
-            .SelectMany(p => p.Documents)
-            .FirstOrDefault(d => d.FilePath?.EndsWith(filePath, StringComparison.OrdinalIgnoreCase) == true);
+        var matches = DocumentResolver.FindDocuments(solution, filePath);
 
-        if (document?.FilePath is null)
+        if (matches.Count == 0)
             return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.FileNotFound,
                 $"File '{filePath}' is not part of any project in the solution."));
+
+        if (matches.Count > 1)
+            return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.AmbiguousMatch,
+                $"'{filePath}' matches {matches.Count} files. Re-query with a longer path.",
+                matches.Take(10)
+                    .Select(m =>
+                    {
+                        var relative = workspace.ToRelativePath(m.FilePath!);
+                        return new SymbolCandidate(relative, "file", relative, 1);
+                    })
+                    .ToList()));
+
+        var document = matches[0];
 
         var root = await document.GetSyntaxRootAsync(ct);
         if (root is null)
@@ -58,7 +69,7 @@ public static class GetFileOutlineTool
         }
 
         return JsonSerializer.Serialize(new FileOutlineResult(
-            File: workspace.ToRelativePath(document.FilePath),
+            File: workspace.ToRelativePath(document.FilePath!),
             Namespace: namespaceName,
             UsingCount: usingCount,
             Types: types,
