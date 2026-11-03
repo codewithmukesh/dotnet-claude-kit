@@ -40,7 +40,7 @@ public class DetectAntiPatternsTests(TestSolutionFixture fixture)
         var result = await RunAsync(file: "AntiPatternExamples.cs");
 
         var violations = result.Expand().Where(v => v.Id == "AP001").ToList();
-        Assert.DoesNotContain(violations, v => v.Message.Contains("OnButtonClick"));
+        Assert.DoesNotContain(violations, v => v.Message!.Contains("OnButtonClick"));
     }
 
     [Fact]
