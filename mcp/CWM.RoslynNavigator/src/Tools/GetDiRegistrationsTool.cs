@@ -18,7 +18,7 @@ public static class GetDiRegistrationsTool
         "TryAddKeyedSingleton", "TryAddKeyedScoped", "TryAddKeyedTransient",
     ];
 
-    [McpServerTool(Name = "get_di_registrations"), Description("Map of dependency-injection registrations from Add{Singleton,Scoped,Transient}/AddKeyed*/TryAdd* calls: service, implementation, lifetime, and file:line. Flags duplicate registrations of the same service (which may be intentional multi-registration) and captive-dependency risks — a singleton implementation whose constructor takes a service registered as scoped. Best-effort static analysis: factory-lambda registrations report '(factory)' as the implementation, matching is by type name, and registrations built via reflection, Scrutor scanning, or extension-method indirection are not seen.")]
+    [McpServerTool(Name = "get_di_registrations"), Description("Map of dependency-injection registrations: service, implementation, lifetime, and file:line. Supported containers: Microsoft.Extensions.DependencyInjection (Add{Singleton,Scoped,Transient}/AddKeyed*/TryAdd*), Prism IContainerRegistry (Register/RegisterSingleton/RegisterScoped/RegisterInstance/RegisterMany, matched by receiver type), and Autofac ContainerBuilder (RegisterType/Register/RegisterInstance with As<>/SingleInstance/InstancePerLifetimeScope chains). Flags duplicate registrations of the same service (which may be intentional multi-registration) and captive-dependency risks — a singleton implementation whose constructor takes a service registered as scoped. Best-effort static analysis: factory-lambda registrations report '(factory)' and instances '(instance)' as the implementation, matching is by type name, and registrations built via reflection, Scrutor/assembly scanning, or extension-method indirection are not seen. When calls against other containers (DryIoc, Unity, Castle Windsor, SimpleInjector, Ninject, ...) are seen but not mapped, the response carries a Note with the counts — so Count 0 with a Note does not mean no DI.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
         [Description("Optional: filter to registrations in files whose path contains this value")] string? file = null,
@@ -36,6 +36,7 @@ public static class GetDiRegistrationsTool
         var registrations = new List<DiRegistration>();
         var typeDeclarations = new Dictionary<string, TypeDeclarationSyntax>(StringComparer.Ordinal);
         var seenFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var unrecognized = new Dictionary<string, int>(StringComparer.Ordinal);
 
         foreach (var document in solution.Projects.SelectMany(p => p.Documents))
         {
@@ -54,7 +55,12 @@ public static class GetDiRegistrationsTool
             if (file is not null && !document.FilePath.Contains(file, StringComparison.OrdinalIgnoreCase))
                 continue;
 
-            foreach (var registration in AnalyzeRoot(root, document.FilePath))
+            // Only pay for a semantic model when the file has Register*/Bind*/For calls worth resolving
+            var model = root.DescendantNodes().OfType<InvocationExpressionSyntax>().Any(DiContainerSupport.IsContainerCandidate)
+                ? await document.GetSemanticModelAsync(ct)
+                : null;
+
+            foreach (var registration in AnalyzeRoot(root, document.FilePath, model, unrecognized))
             {
                 registrations.Add(registration with { File = workspace.ToRelativePath(registration.File) });
             }
@@ -66,13 +72,20 @@ public static class GetDiRegistrationsTool
         var page = Paging.Apply(registrations, maxResults);
 
         return JsonSerializer.Serialize(new DiRegistrationsResult(
-            page.Items, duplicates, captiveRisks, page.Count, page.TotalFound, page.Truncated, page.Limit));
+            page.Items, duplicates, captiveRisks, page.Count, page.TotalFound, page.Truncated, page.Limit,
+            DiContainerSupport.BuildNote(registrations.Count, unrecognized)));
     }
 
     /// <summary>
-    /// Syntax-only registration extraction for one file. Internal for direct unit testing.
+    /// Registration extraction for one file. Microsoft DI is matched syntactically by method name;
+    /// Prism and Autofac need a <paramref name="model"/> (matched by receiver type). Calls on other
+    /// known containers are counted into <paramref name="unrecognized"/>. Internal for direct unit testing.
     /// </summary>
-    internal static List<DiRegistration> AnalyzeRoot(SyntaxNode root, string filePath)
+    internal static List<DiRegistration> AnalyzeRoot(
+        SyntaxNode root,
+        string filePath,
+        SemanticModel? model = null,
+        Dictionary<string, int>? unrecognized = null)
     {
         var results = new List<DiRegistration>();
 
@@ -83,7 +96,12 @@ public static class GetDiRegistrationsTool
 
             var methodName = access.Name.Identifier.Text;
             if (!RegistrationMethods.Contains(methodName))
+            {
+                if (model is not null && DiContainerSupport.IsContainerCandidate(invocation))
+                    DiContainerSupport.TryAnalyze(invocation, access, model, filePath, results, unrecognized);
+
                 continue;
+            }
 
             var lifetime = methodName.Contains("Singleton") ? "singleton"
                 : methodName.Contains("Scoped") ? "scoped"
@@ -166,7 +184,7 @@ public static class GetDiRegistrationsTool
         foreach (var registration in registrations.Where(r => r.Lifetime == "singleton"))
         {
             var implName = SimpleTypeName(registration.Implementation);
-            if (implName == "(factory)" || !typeDeclarations.TryGetValue(implName, out var typeDecl))
+            if (implName is "(factory)" or "(instance)" || !typeDeclarations.TryGetValue(implName, out var typeDecl))
                 continue;
 
             foreach (var parameter in ConstructorParameters(typeDecl))
