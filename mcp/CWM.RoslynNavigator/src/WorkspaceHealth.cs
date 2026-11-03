@@ -106,7 +106,7 @@ internal sealed class WorkspaceHealth(TimeProvider clock)
     {
         var projectPaths = solution?.Projects.Select(p => p.FilePath).OfType<string>().Distinct().ToList() ?? [];
         return _diagnostics
-            .Select(d => d with { ProjectPath = projectPaths.FirstOrDefault(p => d.Message.Contains(p, StringComparison.OrdinalIgnoreCase)) })
+            .Select(d => d with { ProjectPath = projectPaths.FirstOrDefault(p => d.Message.Contains(p, PathComparison.Comparison)) })
             .ToList();
     }
 
@@ -133,13 +133,13 @@ internal sealed class WorkspaceHealth(TimeProvider clock)
             .Select(p => p.FilePath)
             .OfType<string>()
             .Select(SolutionFileReader.NormalizePath)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            .ToHashSet(PathComparison.Comparer);
 
         foreach (var declaring in solutions)
         {
             foreach (var declared in declaring.ProjectPaths)
             {
-                if (loadedPaths.Contains(declared) || problems.Any(p => string.Equals(p.Path, declared, StringComparison.OrdinalIgnoreCase)))
+                if (loadedPaths.Contains(declared) || problems.Any(p => string.Equals(p.Path, declared, PathComparison.Comparison)))
                     continue;
 
                 problems.Add(new ProjectProblem(
@@ -160,7 +160,7 @@ internal sealed class WorkspaceHealth(TimeProvider clock)
             {
                 foreach (var diagnostic in diagnostics)
                 {
-                    if (diagnostic.Kind == "failure" && string.Equals(diagnostic.ProjectPath, path, StringComparison.OrdinalIgnoreCase))
+                    if (diagnostic.Kind == "failure" && string.Equals(diagnostic.ProjectPath, path, PathComparison.Comparison))
                         issues.Add($"load failure: {diagnostic.Message}");
                 }
             }
@@ -199,6 +199,6 @@ internal sealed class WorkspaceHealth(TimeProvider clock)
 
         var objPrefix = Path.Combine(projectDirectory, "obj") + Path.DirectorySeparatorChar;
         return project.Documents.Count(d =>
-            d.FilePath is not { } path || !path.StartsWith(objPrefix, StringComparison.OrdinalIgnoreCase));
+            d.FilePath is not { } path || !path.StartsWith(objPrefix, PathComparison.Comparison));
     }
 }

@@ -51,7 +51,7 @@ internal static class SolutionDiscovery
             ? explicitPaths.SelectMany(path => ResolveExplicit(path, all))
             : ScanDirectory(workingDirectory ?? Directory.GetCurrentDirectory(), all);
 
-        return found.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        return found.Distinct(PathComparison.Comparer).ToList();
     }
 
     /// <summary>

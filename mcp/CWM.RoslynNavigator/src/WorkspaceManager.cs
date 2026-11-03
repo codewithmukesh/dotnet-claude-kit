@@ -27,17 +27,17 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     private readonly SemaphoreSlim _loadLock = new(1, 1);
     private readonly ConcurrentDictionary<DocumentId, TrackedDocument> _knownDocuments = new();
     private readonly ConcurrentDictionary<string, BuildFileInfo> _buildFiles = new();
-    private readonly ConcurrentDictionary<string, byte> _knownDocumentPaths = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, byte> _knownDocumentPaths = new(PathComparison.Comparer);
     private int _loadCount;
     private readonly CancellationTokenSource _backgroundCts = new();
     private int _structuralScanRunning;
     // New-file tracking: candidates found by the background walk, files known not to be
     // compiled (kept across reloads so they are never re-classified), and per-project answers
     // to "does the SDK default glob alone decide what this project compiles?".
-    private readonly ConcurrentDictionary<string, byte> _pendingNewFiles = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, byte> _excludedSourceFiles = new(StringComparer.OrdinalIgnoreCase);
-    private readonly ConcurrentDictionary<string, bool> _defaultGlobByProject = new(StringComparer.OrdinalIgnoreCase);
-    private Dictionary<string, ProjectId[]> _projectsByDirectory = new(StringComparer.OrdinalIgnoreCase);
+    private readonly ConcurrentDictionary<string, byte> _pendingNewFiles = new(PathComparison.Comparer);
+    private readonly ConcurrentDictionary<string, byte> _excludedSourceFiles = new(PathComparison.Comparer);
+    private readonly ConcurrentDictionary<string, bool> _defaultGlobByProject = new(PathComparison.Comparer);
+    private Dictionary<string, ProjectId[]> _projectsByDirectory = new(PathComparison.Comparer);
     private DateTimeOffset _lastLoadStartedUtc;
     private Task _structuralScan = Task.CompletedTask;
     private CancellationTokenSource? _warmUpCts;
@@ -54,7 +54,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     private volatile Solution? _solution;
     private IReadOnlyList<string> _solutionPaths = [];
     private volatile IReadOnlyList<LoadedSolution> _loadedSolutions = [];
-    private Dictionary<string, List<string>> _projectSolutions = new(StringComparer.OrdinalIgnoreCase);
+    private Dictionary<string, List<string>> _projectSolutions = new(PathComparison.Comparer);
     private string? _rootDirectory;
     private string? _errorMessage;
     private int _snapshotVersion;
@@ -493,7 +493,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
                 .Select(p => p.FilePath)
                 .OfType<string>()
                 .Select(SolutionFileReader.NormalizePath)
-                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Distinct(PathComparison.Comparer)
                 .ToList();
             return new LoadedSolution(solutionPath, loaded, null);
         }
@@ -556,18 +556,18 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             .Select(p => p.FilePath)
             .OfType<string>()
             .Select(SolutionFileReader.NormalizePath)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            .ToHashSet(PathComparison.Comparer);
 
     private static Dictionary<string, List<string>> BuildMembership(IEnumerable<LoadedSolution> solutions)
     {
-        var map = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        var map = new Dictionary<string, List<string>>(PathComparison.Comparer);
         foreach (var solution in solutions)
         {
             foreach (var projectPath in solution.ProjectPaths)
             {
                 if (!map.TryGetValue(projectPath, out var names))
                     map[projectPath] = names = [];
-                if (!names.Contains(solution.Name, StringComparer.OrdinalIgnoreCase))
+                if (!names.Contains(solution.Name, PathComparison.Comparer))
                     names.Add(solution.Name);
             }
         }
@@ -596,12 +596,20 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         return common ?? directories[0];
     }
 
-    private static bool IsSameOrUnder(string path, string root)
+    internal static bool IsSameOrUnder(string path, string root) =>
+        IsSameOrUnder(path, root, PathComparison.Comparison);
+
+    /// <summary>
+    /// Whether <paramref name="path"/> is <paramref name="root"/> or lies beneath it, on a
+    /// directory boundary (<c>/repo/src2</c> is not under <c>/repo/src</c>). Case-sensitive
+    /// on Linux, where <c>/repo/Src</c> is a different directory.
+    /// </summary>
+    internal static bool IsSameOrUnder(string path, string root, StringComparison comparison)
     {
         var trimmedRoot = Path.TrimEndingDirectorySeparator(root);
-        return path.Equals(trimmedRoot, StringComparison.OrdinalIgnoreCase)
-            || path.StartsWith(trimmedRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-            || (Path.EndsInDirectorySeparator(root) && path.StartsWith(root, StringComparison.OrdinalIgnoreCase));
+        return path.Equals(trimmedRoot, comparison)
+            || path.StartsWith(trimmedRoot + Path.DirectorySeparatorChar, comparison)
+            || (Path.EndsInDirectorySeparator(root) && path.StartsWith(root, comparison));
     }
 
     /// <summary>
@@ -824,7 +832,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
 
                 foreach (var solutionPath in SolutionDiscovery.ScanDirectory(localPath, DiscoverAllSolutions))
                 {
-                    if (solutionPaths.Contains(solutionPath, StringComparer.OrdinalIgnoreCase)) continue;
+                    if (solutionPaths.Contains(solutionPath, PathComparison.Comparer)) continue;
                     logger.LogInformation("Discovered solution from MCP roots: {SolutionPath}", solutionPath);
                     solutionPaths.Add(solutionPath);
                 }
@@ -923,7 +931,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         _buildFiles.Clear();
         _knownDocumentPaths.Clear();
         _defaultGlobByProject.Clear();
-        var projectsByDirectory = new Dictionary<string, List<ProjectId>>(StringComparer.OrdinalIgnoreCase);
+        var projectsByDirectory = new Dictionary<string, List<ProjectId>>(PathComparison.Comparer);
 
         foreach (var projectId in _solution.ProjectIds)
         {
@@ -960,7 +968,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             TrackBuildFile(sharedFile, stampsAtLoadStart);
 
         _projectsByDirectory = projectsByDirectory.ToDictionary(
-            pair => pair.Key, pair => pair.Value.ToArray(), StringComparer.OrdinalIgnoreCase);
+            pair => pair.Key, pair => pair.Value.ToArray(), PathComparison.Comparer);
 
         // A file a csproj edit has since pulled in is a document now, not an exclusion.
         foreach (var path in _excludedSourceFiles.Keys)
@@ -994,7 +1002,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         var roots = _solutionPaths
             .Select(Path.GetDirectoryName)
             .OfType<string>()
-            .Distinct(StringComparer.OrdinalIgnoreCase);
+            .Distinct(PathComparison.Comparer);
 
         foreach (var root in roots)
         {
@@ -1148,7 +1156,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     private DocumentScan ScanKnownDocuments(CancellationToken ct)
     {
         var byDirectory = new Dictionary<string, List<KeyValuePair<DocumentId, TrackedDocument>>>(
-            StringComparer.OrdinalIgnoreCase);
+            PathComparison.Comparer);
         foreach (var entry in _knownDocuments)
         {
             if (!byDirectory.TryGetValue(entry.Value.Directory, out var documents))
@@ -1156,7 +1164,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             documents.Add(entry);
         }
 
-        var scan = new DocumentScan([], [], new HashSet<string>(StringComparer.OrdinalIgnoreCase));
+        var scan = new DocumentScan([], [], new HashSet<string>(PathComparison.Comparer));
         var gate = new Lock();
 
         Parallel.ForEach(
@@ -1214,7 +1222,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     /// </summary>
     private static Dictionary<string, DateTime>? ReadDirectoryTimestamps(string directory)
     {
-        var result = new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
+        var result = new Dictionary<string, DateTime>(PathComparison.Comparer);
         try
         {
             var entries = new FileSystemEnumerable<(string Path, DateTime LastWriteUtc)>(
@@ -1413,7 +1421,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     /// </summary>
     private void RebuildKnownDocumentPaths()
     {
-        var live = _knownDocuments.Values.Select(d => d.FilePath).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var live = _knownDocuments.Values.Select(d => d.FilePath).ToHashSet(PathComparison.Comparer);
         foreach (var path in _knownDocumentPaths.Keys)
         {
             if (!live.Contains(path))
@@ -1506,7 +1514,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             AttributesToSkip = FileAttributes.Hidden | FileAttributes.System
         };
 
-        var walked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var walked = new HashSet<string>(PathComparison.Comparer);
         foreach (var project in solution.Projects)
         {
             ct.ThrowIfCancellationRequested();
@@ -1524,8 +1532,8 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             {
                 ct.ThrowIfCancellationRequested();
 
-                if (file.StartsWith(binPrefix, StringComparison.OrdinalIgnoreCase) ||
-                    file.StartsWith(objPrefix, StringComparison.OrdinalIgnoreCase))
+                if (file.StartsWith(binPrefix, PathComparison.Comparison) ||
+                    file.StartsWith(objPrefix, PathComparison.Comparison))
                     continue;
 
                 if (IsUntrackedSourceFile(file))

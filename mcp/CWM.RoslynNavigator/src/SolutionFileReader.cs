@@ -34,7 +34,7 @@ internal static class SolutionFileReader
 
     /// <summary>
     /// Canonical form used to dedupe project files across solutions: absolute, OS separators.
-    /// Compare with <see cref="StringComparer.OrdinalIgnoreCase"/>, as the rest of the workspace does.
+    /// Compare with <see cref="PathComparison.Comparer"/>, as the rest of the workspace does.
     /// </summary>
     public static string NormalizePath(string path) =>
         Path.GetFullPath(path.Replace('\\', Path.DirectorySeparatorChar).Replace('/', Path.DirectorySeparatorChar));

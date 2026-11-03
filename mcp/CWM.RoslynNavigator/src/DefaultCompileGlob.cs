@@ -53,8 +53,8 @@ internal static partial class DefaultCompileGlob
         var segments = relative.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
 
         if (segments.Length > 1
-            && (segments[0].Equals("bin", StringComparison.OrdinalIgnoreCase)
-                || segments[0].Equals("obj", StringComparison.OrdinalIgnoreCase)))
+            && (segments[0].Equals("bin", PathComparison.Comparison)
+                || segments[0].Equals("obj", PathComparison.Comparison)))
             return true;
 
         for (var i = 0; i < segments.Length - 1; i++)
