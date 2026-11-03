@@ -157,8 +157,9 @@ project, the issues found:
 - an analyzer or source generator file that does not exist
 
 It also carries the raw `LoadDiagnostics`, background warm-up progress (`WarmUp`:
-`Compiled` of `Total`), and `SnapshotVersion`, which increments on every reload or
-in-place document refresh.
+`Compiled` of `Total`), `SnapshotVersion`, which increments on every reload or
+in-place document refresh, and `Reloading` / `ReloadReason` / `LastReloadError` for
+background reloads (see [Scaling](#scaling)).
 
 When the workspace is incomplete, any tool result that comes back **empty** — `TotalFound`
 (or `Count`) of 0, or a `SymbolNotFound` / `FileNotFound` error — gains a `WorkspaceWarning`
@@ -585,9 +586,16 @@ One strategy for every solution size:
   its `Directory.Build.*` files. Otherwise the solution reloads so MSBuild can decide. Files
   under `bin/`, `obj/`, or dot-folders are ignored, and a file the project excluded is
   remembered so it never triggers a second reload.
-- **Build-file changes still reload in-band.** A changed `.csproj` or `Directory.*` file
-  reloads every solution on the next call; that call waits for the open (not the
-  compilation, which warms in the background).
+- **Reloads never take the workspace offline.** A changed `.csproj` or `Directory.*` file
+  reloads every solution in the background: the next workspace is opened beside the current
+  one while every tool call keeps answering from the last good snapshot, then swapped in
+  atomically. Only the very first load returns `Loading`. Answers given during a reload carry
+  a `WorkspaceWarning` saying they come from the previous snapshot, and
+  `get_workspace_status` reports `Reloading` and the `ReloadReason`. Calls that notice the
+  same change concurrently share one reload; a build file saved again while a reload runs is
+  picked up by the next one. A reload that fails (e.g. an unparseable solution file) keeps the
+  previous snapshot, is reported as `LastReloadError` (and `Healthy: false`), and is retried
+  after 30 s. The replaced workspace is disposed as soon as the last call still using it ends.
 
 ## Troubleshooting
 

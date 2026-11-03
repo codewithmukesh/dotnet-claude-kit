@@ -41,10 +41,13 @@ builder.Services.AddMcpServer()
     .WithRequestFilters(filters => filters
     // An empty answer from a partially loaded workspace says so (see IncompleteWorkspaceNote).
     // Done here, once, so no tool's response shape changes and new tools are covered.
+    // The same filter leases the current workspace for the call, so a background reload that
+    // swaps in a new snapshot meanwhile disposes the old workspace only once the call is done.
     .AddCallToolFilter(next => async (context, ct) =>
     {
-        var result = await next(context, ct);
         var workspace = context.Services?.GetService<WorkspaceManager>();
+        using var lease = workspace?.AcquireSnapshotLease();
+        var result = await next(context, ct);
         return workspace is null || context.Params?.Name == "get_workspace_status"
             ? result
             : IncompleteWorkspaceNote.Apply(result, workspace);

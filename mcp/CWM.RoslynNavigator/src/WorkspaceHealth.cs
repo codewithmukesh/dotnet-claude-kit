@@ -26,6 +26,9 @@ internal sealed record WarmUpProgress(string State, int Compiled, int Total, lon
 /// references whose file does not exist. Generator exceptions are not observable through the
 /// public Workspaces API without running the generator driver again, so they are not
 /// reported.</para>
+///
+/// <para>One instance per load, swapped in with the snapshot it describes: a warm-up still
+/// winding down after a reload writes into the record of the load it belongs to, never the next.</para>
 /// </summary>
 internal sealed class WorkspaceHealth(TimeProvider clock)
 {
@@ -38,33 +41,10 @@ internal sealed class WorkspaceHealth(TimeProvider clock)
     private long _warmUpStarted;
     private long? _warmUpElapsedMs;
     private int _revision;
-    private int _generation;
     private (int SnapshotVersion, int Revision, IReadOnlyList<ProjectProblem> Problems)? _cache;
 
     /// <summary>Bumped on every recorded fact; part of the problem-list cache key.</summary>
     public int Revision => Volatile.Read(ref _revision);
-
-    /// <summary>
-    /// Identifies the current load. A warm-up passes the generation it started under, so a
-    /// superseded warm-up still winding down cannot write into the next load's record.
-    /// </summary>
-    public int Generation => Volatile.Read(ref _generation);
-
-    /// <summary>Clears everything recorded for the previous load.</summary>
-    public void Reset()
-    {
-        Interlocked.Increment(ref _generation);
-        _diagnostics.Clear();
-        _compileProblems.Clear();
-        lock (_gate)
-        {
-            _compiled = 0;
-            _total = 0;
-            _warmUpState = "not-started";
-            _warmUpElapsedMs = null;
-        }
-        Interlocked.Increment(ref _revision);
-    }
 
     public void RecordDiagnostic(WorkspaceDiagnosticKind kind, string message)
     {
@@ -73,11 +53,10 @@ internal sealed class WorkspaceHealth(TimeProvider clock)
         Interlocked.Increment(ref _revision);
     }
 
-    public void WarmUpStarted(int generation, int total)
+    public void WarmUpStarted(int total)
     {
         lock (_gate)
         {
-            if (generation != Generation) return;
             _compiled = 0;
             _total = total;
             _warmUpState = "running";
@@ -91,10 +70,8 @@ internal sealed class WorkspaceHealth(TimeProvider clock)
     /// has no usable references — every type from the BCL or a package is an error type and
     /// every navigation answer for that project is suspect.
     /// </summary>
-    public void ProjectCompiled(int generation, ProjectId projectId, Compilation? compilation, Exception? error)
+    public void ProjectCompiled(ProjectId projectId, Compilation? compilation, Exception? error)
     {
-        if (generation != Generation) return;
-
         if (error is not null)
         {
             _compileProblems[projectId] = $"compilation failed: {error.Message}";
@@ -110,11 +87,10 @@ internal sealed class WorkspaceHealth(TimeProvider clock)
         lock (_gate) _compiled++;
     }
 
-    public void WarmUpFinished(int generation, string state)
+    public void WarmUpFinished(string state)
     {
         lock (_gate)
         {
-            if (generation != Generation) return;
             _warmUpState = state;
             _warmUpElapsedMs = (long)clock.GetElapsedTime(_warmUpStarted).TotalMilliseconds;
         }

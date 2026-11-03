@@ -8,7 +8,7 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class GetWorkspaceStatusTool
 {
-    [McpServerTool(Name = "get_workspace_status"), Description("Report what the server has loaded and how completely: workspace state, loaded solutions, project and document counts, background compilation warm-up progress (Compiled of Total), snapshot version, and every project that loaded or compiled incompletely (load failures, no documents, unresolved core library, compilation errors thrown, missing analyzers/generators) plus raw workspace load diagnostics. Healthy=false means answers from other tools may be missing results. Call it when a result looks suspiciously empty, or before trusting dead-code or reference counts on an unfamiliar solution. Works while loading.")]
+    [McpServerTool(Name = "get_workspace_status"), Description("Report what the server has loaded and how completely: workspace state, loaded solutions, project and document counts, background compilation warm-up progress (Compiled of Total), snapshot version, whether a background reload is in flight (Reloading) or the last one failed (LastReloadError), and every project that loaded or compiled incompletely (load failures, no documents, unresolved core library, compilation errors thrown, missing analyzers/generators) plus raw workspace load diagnostics. Healthy=false means answers from other tools may be missing results. Call it when a result looks suspiciously empty, or before trusting dead-code or reference counts on an unfamiliar solution. Works while loading.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
         [Description("Maximum entries in each of IncompleteProjects and LoadDiagnostics")] int maxResults = 50,
@@ -46,7 +46,10 @@ public static class GetWorkspaceStatusTool
             .Select(s => new SolutionSummary(s.Name, workspace.ToRelativePath(s.Path), s.ProjectPaths.Count, s.Error))
             .ToList();
 
+        // A failed reload leaves answers coming from a snapshot that no longer matches disk.
+        var lastReloadError = workspace.LastReloadError;
         var healthy = workspace.State == WorkspaceState.Ready
+            && lastReloadError is null
             && problems.Count == 0
             && !diagnostics.Any(d => d.Kind == "failure");
 
@@ -66,6 +69,9 @@ public static class GetWorkspaceStatusTool
             LoadDiagnostics: diagnosticPage.Items,
             LoadDiagnosticCount: diagnosticPage.TotalFound,
             Truncated: problemPage.Truncated || diagnosticPage.Truncated,
-            Limit: problemPage.Limit));
+            Limit: problemPage.Limit,
+            Reloading: workspace.IsReloading,
+            ReloadReason: workspace.ReloadReason,
+            LastReloadError: lastReloadError));
     }
 }

@@ -20,7 +20,11 @@ namespace CWM.RoslynNavigator;
 /// </summary>
 public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvider clock) : IDisposable
 {
+    // _writeLock guards snapshot mutations (document refreshes, the swap after a load) and is
+    // only ever held briefly. _loadLock serializes loads, which take as long as MSBuild needs;
+    // holding it never blocks a tool call, because calls read the current snapshot lock-free.
     private readonly SemaphoreSlim _writeLock = new(1, 1);
+    private readonly SemaphoreSlim _loadLock = new(1, 1);
     private readonly ConcurrentDictionary<DocumentId, TrackedDocument> _knownDocuments = new();
     private readonly ConcurrentDictionary<string, BuildFileInfo> _buildFiles = new();
     private readonly ConcurrentDictionary<string, byte> _knownDocumentPaths = new(StringComparer.OrdinalIgnoreCase);
@@ -46,19 +50,88 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     private static readonly long StructuralScanCooldownTicks = TimeSpan.FromSeconds(60).Ticks;
     private static readonly long ErrorRetryCooldownTicks = TimeSpan.FromSeconds(30).Ticks;
 
-    private MSBuildWorkspace? _workspace;
+    private WorkspaceGeneration? _generation;
     private volatile Solution? _solution;
     private IReadOnlyList<string> _solutionPaths = [];
-    private IReadOnlyList<LoadedSolution> _loadedSolutions = [];
+    private volatile IReadOnlyList<LoadedSolution> _loadedSolutions = [];
     private Dictionary<string, List<string>> _projectSolutions = new(StringComparer.OrdinalIgnoreCase);
     private string? _rootDirectory;
     private string? _errorMessage;
     private int _snapshotVersion;
-    private readonly WorkspaceHealth _health = new(clock);
+    private volatile WorkspaceHealth _health = new(clock);
+
+    // Background reload: at most one in flight (_reloadRunning), why it started, and what
+    // the last failed one said. A failed reload keeps the previous snapshot.
+    private int _reloadRunning;
+    private int _reloading;
+    private volatile string? _reloadReason;
+    private volatile string? _lastReloadError;
+    private long _reloadRetryNotBeforeTicks;
+    private Task _reload = Task.CompletedTask;
+    private int _liveWorkspaces;
+    private volatile bool _disposed;
 
     public WorkspaceState State { get; private set; } = WorkspaceState.NotStarted;
     public string? ErrorMessage => _errorMessage;
     public int ProjectCount => _solution?.ProjectIds.Count ?? 0;
+
+    /// <summary>
+    /// True while a reload is building the next snapshot in the background. Tool calls keep
+    /// answering from the current one meanwhile; <see cref="StalenessWarning"/> says so.
+    /// </summary>
+    public bool IsReloading => Volatile.Read(ref _reloadRunning) == 1 || Volatile.Read(ref _reloading) == 1;
+
+    /// <summary>Why the in-flight reload started, or null when none is running.</summary>
+    public string? ReloadReason => IsReloading ? _reloadReason ?? "reload requested" : null;
+
+    /// <summary>
+    /// The error of the last background reload, cleared by the next successful load. While set,
+    /// answers come from the snapshot before the failed reload.
+    /// </summary>
+    public string? LastReloadError => _lastReloadError;
+
+    /// <summary>
+    /// Why answers may lag the files on disk right now — a reload in flight, or a failed one —
+    /// or null when the snapshot is current.
+    /// </summary>
+    public string? StalenessWarning
+    {
+        get
+        {
+            if (State != WorkspaceState.Ready) return null;
+            if (ReloadReason is { } reason)
+                return $"The workspace is reloading in the background ({reason}); this answer comes from the previous snapshot and may not reflect that change yet.";
+            if (_lastReloadError is { } error)
+                return $"The last workspace reload failed ({error}); this answer comes from the snapshot before it. Call get_workspace_status for details.";
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Awaited after a load has opened its solutions and before it replaces the snapshot. Test
+    /// seam: holds a reload open so calls made during it can be observed.
+    /// </summary>
+    internal Func<CancellationToken, Task>? BeforeSwap { get; set; }
+
+    /// <summary>MSBuildWorkspace instances not yet disposed. Test seam for the swap's cleanup.</summary>
+    internal int LiveWorkspaceCount => Volatile.Read(ref _liveWorkspaces);
+
+    /// <summary>
+    /// Keeps the current workspace alive for the duration of a tool call, so a reload that
+    /// swaps in the next snapshot meanwhile disposes the old workspace only after the call
+    /// finishes with it. Null before the first load.
+    /// </summary>
+    internal IDisposable? AcquireSnapshotLease()
+    {
+        while (true)
+        {
+            var generation = Volatile.Read(ref _generation);
+            if (generation is null) return null;
+            if (generation.TryAcquire() is { } lease) return lease;
+            // Retired between the read and the acquire: the swap has already published the
+            // next generation, so the loop terminates.
+        }
+    }
 
     /// <summary>
     /// Set by Program.cs after host build to allow lazy McpServer resolution.
@@ -87,8 +160,16 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     internal WorkspaceHealth Health => _health;
 
     /// <summary>Projects that loaded or compiled incompletely in the current snapshot.</summary>
-    internal IReadOnlyList<ProjectProblem> GetProjectProblems() =>
-        _health.GetProblems(_solution, _loadedSolutions, SnapshotVersion);
+    internal IReadOnlyList<ProjectProblem> GetProjectProblems()
+    {
+        // Read in the reverse of the swap's write order (solution, solutions, health, version):
+        // seeing the new health implies seeing the new solution, so the problem cache never
+        // pairs one load's health with another load's projects.
+        var health = _health;
+        var solution = _solution;
+        var solutions = _loadedSolutions;
+        return health.GetProblems(solution, solutions, SnapshotVersion);
+    }
 
     /// <summary>
     /// Loads the solution at the specified path. Call this once on startup.
@@ -108,82 +189,259 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     /// Compilations warm up in the background; a tool call that needs one before warm-up
     /// reaches it awaits the same in-flight build, since Roslyn builds one compilation per
     /// project per snapshot no matter how many callers ask.</para>
+    ///
+    /// <para>Only the first load leaves the workspace without an answer (<c>Loading</c>). Every
+    /// later load — a reload after a build-file change — opens the next workspace beside the
+    /// current one while tool calls keep answering from the current snapshot, then swaps it in
+    /// atomically. A reload that fails keeps the current snapshot and reports the error in
+    /// <see cref="LastReloadError"/>; cancellation is never reported as a failure.</para>
     /// </summary>
     public async Task LoadSolutionsAsync(IReadOnlyList<string> solutionPaths, CancellationToken ct = default)
     {
         if (solutionPaths.Count == 0)
             throw new ArgumentException("At least one solution path is required.", nameof(solutionPaths));
 
-        await _writeLock.WaitAsync(ct);
-        var solutionPath = solutionPaths[0];
+        await _loadLock.WaitAsync(ct);
         try
         {
+            await LoadAndSwapAsync([.. solutionPaths], ct);
+        }
+        finally
+        {
+            _loadLock.Release();
+        }
+    }
+
+    /// <summary>A workspace opened by a load and not yet swapped in.</summary>
+    private sealed record PendingLoad(
+        string[] SolutionPaths,
+        MSBuildWorkspace Workspace,
+        Solution Solution,
+        IReadOnlyList<LoadedSolution> Loaded,
+        WorkspaceHealth Health,
+        DateTimeOffset StartedUtc,
+        IReadOnlyDictionary<string, DateTime> BuildFileStampsAtStart);
+
+    /// <summary>Must hold <see cref="_loadLock"/>.</summary>
+    private async Task LoadAndSwapAsync(string[] solutionPaths, CancellationToken ct)
+    {
+        var reloading = _solution is not null;
+        var previousState = State;
+        var previousError = _errorMessage;
+
+        if (reloading)
+        {
+            Volatile.Write(ref _reloading, 1);
+            logger.LogInformation(
+                "Reloading {SolutionPath} in the background; serving snapshot {Version} meanwhile.",
+                string.Join(", ", solutionPaths), SnapshotVersion);
+        }
+        else
+        {
             State = WorkspaceState.Loading;
-            // The previous snapshot is about to be discarded; compiling it further is waste.
-            CancelWarmUp();
-            _solutionPaths = [.. solutionPaths];
+            _solutionPaths = solutionPaths;
             _rootDirectory = ComputeRootDirectory(solutionPaths);
             _errorMessage = null;
-
             logger.LogInformation("Loading solution: {SolutionPath}", string.Join(", ", solutionPaths));
+        }
 
-            // Anything on disk before MSBuild evaluates and still not a document afterwards was
-            // excluded by the project; files created from here on are genuinely new.
-            _lastLoadStartedUtc = clock.GetUtcNow();
-            _pendingNewFiles.Clear();
+        PendingLoad? pending = null;
+        try
+        {
+            pending = await OpenSolutionsAsync(solutionPaths, ct);
+            if (BeforeSwap is { } beforeSwap)
+                await beforeSwap(ct);
 
-            // Dispose previous workspace to avoid leaking Roslyn Solution snapshots
-            _workspace?.Dispose();
+            await SwapAsync(pending);
+            pending = null;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            // Superseded or shutting down: nothing failed, so nothing is reported as failed.
+            logger.LogInformation("Workspace load cancelled.");
+            if (!reloading)
+            {
+                State = previousState == WorkspaceState.Loading ? WorkspaceState.NotStarted : previousState;
+                _errorMessage = previousError;
+            }
 
-            // Shadow-copying host: analyzers and generators load from temp copies, never from
-            // ~/.nuget/packages, so this long-lived process cannot block `dotnet restore` (#25).
-            _workspace = MSBuildWorkspace.Create(ShadowCopyAnalyzerService.HostServices);
-            _health.Reset();
-            _workspace.RegisterWorkspaceFailedHandler(args =>
+            throw;
+        }
+        catch (Exception ex)
+        {
+            if (reloading)
+            {
+                logger.LogError(ex, "Background reload failed; keeping snapshot {Version}.", SnapshotVersion);
+                _lastReloadError = ex.Message;
+                Interlocked.Exchange(ref _reloadRetryNotBeforeTicks, clock.GetUtcNow().UtcTicks + ErrorRetryCooldownTicks);
+            }
+            else
+            {
+                logger.LogError(ex, "Failed to load solution: {SolutionPath}", solutionPaths[0]);
+                _errorMessage = ex.Message;
+                State = WorkspaceState.Error;
+            }
+
+            throw;
+        }
+        finally
+        {
+            if (pending is not null)
+                DisposeWorkspace(pending.Workspace);
+            if (reloading)
+                Volatile.Write(ref _reloading, 0);
+        }
+    }
+
+    /// <summary>
+    /// Opens the solutions into a new workspace without touching the current snapshot. The
+    /// first solution opens via <c>OpenSolutionAsync</c>; each further one contributes only
+    /// the projects not already loaded.
+    /// </summary>
+    private async Task<PendingLoad> OpenSolutionsAsync(string[] solutionPaths, CancellationToken ct)
+    {
+        // Anything on disk before MSBuild evaluates and still not a document afterwards was
+        // excluded by the project; files created from here on are genuinely new.
+        var startedUtc = clock.GetUtcNow();
+        // A build file whose stamp moves between here and the swap changed after MSBuild may
+        // have read it; the swap marks it changed so the next refresh reloads again.
+        var stampsAtStart = _buildFiles.Keys.ToDictionary(path => path, File.GetLastWriteTimeUtc);
+
+        var health = new WorkspaceHealth(clock);
+        // Shadow-copying host: analyzers and generators load from temp copies, never from
+        // ~/.nuget/packages, so this long-lived process cannot block `dotnet restore` (#25).
+        var workspace = MSBuildWorkspace.Create(ShadowCopyAnalyzerService.HostServices);
+        Interlocked.Increment(ref _liveWorkspaces);
+        try
+        {
+            workspace.RegisterWorkspaceFailedHandler(args =>
             {
                 // Logged and kept: a failure here means a project loaded partially or not at
                 // all, which get_workspace_status and empty results must be able to report.
-                _health.RecordDiagnostic(args.Diagnostic.Kind, args.Diagnostic.Message);
+                health.RecordDiagnostic(args.Diagnostic.Kind, args.Diagnostic.Message);
                 if (args.Diagnostic.Kind == WorkspaceDiagnosticKind.Failure)
                     logger.LogError("Workspace failure: {Message}", args.Diagnostic.Message);
                 else
                     logger.LogWarning("Workspace warning: {Message}", args.Diagnostic.Message);
             });
 
-            _solution = await _workspace.OpenSolutionAsync(solutionPath, cancellationToken: ct);
-            List<LoadedSolution> loaded = [await DescribePrimaryAsync(solutionPath, _solution, ct)];
+            var primary = await workspace.OpenSolutionAsync(solutionPaths[0], cancellationToken: ct);
+            List<LoadedSolution> loaded = [await DescribePrimaryAsync(solutionPaths[0], primary, logger, ct)];
 
             foreach (var additional in solutionPaths.Skip(1))
-                loaded.Add(await AddSolutionProjectsAsync(_workspace, additional, ct));
+                loaded.Add(await AddSolutionProjectsAsync(workspace, additional, ct));
 
-            _solution = _workspace.CurrentSolution;
-            _loadedSolutions = loaded;
-            _projectSolutions = BuildMembership(loaded);
+            return new PendingLoad(
+                solutionPaths, workspace, workspace.CurrentSolution, loaded, health, startedUtc, stampsAtStart);
+        }
+        catch
+        {
+            DisposeWorkspace(workspace);
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Publishes a loaded workspace as the current snapshot. Brief: everything slow happened in
+    /// <see cref="OpenSolutionsAsync"/>. The replaced workspace is retired, and disposed as
+    /// soon as no tool call still holds a lease on it.
+    /// </summary>
+    private async Task SwapAsync(PendingLoad load)
+    {
+        WorkspaceGeneration? retired;
+        await _writeLock.WaitAsync(CancellationToken.None);
+        try
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+
+            // The previous snapshot is being replaced; compiling it further is waste.
+            CancelWarmUp();
+
+            retired = _generation;
+            Volatile.Write(ref _generation,
+                new WorkspaceGeneration(load.Workspace, () => Interlocked.Decrement(ref _liveWorkspaces)));
+
+            _solutionPaths = load.SolutionPaths;
+            _rootDirectory = ComputeRootDirectory(load.SolutionPaths);
+            _projectSolutions = BuildMembership(load.Loaded);
+            _lastLoadStartedUtc = load.StartedUtc;
+            // Write order matters to GetProjectProblems: solution, solutions, health, version.
+            _solution = load.Solution;
+            _loadedSolutions = load.Loaded;
+            _health = load.Health;
             Interlocked.Increment(ref _loadCount);
             Interlocked.Increment(ref _snapshotVersion);
+            _errorMessage = null;
+            _lastReloadError = null;
 
-            if (solutionPaths.Count == 1)
-                logger.LogInformation("Solution loaded: {ProjectCount} projects", _solution.ProjectIds.Count);
+            if (load.SolutionPaths.Length == 1)
+                logger.LogInformation("Solution loaded: {ProjectCount} projects", load.Solution.ProjectIds.Count);
             else
                 logger.LogInformation("{SolutionCount} solutions loaded: {ProjectCount} distinct projects",
-                    solutionPaths.Count, _solution.ProjectIds.Count);
+                    load.SolutionPaths.Length, load.Solution.ProjectIds.Count);
 
-            SnapshotFileTimestamps();
+            SnapshotFileTimestamps(load.BuildFileStampsAtStart);
             State = WorkspaceState.Ready;
-            StartWarmUp(_solution);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to load solution: {SolutionPath}", solutionPath);
-            _errorMessage = ex.Message;
-            State = WorkspaceState.Error;
-            throw;
+            StartWarmUp(load.Solution);
         }
         finally
         {
             _writeLock.Release();
         }
+
+        retired?.Retire();
     }
+
+    private void DisposeWorkspace(MSBuildWorkspace workspace)
+    {
+        workspace.Dispose();
+        Interlocked.Decrement(ref _liveWorkspaces);
+    }
+
+    /// <summary>
+    /// Starts a reload of the configured solutions in the background, unless one is already in
+    /// flight — racing callers that notice the same change coalesce into one reload. Returns
+    /// whether this call started it. A change made while a reload runs is picked up by the
+    /// first refresh after it completes.
+    /// </summary>
+    private bool StartBackgroundReload(string reason)
+    {
+        if (_solution is null || _disposed) return false;
+        if (Interlocked.CompareExchange(ref _reloadRunning, 1, 0) != 0) return false;
+
+        _reloadReason = reason;
+        logger.LogInformation("{Reason}: reloading in the background.", reason);
+        _reload = Task.Run(async () =>
+        {
+            try
+            {
+                await LoadSolutionsAsync(_solutionPaths, _backgroundCts.Token);
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
+            {
+                // Shutting down.
+            }
+            catch (Exception)
+            {
+                // Recorded in LastReloadError by the load; the previous snapshot stays current.
+            }
+            finally
+            {
+                _reloadReason = null;
+                Interlocked.Exchange(ref _reloadRunning, 0);
+            }
+        }, CancellationToken.None);
+        return true;
+    }
+
+    /// <summary>
+    /// Awaits the in-flight background reload. Test seam — nothing in the request path
+    /// should ever wait on this.
+    /// </summary>
+    internal Task WaitForReloadAsync() => _reload;
+
+    private bool ReloadRetryAllowed() =>
+        clock.GetUtcNow().UtcTicks >= Interlocked.Read(ref _reloadRetryNotBeforeTicks);
 
     /// <summary>
     /// Gets the current solution snapshot. Returns null if workspace is not ready.
@@ -221,7 +479,8 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     /// projects) keeps referenced-but-undeclared projects out, matching how additional
     /// solutions are described; the loaded projects are the fallback if parsing fails.
     /// </summary>
-    private async Task<LoadedSolution> DescribePrimaryAsync(string solutionPath, Solution solution, CancellationToken ct)
+    internal static async Task<LoadedSolution> DescribePrimaryAsync(
+        string solutionPath, Solution solution, ILogger log, CancellationToken ct)
     {
         try
         {
@@ -229,7 +488,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
-            logger.LogDebug(ex, "Could not parse {SolutionPath}; using its loaded projects.", solutionPath);
+            log.LogDebug(ex, "Could not parse {SolutionPath}; using its loaded projects.", solutionPath);
             var loaded = solution.Projects
                 .Select(p => p.FilePath)
                 .OfType<string>()
@@ -407,7 +666,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     /// and results are returned in <see cref="Solution.ProjectIds"/> order regardless.
     /// </summary>
     private static async Task<Compilation?[]> CompileAllAsync(
-        Solution solution, CancellationToken ct, WorkspaceHealth? health = null, int generation = 0)
+        Solution solution, CancellationToken ct, WorkspaceHealth? health = null)
     {
         var projectIds = solution.ProjectIds;
         var results = new Compilation?[projectIds.Count];
@@ -436,11 +695,11 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
                 try
                 {
                     results[i] = await project.GetCompilationAsync(token);
-                    health.ProjectCompiled(generation, projectId, results[i], null);
+                    health.ProjectCompiled(projectId, results[i], null);
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    health.ProjectCompiled(generation, projectId, null, ex);
+                    health.ProjectCompiled(projectId, null, ex);
                 }
             });
 
@@ -458,6 +717,10 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         WorkspaceState.Loading => "Workspace is loading the solution. Please try again in a moment.",
         WorkspaceState.Error =>
             $"Workspace failed to load: {_errorMessage}. The server retries automatically on later calls.",
+        WorkspaceState.Ready when ReloadReason is { } reason =>
+            $"Workspace is ready and reloading in the background ({reason}). Answers come from the previous snapshot until the reload completes.",
+        WorkspaceState.Ready when _lastReloadError is { } error =>
+            $"Workspace is ready, but the last reload failed ({error}); answers come from the snapshot before it. The reload is retried on a later call.",
         WorkspaceState.Ready => "Workspace is ready.",
         _ => "Unknown workspace state."
     };
@@ -484,9 +747,8 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             }
             catch (Exception ex)
             {
-                // A failed refresh (e.g. a .csproj saved mid-write) must not surface as a
-                // raw MCP error. LoadSolutionAsync already recorded the Error state; fall
-                // through to the status response and let the retry path below recover.
+                // A failed refresh must not surface as a raw MCP error. Reloads run in the
+                // background and keep the current snapshot, so the answer below still stands.
                 logger.LogWarning(ex, "Workspace refresh failed; will retry on a later call.");
             }
 
@@ -497,19 +759,9 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         // such as mid-write project files). Cooldown prevents hammering a broken solution.
         if (State == WorkspaceState.Error && _solutionPaths.Count > 0 && TryClaimErrorRetry())
         {
-            try
-            {
-                await LoadSolutionsAsync(_solutionPaths, ct);
-            }
-            catch (OperationCanceledException)
-            {
-                throw;
-            }
-            catch (Exception ex)
-            {
-                logger.LogWarning(ex, "Workspace reload retry failed.");
-            }
-
+            // On the server's own token, not the caller's: a cancelled request must not
+            // abandon a load every later call is waiting for.
+            await RunLoadAsync(_solutionPaths).WaitAsync(ct);
             if (State == WorkspaceState.Ready) return null;
         }
 
@@ -521,6 +773,27 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         }
 
         return JsonSerializer.Serialize(new StatusResponse(State.ToString(), GetStatusMessage()));
+    }
+
+    /// <summary>
+    /// A load on the server's lifetime token whose failure is recorded (State, ErrorMessage,
+    /// LastReloadError) rather than thrown, so callers can stop waiting without leaving an
+    /// unobserved exception behind.
+    /// </summary>
+    private async Task RunLoadAsync(IReadOnlyList<string> solutionPaths)
+    {
+        try
+        {
+            await LoadSolutionsAsync(solutionPaths, _backgroundCts.Token);
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
+        {
+            // Shutting down.
+        }
+        catch (Exception ex)
+        {
+            logger.LogWarning(ex, "Workspace load failed; will retry on a later call.");
+        }
     }
 
     private bool TryClaimErrorRetry()
@@ -582,8 +855,9 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         _warmUpCts = cts;
         var token = cts.Token;
 
-        var generation = _health.Generation;
-        _health.WarmUpStarted(generation, solution.ProjectIds.Count);
+        // Captured: a reload swaps _health, and this warm-up reports into its own load's record.
+        var health = _health;
+        health.WarmUpStarted(solution.ProjectIds.Count);
 
         _warmUp = Task.Run(async () =>
         {
@@ -592,21 +866,21 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             {
                 logger.LogInformation("Warming compilations for {Count} projects in the background...",
                     solution.ProjectIds.Count);
-                await CompileAllAsync(solution, token, _health, generation);
-                _health.WarmUpFinished(generation, "completed");
+                await CompileAllAsync(solution, token, health);
+                health.WarmUpFinished("completed");
                 logger.LogInformation("All compilations warmed in {Elapsed} ms.",
                     (long)clock.GetElapsedTime(started).TotalMilliseconds);
             }
             catch (OperationCanceledException)
             {
                 // Superseded by a reload, or shutting down.
-                _health.WarmUpFinished(generation, "cancelled");
+                health.WarmUpFinished("cancelled");
             }
             catch (Exception ex)
             {
                 // Warm-up is an optimization: a project that fails to compile here fails the
                 // same way, with a proper error, when a tool asks for it.
-                _health.WarmUpFinished(generation, "failed");
+                health.WarmUpFinished("failed");
                 logger.LogWarning(ex, "Background compilation warm-up failed.");
             }
         }, CancellationToken.None);
@@ -641,7 +915,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     /// timestamp alone cannot tell a real edit from a rewrite with identical content —
     /// which is what a branch switch or a formatter produces across many files at once.
     /// </summary>
-    private void SnapshotFileTimestamps()
+    private void SnapshotFileTimestamps(IReadOnlyDictionary<string, DateTime> stampsAtLoadStart)
     {
         if (_solution is null) return;
 
@@ -658,7 +932,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
 
             if (project.FilePath is not null)
             {
-                TrackBuildFile(project.FilePath);
+                TrackBuildFile(project.FilePath, stampsAtLoadStart);
 
                 if (Path.GetDirectoryName(project.FilePath) is { } projectDir)
                 {
@@ -683,7 +957,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         }
 
         foreach (var sharedFile in EnumerateSharedBuildFiles())
-            TrackBuildFile(sharedFile);
+            TrackBuildFile(sharedFile, stampsAtLoadStart);
 
         _projectsByDirectory = projectsByDirectory.ToDictionary(
             pair => pair.Key, pair => pair.Value.ToArray(), StringComparer.OrdinalIgnoreCase);
@@ -734,12 +1008,19 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         }
     }
 
-    private void TrackBuildFile(string path)
+    /// <summary>
+    /// Records a build file's baseline. One whose stamp moved since the load started may have
+    /// changed after MSBuild read it, so it is recorded as unknown — the next refresh sees it
+    /// as changed and reloads again, instead of the edit being silently absorbed.
+    /// </summary>
+    private void TrackBuildFile(string path, IReadOnlyDictionary<string, DateTime> stampsAtLoadStart)
     {
         var writeTime = File.GetLastWriteTimeUtc(path);
         if (writeTime.Year < 1900) return;
 
-        _buildFiles[path] = new BuildFileInfo(writeTime, ComputeHash(path));
+        _buildFiles[path] = stampsAtLoadStart.TryGetValue(path, out var atStart) && atStart != writeTime
+            ? new BuildFileInfo(DateTime.MinValue, null)
+            : new BuildFileInfo(writeTime, ComputeHash(path));
     }
 
     /// <summary>
@@ -782,34 +1063,38 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
 
         var now = clock.GetUtcNow().UtcTicks;
 
+        // Claimed atomically: racing callers past the cooldown must not all run the scan (and,
+        // before reloads were coalesced, each start its own reload of the same change).
         var lastRefresh = Interlocked.Read(ref _lastRefreshTicks);
         if (now - lastRefresh < RefreshCooldownTicks) return;
-        Interlocked.Exchange(ref _lastRefreshTicks, now);
+        if (Interlocked.CompareExchange(ref _lastRefreshTicks, now, lastRefresh) != lastRefresh) return;
 
-        // Phase 1: check build files (one stat each, hashed only when the stat moved)
-        var changedBuildFiles = GetChangedBuildFiles();
-        if (changedBuildFiles.Count > 0)
+        // Phase 1: check build files (one stat each, hashed only when the stat moved). While a
+        // reload is in flight its swap re-baselines them, and anything that changed after it
+        // started is flagged then — checking now would only find the change it is handling.
+        if (!IsReloading && ReloadRetryAllowed())
         {
-            logger.LogInformation(
-                "Build files changed ({Files}). Reloading solution.",
-                string.Join(", ", changedBuildFiles.Select(Path.GetFileName)));
-
-            await LoadSolutionsAsync(_solutionPaths, ct);
-            return;
+            var changedBuildFiles = GetChangedBuildFiles();
+            if (changedBuildFiles.Count > 0)
+            {
+                StartBackgroundReload(
+                    $"build files changed: {string.Join(", ", changedBuildFiles.Select(Path.GetFileName).Distinct())}");
+            }
         }
 
         // Phase 2: the recursive walk for files in folders no document lives in yet never
         // runs in-band; it reports into _pendingNewFiles for a later call to act on.
         var lastStructural = Interlocked.Read(ref _lastStructuralScanTicks);
-        if (now - lastStructural >= StructuralScanCooldownTicks)
+        if (now - lastStructural >= StructuralScanCooldownTicks
+            && Interlocked.CompareExchange(ref _lastStructuralScanTicks, now, lastStructural) == lastStructural)
         {
-            Interlocked.Exchange(ref _lastStructuralScanTicks, now);
             StartStructuralScan();
         }
 
         // Phase 3: collect changed, deleted, and new documents without holding the lock (the
         // directory reads are the expensive part — keeping them lock-free avoids blocking
-        // concurrent tool calls).
+        // concurrent tool calls). Document edits still apply to the current snapshot while a
+        // reload is in flight, so answers stay fresh for the files that changed.
         var scan = ScanKnownDocuments(ct);
         foreach (var path in _pendingNewFiles.Keys)
         {
@@ -817,23 +1102,25 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             scan.NewFiles.Add(path);
         }
 
-        var additions = ClassifyNewFiles(scan.NewFiles, out var needReload);
-        if (needReload.Count > 0)
-        {
-            logger.LogInformation(
-                "New source files in projects with custom compile items ({Files}). Reloading solution.",
-                string.Join(", ", needReload.Select(Path.GetFileName)));
+        if (scan.Changed.Count == 0 && scan.Deleted.Count == 0 && scan.NewFiles.Count == 0) return;
 
-            await LoadSolutionsAsync(_solutionPaths, ct);
-            return;
-        }
-
-        if (scan.Changed.Count == 0 && scan.Deleted.Count == 0 && additions.Count == 0) return;
-
-        // Apply mutations under lock.
+        // Classify and apply under the lock: a swap rebuilds the tracked-document maps under
+        // the same lock, and classifying against half-rebuilt maps would mark real documents
+        // as excluded for good.
         await _writeLock.WaitAsync(ct);
         try
         {
+            var additions = ClassifyNewFiles(scan.NewFiles, out var needReload);
+            if (needReload.Count > 0
+                && !StartBackgroundReload(
+                    $"new source files in projects with custom compile items: {string.Join(", ", needReload.Select(Path.GetFileName))}"))
+            {
+                // A reload already in flight may have evaluated the projects before these
+                // files existed; ask again once it has swapped in.
+                foreach (var path in needReload)
+                    _pendingNewFiles[path] = 0;
+            }
+
             await ApplyDocumentChangesAsync(scan, additions, ct);
         }
         finally
@@ -1251,13 +1538,15 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
 
     public void Dispose()
     {
+        _disposed = true;
         _backgroundCts.Cancel();
 
         try
         {
-            // Bounded so shutdown cannot block on a large directory walk or a compilation
-            // that is slow to observe cancellation.
-            Task.WaitAll([_structuralScan, _warmUp], TimeSpan.FromSeconds(2));
+            // Bounded so shutdown cannot block on a large directory walk, a compilation, or a
+            // reload that is slow to observe cancellation. A reload still running afterwards
+            // finds the manager disposed at its swap and disposes its own workspace.
+            Task.WaitAll([_structuralScan, _warmUp, _reload], TimeSpan.FromSeconds(2));
         }
         catch (Exception)
         {
@@ -1265,8 +1554,8 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         }
 
         _warmUpCts?.Dispose();
-        _backgroundCts.Dispose();
-        _workspace?.Dispose();
-        _writeLock.Dispose();
+        _generation?.DisposeNow();
+        // The semaphores are deliberately not disposed: a background load that outlived the
+        // bounded wait above still releases them on its way out.
     }
 }

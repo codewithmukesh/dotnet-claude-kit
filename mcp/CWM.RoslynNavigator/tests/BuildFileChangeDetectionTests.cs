@@ -66,6 +66,7 @@ public sealed class BuildFileChangeDetectionTests : IDisposable
 
         _clock.Advance(PastCooldown);
         await _workspace.RefreshChangedDocumentsAsync(ct);
+        await _workspace.WaitForReloadAsync(); // reloads build the next snapshot in the background
 
         Assert.Equal(loadsAfterInitial + 1, _workspace.LoadCount);
     }
@@ -89,6 +90,7 @@ public sealed class BuildFileChangeDetectionTests : IDisposable
 
         _clock.Advance(PastCooldown);
         await _workspace.RefreshChangedDocumentsAsync(ct);
+        await _workspace.WaitForReloadAsync(); // reloads build the next snapshot in the background
 
         Assert.Equal(loadsAfterInitial + 1, _workspace.LoadCount);
     }
