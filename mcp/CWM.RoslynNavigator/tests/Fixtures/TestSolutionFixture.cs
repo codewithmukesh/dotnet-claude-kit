@@ -52,22 +52,30 @@ public class TestSolutionFixture : IAsyncLifetime
     public static string SampleSolutionPath => FindSampleSolutionPath();
 
     /// <summary>
+    /// A second solution (.slnx) that shares SampleDomain with SampleSolution.sln and adds
+    /// ShippingService — the multi-solution (#16) counterpart.
+    /// </summary>
+    public static string SecondSolutionPath => FindTestDataFile("SecondSolution", "SecondSolution.slnx");
+
+    /// <summary>
     /// Registers MSBuild for tests that construct a WorkspaceManager directly.
     /// </summary>
     public static void RegisterMSBuild() => EnsureMSBuildRegistered();
 
-    private static string FindSampleSolutionPath()
+    private static string FindSampleSolutionPath() => FindTestDataFile("SampleSolution", "SampleSolution.sln");
+
+    private static string FindTestDataFile(string folder, string fileName)
     {
         // Walk up from the test output directory to find the TestData folder
         var directory = AppContext.BaseDirectory;
         while (directory is not null)
         {
-            var candidatePath = Path.Combine(directory, "TestData", "SampleSolution", "SampleSolution.sln");
+            var candidatePath = Path.Combine(directory, "TestData", folder, fileName);
             if (File.Exists(candidatePath))
                 return candidatePath;
 
             // Also check in tests/ subfolder
-            candidatePath = Path.Combine(directory, "tests", "TestData", "SampleSolution", "SampleSolution.sln");
+            candidatePath = Path.Combine(directory, "tests", "TestData", folder, fileName);
             if (File.Exists(candidatePath))
                 return candidatePath;
 
@@ -75,6 +83,6 @@ public class TestSolutionFixture : IAsyncLifetime
         }
 
         throw new FileNotFoundException(
-            "Could not find SampleSolution.sln. Ensure TestData is copied to the output directory.");
+            $"Could not find {fileName}. Ensure TestData is copied to the output directory.");
     }
 }

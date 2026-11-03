@@ -13,13 +13,13 @@ internal sealed class WorkspaceInitializer(
     ILogger<WorkspaceInitializer> logger) : BackgroundService
 {
     /// <summary>
-    /// The solution path to load. Set by Program.cs from command-line args or discovery.
+    /// The solutions to load, primary first. Set by Program.cs from command-line args or discovery.
     /// </summary>
-    public static string? SolutionPath { get; set; }
+    public static IReadOnlyList<string> SolutionPaths { get; set; } = [];
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        if (string.IsNullOrEmpty(SolutionPath))
+        if (SolutionPaths.Count == 0)
         {
             logger.LogWarning("No solution path configured. Workspace will not be initialized. " +
                               "Pass --solution <path> or ensure a .sln/.slnx file exists in the working directory.");
@@ -28,8 +28,8 @@ internal sealed class WorkspaceInitializer(
 
         try
         {
-            logger.LogInformation("Initializing workspace with solution: {SolutionPath}", SolutionPath);
-            await workspaceManager.LoadSolutionAsync(SolutionPath, stoppingToken);
+            logger.LogInformation("Initializing workspace with solution: {SolutionPath}", string.Join(", ", SolutionPaths));
+            await workspaceManager.LoadSolutionsAsync(SolutionPaths, stoppingToken);
             logger.LogInformation("Workspace initialization complete. {ProjectCount} projects loaded.",
                 workspaceManager.ProjectCount);
         }

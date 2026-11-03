@@ -48,4 +48,16 @@ public class GetProjectGraphTests(TestSolutionFixture fixture) : IClassFixture<T
 
         Assert.Equal("SampleSolution.sln", result.Solution);
     }
+
+    [Fact]
+    public async Task GetProjectGraph_SingleSolution_OmitsMultiSolutionFields()
+    {
+        // Multi-solution support (#16) must not change single-solution output.
+        var json = await GetProjectGraphTool.ExecuteAsync(fixture.WorkspaceManager, ct: TestContext.Current.CancellationToken);
+
+        Assert.DoesNotContain("\"Solutions\"", json);
+        Assert.Equal(
+            Path.GetDirectoryName(TestSolutionFixture.SampleSolutionPath),
+            fixture.WorkspaceManager.SolutionDirectory);
+    }
 }
