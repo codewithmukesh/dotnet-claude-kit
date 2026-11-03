@@ -231,7 +231,7 @@ internal static class SymbolResolver
 
         var byFile = symbols
             .Where(s => s.DeclaringSyntaxReferences.Any(r =>
-                r.SyntaxTree.FilePath.EndsWith(file, StringComparison.OrdinalIgnoreCase)))
+                DocumentResolver.PathMatches(r.SyntaxTree.FilePath, file)))
             .ToList();
 
         if (byFile.Count == 0) return symbols;
