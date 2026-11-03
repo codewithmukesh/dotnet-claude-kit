@@ -10,7 +10,7 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class GetProjectGraphTool
 {
-    [McpServerTool(Name = "get_project_graph"), Description("Get the solution project dependency tree with names, paths, target frameworks, and project references.")]
+    [McpServerTool(Name = "get_project_graph"), Description("Get the solution project dependency tree with names, paths, target frameworks, and project references. When several solutions are loaded, also lists them (Solutions) and which solution(s) each project belongs to.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
         CancellationToken ct = default)
@@ -21,6 +21,9 @@ public static class GetProjectGraphTool
         var solution = workspace.GetSolution();
         if (solution is null)
             return JsonSerializer.Serialize(new ProjectGraphResult("unknown", []));
+
+        // Membership is noise with one solution, so single-solution output is unchanged.
+        var multiSolution = workspace.LoadedSolutions.Count > 1;
 
         var projects = solution.Projects.Select(project =>
         {
@@ -34,14 +37,21 @@ public static class GetProjectGraphTool
                 Name: project.Name,
                 Path: project.FilePath ?? "unknown",
                 TargetFramework: targetFramework,
-                References: references);
+                References: references,
+                Solutions: multiSolution ? workspace.GetSolutionsForProject(project.FilePath) : null);
         }).ToList();
 
-        var solutionName = solution.FilePath is not null
-            ? Path.GetFileName(solution.FilePath)
-            : "unknown";
+        var solutionName = workspace.SolutionFilePath is { } primary
+            ? Path.GetFileName(primary)
+            : solution.FilePath is not null ? Path.GetFileName(solution.FilePath) : "unknown";
 
-        return JsonSerializer.Serialize(new ProjectGraphResult(solutionName, projects));
+        var solutions = multiSolution
+            ? workspace.LoadedSolutions
+                .Select(s => new SolutionSummary(s.Name, workspace.ToRelativePath(s.Path), s.ProjectPaths.Count, s.Error))
+                .ToList()
+            : null;
+
+        return JsonSerializer.Serialize(new ProjectGraphResult(solutionName, projects, solutions));
     }
 
     internal static string DetectTargetFramework(Microsoft.CodeAnalysis.Project project)

@@ -73,19 +73,21 @@ builder.Services.AddMcpServer()
         return result;
     }));
 
-// Discover solution path
-var solutionPath = SolutionDiscovery.FindSolutionPath(args);
-WorkspaceInitializer.SolutionPath = solutionPath;
+// Discover solution paths: --solution is repeatable, --all-solutions loads every solution found.
+var solutionPaths = SolutionDiscovery.FindSolutionPaths(args);
+WorkspaceInitializer.SolutionPaths = solutionPaths;
 
 var app = builder.Build();
 
 var workspaceManager = app.Services.GetRequiredService<WorkspaceManager>();
 workspaceManager.Services = app.Services;
+workspaceManager.DiscoverAllSolutions = SolutionDiscovery.IsAllSolutionsMode(args);
 
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
-if (solutionPath is not null)
+if (solutionPaths.Count > 0)
 {
-    logger.LogInformation("Discovered solution: {SolutionPath}", solutionPath);
+    foreach (var solutionPath in solutionPaths)
+        logger.LogInformation("Discovered solution: {SolutionPath}", solutionPath);
 }
 else
 {

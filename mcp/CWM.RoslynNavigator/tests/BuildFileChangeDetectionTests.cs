@@ -166,7 +166,7 @@ public sealed class BuildFileChangeDetectionTests : IDisposable
         }
     }
 
-    private static void CopyDirectory(string source, string destination)
+    internal static void CopyDirectory(string source, string destination)
     {
         Directory.CreateDirectory(destination);
 

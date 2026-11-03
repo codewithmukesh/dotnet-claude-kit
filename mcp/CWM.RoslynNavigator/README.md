@@ -26,7 +26,7 @@ CWM.RoslynNavigator is a Model Context Protocol (MCP) server that provides Claud
 | `get_type_hierarchy` | Inheritance chain, interfaces, and derived types |
 | `get_public_api` | Public members of a type without reading the full file |
 | `get_symbol_detail` | Full signature, parameters, return type, and XML docs |
-| `get_project_graph` | Solution project dependency tree |
+| `get_project_graph` | Solution project dependency tree; with several solutions loaded, also which solution(s) each project belongs to |
 | `get_dependency_graph` | Call dependency graph for a method |
 | `get_diagnostics` | Compiler and analyzer warnings/errors |
 | `get_test_coverage_map` | Heuristic test coverage by naming convention |
@@ -322,6 +322,9 @@ You can also add it manually to your Claude Code global settings (`~/.claude/set
 }
 ```
 
+Working across several solutions (e.g. microservices)? Repeat `--solution`, or add
+`--all-solutions` — see [Multiple Solutions](#multiple-solutions).
+
 ### As a Local Tool (per-repo)
 
 ```bash
@@ -389,16 +392,74 @@ dotnet publish src/CWM.RoslynNavigator.csproj -c Release --os linux --arch x64 \
 
 The server resolves the solution file in this order:
 
-1. **Explicit `--solution` argument** — Pass a `.sln`/`.slnx` file path directly, or a directory to scan recursively
+1. **Explicit `--solution` argument** — Pass a `.sln`/`.slnx` file path directly, or a directory to scan recursively. Repeatable — see [Multiple Solutions](#multiple-solutions)
 2. **Working directory scan** — If no argument, scans the current working directory recursively for solution files
-3. **MCP roots discovery** — On the first tool call, if no solution was found at startup, the server requests workspace roots from the MCP host (e.g., Claude Code) and scans those directories. This is a one-shot attempt — if no solution is found, it won't retry. This enables true zero-arg global tool operation.
-4. **Deterministic selection** — Shallowest solution wins (BFS); within the same depth, alphabetical (case-insensitive) ordering is used
+3. **MCP roots discovery** — On the first tool call, if no solution was found at startup, the server requests workspace roots from the MCP host (e.g., Claude Code) and scans those directories, loading a solution from **each** root that has one. This is a one-shot attempt — if no solution is found, it won't retry. This enables true zero-arg global tool operation.
+4. **Deterministic selection** — Shallowest solution wins (BFS); within the same depth, alphabetical (case-insensitive) ordering is used. With `--all-solutions`, every solution found is loaded instead.
 
 ### Recursive Search
 
 Discovery searches up to **3 levels deep** using breadth-first search, so a solution at `src/MyApp.sln` or `src/backend/Api/Api.sln` is found automatically.
 
 The following directories are skipped during scanning: `.git`, `.vs`, `.idea`, `node_modules`, `bin`, `obj`, `packages`, `artifacts`, `TestResults`, `.claude`.
+
+## Multiple Solutions
+
+A feature in a microservices codebase often spans several solutions. Instead of registering
+one server per solution, load them all into one:
+
+| Flag | Effect |
+|------|--------|
+| `--solution <path>` / `-s <path>` | Repeatable. Each value is a `.sln`/`.slnx` file, or a directory scanned for its first solution. The first one is the *primary* solution. |
+| `--all-solutions` | Load **every** solution found within the depth limit — in each `--solution` directory, in the working directory when no `--solution` is given, and in each MCP root. |
+
+```bash
+# Explicit list
+cwm-roslyn-navigator --solution services/orders/Orders.sln --solution services/billing/Billing.slnx
+
+# Everything under the repo (up to 3 levels deep)
+cwm-roslyn-navigator --solution . --all-solutions
+```
+
+MCP config for a microservices repo:
+
+```json
+{
+  "mcpServers": {
+    "cwm-roslyn-navigator": {
+      "command": "cwm-roslyn-navigator",
+      "args": ["--solution", "${workspaceFolder}", "--all-solutions"]
+    }
+  }
+}
+```
+
+**How it works — one workspace, many solutions.** The primary solution opens exactly as a
+single solution does. Every further solution contributes only the projects not already
+loaded, so a shared library referenced by five services is loaded and compiled **once**, and
+project references across solution boundaries resolve to that one project. Every tool then
+works across all solutions with no extra parameter: `find_references` on a shared contract
+returns callers from every service.
+
+- **Which solutions are loaded** — `get_project_graph` adds a `Solutions` list (name, path,
+  declared project count, load error if any) and, per project, the solution(s) that declare
+  it. Both fields are omitted when a single solution is loaded, so single-solution output is
+  unchanged.
+- **Paths** — tool results are relative to the deepest directory containing every loaded
+  solution (e.g. `orders/src/OrderService.cs`), so they stay unambiguous across solutions and
+  can be passed straight back to file-addressed tools.
+- **Failures** — a solution file that cannot be read is reported in `Solutions[].Error`; the
+  others still load. A project that fails to load is logged and skipped, as within one solution.
+- **Reloads** — a changed `.csproj`, `Directory.*` file (checked next to each solution), or
+  new source file reloads **all** configured solutions.
+- **Limits** — names must still be unique enough to resolve: if two services both define
+  `OrderService`, qualify it (`Orders.Api.OrderService`), as you would within one solution.
+  `.cwm-navigator.json` is discovered from the common root upward.
+
+**Cost.** Memory and load time scale with the number of *distinct* projects, not solutions —
+shared projects are free after the first. The [Scaling](#scaling) thresholds apply to the
+combined project count: past 50 projects compilations load lazily, and the 30-entry LRU
+compilation cache is shared across all solutions.
 
 ## Architecture
 
@@ -407,6 +468,7 @@ Program.cs              → MSBuildLocator → Host → MCP stdio transport
 WorkspaceManager.cs     → MSBuildWorkspace lifecycle, file watching, compilation caching
 WorkspaceInitializer.cs → BackgroundService triggers workspace load on startup
 SolutionDiscovery.cs    → Auto-detect .sln/.slnx from args or working directory
+SolutionFileReader.cs   → List a solution's projects (multi-solution dedupe and membership)
 SymbolResolver.cs       → Cross-project symbol resolution with disambiguation
 Tools/                  → MCP tool implementations (23 read-only tools)
 Responses/              → Token-optimized JSON response DTOs

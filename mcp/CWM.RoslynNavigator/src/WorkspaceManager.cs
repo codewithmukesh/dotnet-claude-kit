@@ -43,7 +43,10 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
 
     private MSBuildWorkspace? _workspace;
     private Solution? _solution;
-    private string? _solutionPath;
+    private IReadOnlyList<string> _solutionPaths = [];
+    private IReadOnlyList<LoadedSolution> _loadedSolutions = [];
+    private Dictionary<string, List<string>> _projectSolutions = new(StringComparer.OrdinalIgnoreCase);
+    private string? _rootDirectory;
     private string? _errorMessage;
 
     public WorkspaceState State { get; private set; } = WorkspaceState.NotStarted;
@@ -55,6 +58,12 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     /// Set by Program.cs after host build to allow lazy McpServer resolution.
     /// </summary>
     internal IServiceProvider? Services { get; set; }
+
+    /// <summary>
+    /// When set (<c>--all-solutions</c>), MCP roots discovery loads every solution under each
+    /// root instead of the first. Set by Program.cs.
+    /// </summary>
+    internal bool DiscoverAllSolutions { get; set; }
 
     /// <summary>
     /// Number of compilations currently cached. Test seam for verifying reload eviction.
@@ -70,13 +79,29 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     /// <summary>
     /// Loads the solution at the specified path. Call this once on startup.
     /// </summary>
-    public async Task LoadSolutionAsync(string solutionPath, CancellationToken ct = default)
+    public Task LoadSolutionAsync(string solutionPath, CancellationToken ct = default) =>
+        LoadSolutionsAsync([solutionPath], ct);
+
+    /// <summary>
+    /// Loads one or more solutions into a single workspace. The first opens via
+    /// <c>OpenSolutionAsync</c> exactly as a single-solution load does; each further solution
+    /// contributes only the projects not already loaded, so a library shared by several
+    /// solutions is loaded — and compiled — once, and project references across solution
+    /// boundaries resolve to that one instance. Every tool then sees all solutions at once.
+    /// A failure in an additional solution is recorded against it and does not fail the load.
+    /// </summary>
+    public async Task LoadSolutionsAsync(IReadOnlyList<string> solutionPaths, CancellationToken ct = default)
     {
+        if (solutionPaths.Count == 0)
+            throw new ArgumentException("At least one solution path is required.", nameof(solutionPaths));
+
         await _writeLock.WaitAsync(ct);
+        var solutionPath = solutionPaths[0];
         try
         {
             State = WorkspaceState.Loading;
-            _solutionPath = solutionPath;
+            _solutionPaths = [.. solutionPaths];
+            _rootDirectory = ComputeRootDirectory(solutionPaths);
             _errorMessage = null;
 
             // A reload mints fresh ProjectIds, so every cached Compilation is keyed on a
@@ -85,7 +110,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             _compilationCache.Clear();
             _cacheAccessOrder.Clear();
 
-            logger.LogInformation("Loading solution: {SolutionPath}", solutionPath);
+            logger.LogInformation("Loading solution: {SolutionPath}", string.Join(", ", solutionPaths));
 
             // Dispose previous workspace to avoid leaking Roslyn Solution snapshots
             _workspace?.Dispose();
@@ -102,9 +127,21 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             });
 
             _solution = await _workspace.OpenSolutionAsync(solutionPath, cancellationToken: ct);
+            List<LoadedSolution> loaded = [await DescribePrimaryAsync(solutionPath, _solution, ct)];
+
+            foreach (var additional in solutionPaths.Skip(1))
+                loaded.Add(await AddSolutionProjectsAsync(_workspace, additional, ct));
+
+            _solution = _workspace.CurrentSolution;
+            _loadedSolutions = loaded;
+            _projectSolutions = BuildMembership(loaded);
             Interlocked.Increment(ref _loadCount);
 
-            logger.LogInformation("Solution loaded: {ProjectCount} projects", _solution.ProjectIds.Count);
+            if (solutionPaths.Count == 1)
+                logger.LogInformation("Solution loaded: {ProjectCount} projects", _solution.ProjectIds.Count);
+            else
+                logger.LogInformation("{SolutionCount} solutions loaded: {ProjectCount} distinct projects",
+                    solutionPaths.Count, _solution.ProjectIds.Count);
 
             if (!IsLazyLoading)
             {
@@ -138,13 +175,159 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     public Solution? GetSolution() => _solution;
 
     /// <summary>
-    /// Directory containing the loaded solution file, used as the root for relative paths.
+    /// Root for relative paths: the directory containing the loaded solution file, or — with
+    /// several solutions — the deepest directory containing all of them, so every path a tool
+    /// returns stays relative (no "../") and round-trips through the file-addressed tools.
     /// </summary>
-    public string? SolutionDirectory =>
-        _solutionPath is null ? null : Path.GetDirectoryName(_solutionPath);
+    public string? SolutionDirectory => _rootDirectory;
 
-    /// <summary>Path of the loaded solution file, or null before one is discovered.</summary>
-    public string? SolutionFilePath => _solutionPath;
+    /// <summary>Path of the primary (first) solution file, or null before one is discovered.</summary>
+    public string? SolutionFilePath => _solutionPaths.Count > 0 ? _solutionPaths[0] : null;
+
+    /// <summary>Every configured solution file, primary first.</summary>
+    public IReadOnlyList<string> SolutionFilePaths => _solutionPaths;
+
+    /// <summary>The solutions in the current workspace, with their declared projects and any load error.</summary>
+    public IReadOnlyList<LoadedSolution> LoadedSolutions => _loadedSolutions;
+
+    /// <summary>
+    /// File names of the solutions that declare the project at <paramref name="projectFilePath"/>.
+    /// Empty for a project loaded only as a reference of a declared one.
+    /// </summary>
+    public IReadOnlyList<string> GetSolutionsForProject(string? projectFilePath) =>
+        projectFilePath is not null
+        && _projectSolutions.TryGetValue(SolutionFileReader.NormalizePath(projectFilePath), out var names)
+            ? names
+            : [];
+
+    /// <summary>
+    /// Membership for the primary solution. Parsing the file (rather than reading the loaded
+    /// projects) keeps referenced-but-undeclared projects out, matching how additional
+    /// solutions are described; the loaded projects are the fallback if parsing fails.
+    /// </summary>
+    private async Task<LoadedSolution> DescribePrimaryAsync(string solutionPath, Solution solution, CancellationToken ct)
+    {
+        try
+        {
+            return new LoadedSolution(solutionPath, await SolutionFileReader.GetProjectPathsAsync(solutionPath, ct), null);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogDebug(ex, "Could not parse {SolutionPath}; using its loaded projects.", solutionPath);
+            var loaded = solution.Projects
+                .Select(p => p.FilePath)
+                .OfType<string>()
+                .Select(SolutionFileReader.NormalizePath)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            return new LoadedSolution(solutionPath, loaded, null);
+        }
+    }
+
+    /// <summary>
+    /// Opens every project of <paramref name="solutionPath"/> that the workspace does not
+    /// already hold. <c>OpenProjectAsync</c> also loads project references and resolves the
+    /// ones already in the workspace to the existing project, so a shared library is never
+    /// duplicated. One project failing to load is logged and skipped — the same tolerance
+    /// <c>OpenSolutionAsync</c> applies — and only an unreadable solution file is an error.
+    /// </summary>
+    private async Task<LoadedSolution> AddSolutionProjectsAsync(
+        MSBuildWorkspace workspace, string solutionPath, CancellationToken ct)
+    {
+        IReadOnlyList<string> declared;
+        try
+        {
+            declared = await SolutionFileReader.GetProjectPathsAsync(solutionPath, ct);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            logger.LogError(ex, "Failed to read solution: {SolutionPath}", solutionPath);
+            return new LoadedSolution(solutionPath, [], ex.Message);
+        }
+
+        var added = 0;
+        var loaded = LoadedProjectPaths(workspace.CurrentSolution);
+        foreach (var projectPath in declared)
+        {
+            if (loaded.Contains(projectPath))
+                continue;
+
+            if (!File.Exists(projectPath))
+            {
+                logger.LogWarning("Project in {SolutionPath} not found: {ProjectPath}", solutionPath, projectPath);
+                continue;
+            }
+
+            try
+            {
+                await workspace.OpenProjectAsync(projectPath, cancellationToken: ct);
+                added++;
+                // The open may also have pulled in this solution's other projects as references.
+                loaded = LoadedProjectPaths(workspace.CurrentSolution);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                logger.LogWarning(ex, "Failed to load project {ProjectPath} from {SolutionPath}", projectPath, solutionPath);
+            }
+        }
+
+        logger.LogInformation("Added {SolutionPath}: {Declared} projects declared, {Added} newly loaded",
+            solutionPath, declared.Count, added);
+        return new LoadedSolution(solutionPath, declared, null);
+    }
+
+    private static HashSet<string> LoadedProjectPaths(Solution solution) =>
+        solution.Projects
+            .Select(p => p.FilePath)
+            .OfType<string>()
+            .Select(SolutionFileReader.NormalizePath)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+    private static Dictionary<string, List<string>> BuildMembership(IEnumerable<LoadedSolution> solutions)
+    {
+        var map = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var solution in solutions)
+        {
+            foreach (var projectPath in solution.ProjectPaths)
+            {
+                if (!map.TryGetValue(projectPath, out var names))
+                    map[projectPath] = names = [];
+                if (!names.Contains(solution.Name, StringComparer.OrdinalIgnoreCase))
+                    names.Add(solution.Name);
+            }
+        }
+        return map;
+    }
+
+    /// <summary>
+    /// Deepest directory containing every solution. Falls back to the primary solution's
+    /// directory when they share no root (different drives).
+    /// </summary>
+    internal static string? ComputeRootDirectory(IReadOnlyList<string> solutionPaths)
+    {
+        var directories = solutionPaths
+            .Select(p => Path.GetDirectoryName(Path.GetFullPath(p)))
+            .OfType<string>()
+            .ToList();
+        if (directories.Count == 0) return null;
+
+        var common = directories[0];
+        foreach (var directory in directories.Skip(1))
+        {
+            while (common is not null && !IsSameOrUnder(directory, common))
+                common = Path.GetDirectoryName(common);
+        }
+
+        return common ?? directories[0];
+    }
+
+    private static bool IsSameOrUnder(string path, string root)
+    {
+        var trimmedRoot = Path.TrimEndingDirectorySeparator(root);
+        return path.Equals(trimmedRoot, StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith(trimmedRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+            || (Path.EndsInDirectorySeparator(root) && path.StartsWith(root, StringComparison.OrdinalIgnoreCase));
+    }
 
     /// <summary>
     /// Absolute paths of every document in the solution, captured at load. Used to size the
@@ -247,6 +430,8 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     public string GetStatusMessage() => State switch
     {
         WorkspaceState.NotStarted => "Workspace has not been initialized. Waiting for solution path.",
+        WorkspaceState.Loading when _solutionPaths.Count > 1 =>
+            $"Workspace is loading {_solutionPaths.Count} solutions ({string.Join(", ", _solutionPaths.Select(Path.GetFileName))}). Please try again in a moment.",
         WorkspaceState.Loading => "Workspace is loading the solution. Please try again in a moment.",
         WorkspaceState.Error =>
             $"Workspace failed to load: {_errorMessage}. The server retries automatically on later calls.",
@@ -287,11 +472,11 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
 
         // Retry a previously failed load of a known solution path (transient failures
         // such as mid-write project files). Cooldown prevents hammering a broken solution.
-        if (State == WorkspaceState.Error && _solutionPath is not null && TryClaimErrorRetry())
+        if (State == WorkspaceState.Error && _solutionPaths.Count > 0 && TryClaimErrorRetry())
         {
             try
             {
-                await LoadSolutionAsync(_solutionPath, ct);
+                await LoadSolutionsAsync(_solutionPaths, ct);
             }
             catch (OperationCanceledException)
             {
@@ -331,19 +516,28 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             if (server is null) return;
 
             var rootsResult = await server.RequestRootsAsync(new ListRootsRequestParams(), ct);
+
+            // A solution from EACH root (every solution per root with --all-solutions), so a
+            // multi-root workspace spanning several services loads them all into one workspace.
+            var solutionPaths = new List<string>();
             foreach (var root in rootsResult.Roots)
             {
                 if (!Uri.TryCreate(root.Uri, UriKind.Absolute, out var uri)) continue;
                 var localPath = uri.LocalPath;
                 if (!Directory.Exists(localPath)) continue;
 
-                var solutionPath = SolutionDiscovery.FindSolutionPath([], localPath);
-                if (solutionPath is not null)
+                foreach (var solutionPath in SolutionDiscovery.ScanDirectory(localPath, DiscoverAllSolutions))
                 {
+                    if (solutionPaths.Contains(solutionPath, StringComparer.OrdinalIgnoreCase)) continue;
                     logger.LogInformation("Discovered solution from MCP roots: {SolutionPath}", solutionPath);
-                    await LoadSolutionAsync(solutionPath, ct);
-                    return;
+                    solutionPaths.Add(solutionPath);
                 }
+            }
+
+            if (solutionPaths.Count > 0)
+            {
+                await LoadSolutionsAsync(solutionPaths, ct);
+                return;
             }
 
             logger.LogWarning("MCP roots available but no .sln/.slnx found in any root directory.");
@@ -422,9 +616,6 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     /// </summary>
     private IEnumerable<string> EnumerateSharedBuildFiles()
     {
-        var root = SolutionDirectory;
-        if (root is null || !Directory.Exists(root)) yield break;
-
         string[] names =
         [
             "Directory.Build.props",
@@ -434,10 +625,22 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             "nuget.config"
         ];
 
-        foreach (var name in names)
+        // Each solution's own directory: with several solutions, each service typically
+        // carries its own Directory.Packages.props.
+        var roots = _solutionPaths
+            .Select(Path.GetDirectoryName)
+            .OfType<string>()
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var root in roots)
         {
-            var path = Path.Combine(root, name);
-            if (File.Exists(path)) yield return path;
+            if (!Directory.Exists(root)) continue;
+
+            foreach (var name in names)
+            {
+                var path = Path.Combine(root, name);
+                if (File.Exists(path)) yield return path;
+            }
         }
     }
 
@@ -483,7 +686,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     /// </summary>
     public async Task RefreshChangedDocumentsAsync(CancellationToken ct = default)
     {
-        if (_solution is null || _solutionPath is null) return;
+        if (_solution is null || _solutionPaths.Count == 0) return;
 
         var now = clock.GetUtcNow().UtcTicks;
 
@@ -499,7 +702,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
                 "Build files changed ({Files}). Reloading solution.",
                 string.Join(", ", changedBuildFiles.Select(Path.GetFileName)));
 
-            await LoadSolutionAsync(_solutionPath, ct);
+            await LoadSolutionsAsync(_solutionPaths, ct);
             return;
         }
 
@@ -511,7 +714,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         if (Interlocked.Exchange(ref _newSourceFilesPending, 0) == 1)
         {
             logger.LogInformation("New source files detected. Reloading solution.");
-            await LoadSolutionAsync(_solutionPath, ct);
+            await LoadSolutionsAsync(_solutionPaths, ct);
             return;
         }
 

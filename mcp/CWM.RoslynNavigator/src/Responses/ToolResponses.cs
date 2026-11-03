@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace CWM.RoslynNavigator.Responses;
 
 // Token-optimized response records for MCP tools.
@@ -70,9 +72,25 @@ internal sealed record ProjectInfo(
     string Name,
     string Path,
     string TargetFramework,
-    List<string> References);
+    List<string> References,
+    // Multi-solution only: the solution(s) declaring this project. Omitted for one solution.
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] IReadOnlyList<string>? Solutions = null);
 
-internal sealed record ProjectGraphResult(string Solution, List<ProjectInfo> Projects);
+/// <summary>A loaded solution as reported by get_project_graph when several are loaded.</summary>
+internal sealed record SolutionSummary(
+    string Name,
+    string Path,
+    int ProjectCount,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Error = null);
+
+/// <summary>
+/// <see cref="Solution"/> is the primary solution's file name (unchanged for one solution).
+/// <see cref="Solutions"/> appears only when several solutions are loaded.
+/// </summary>
+internal sealed record ProjectGraphResult(
+    string Solution,
+    List<ProjectInfo> Projects,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<SolutionSummary>? Solutions = null);
 
 internal sealed record MemberInfo(string Kind, string Signature, string Accessibility);
 

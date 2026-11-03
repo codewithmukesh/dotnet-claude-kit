@@ -194,4 +194,86 @@ public class SolutionDiscoveryTests : IDisposable
 
         Assert.Equal(slnPath, result);
     }
+
+    // Multi-solution (#16)
+
+    [Fact]
+    public void FindSolutionPaths_RepeatedSolutionFlag_ReturnsAllInOrder()
+    {
+        var orders = CreateFile("orders", "Orders.sln");
+        var billing = CreateFile("billing", "Billing.slnx");
+
+        var result = SolutionDiscovery.FindSolutionPaths(["--solution", orders, "-s", billing]);
+
+        Assert.Equal([orders, billing], result);
+    }
+
+    [Fact]
+    public void FindSolutionPaths_DuplicateSolutionFlag_Deduplicated()
+    {
+        var orders = CreateFile("orders", "Orders.sln");
+
+        var result = SolutionDiscovery.FindSolutionPaths(["--solution", orders, "--solution", orders]);
+
+        Assert.Equal([orders], result);
+    }
+
+    [Fact]
+    public void FindSolutionPaths_MissingExplicitPath_SkippedWithoutFallback()
+    {
+        var orders = CreateFile("orders", "Orders.sln");
+        CreateFile("Root.sln");
+
+        var result = SolutionDiscovery.FindSolutionPaths(
+            ["--solution", Path.Combine(_tempRoot, "nope.sln"), "--solution", orders], _tempRoot);
+
+        Assert.Equal([orders], result);
+    }
+
+    [Fact]
+    public void FindSolutionPaths_WithoutAllFlag_ReturnsOnlyShallowest()
+    {
+        var root = CreateFile("Root.sln");
+        CreateFile("svc", "Service.sln");
+
+        var result = SolutionDiscovery.FindSolutionPaths([], _tempRoot);
+
+        Assert.Equal([root], result);
+    }
+
+    [Fact]
+    public void FindSolutionPaths_AllSolutionsFlag_ReturnsEverySolutionWithinDepth()
+    {
+        var orders = CreateFile("services", "orders", "Orders.sln");
+        var billing = CreateFile("services", "billing", "Billing.slnx");
+        CreateFile("a", "b", "c", "d", "TooDeep.sln");
+
+        var result = SolutionDiscovery.FindSolutionPaths(["--all-solutions"], _tempRoot);
+
+        Assert.Equal([billing, orders], result); // BFS, then alphabetical
+    }
+
+    [Fact]
+    public void FindSolutionPaths_AllSolutionsFlagWithDirectoryArg_ScansThatDirectory()
+    {
+        var orders = CreateFile("services", "orders", "Orders.sln");
+        var billing = CreateFile("services", "billing", "Billing.sln");
+        CreateFile("Elsewhere.sln");
+
+        var result = SolutionDiscovery.FindSolutionPaths(
+            ["--solution", Path.Combine(_tempRoot, "services"), "--all-solutions"]);
+
+        Assert.Equal([billing, orders], result);
+    }
+
+    [Fact]
+    public void FindSolutionPath_SeveralConfigured_ReturnsFirst()
+    {
+        var orders = CreateFile("orders", "Orders.sln");
+        var billing = CreateFile("billing", "Billing.sln");
+
+        var result = SolutionDiscovery.FindSolutionPath(["--solution", orders, "--solution", billing]);
+
+        Assert.Equal(orders, result);
+    }
 }

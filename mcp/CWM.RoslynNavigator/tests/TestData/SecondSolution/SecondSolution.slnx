@@ -1,0 +1,5 @@
+<Solution>
+  <!-- Shares SampleDomain with SampleSolution.sln: the multi-solution tests (#16) prove it loads once. -->
+  <Project Path="../SampleSolution/SampleDomain/SampleDomain.csproj" />
+  <Project Path="ShippingService/ShippingService.csproj" />
+</Solution>
