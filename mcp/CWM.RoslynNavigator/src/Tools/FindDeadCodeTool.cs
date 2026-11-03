@@ -80,6 +80,7 @@ public static class FindDeadCodeTool
 
         var candidates = new List<(ISymbol Symbol, string File, int Line)>();
         var conventionFiltered = 0;
+        var interfaceImplementations = new Dictionary<INamedTypeSymbol, HashSet<ISymbol>>(SymbolEqualityComparer.Default);
 
         var projects = GetProjectsForScope(solution, scope, path);
 
@@ -115,7 +116,7 @@ public static class FindDeadCodeTool
                     if (symbol is null) continue;
 
                     if (!MatchesKindFilter(symbol, kind)) continue;
-                    if (ShouldSkip(symbol)) continue;
+                    if (ShouldSkip(symbol, interfaceImplementations)) continue;
 
                     if (IsConventionDiscovered(symbol))
                     {
@@ -135,11 +136,12 @@ public static class FindDeadCodeTool
             .DistinctBy(c => c.Symbol.ToDisplayString())
             .ToList();
 
-        // Pre-collect all source texts for fast name-based pre-filter, and index the two
-        // reflection paths a reference search is blind to. Both walks cover the whole
-        // solution, not just the requested scope: a type scoped out of the scan can still
-        // be the thing that names this one.
-        var sourceTexts = new Dictionary<SyntaxTree, string>();
+        // Index, in one pass per file, where each candidate name appears for the fast
+        // name-based pre-filter, and the two reflection paths a reference search is blind to.
+        // Both walks cover the whole solution, not just the requested scope: a type scoped
+        // out of the scan can still be the thing that names this one.
+        var occurrences = new NameOccurrenceIndex(unique.Select(c => c.Symbol.Name));
+        var indexedTrees = new HashSet<SyntaxTree>();
         var reflection = new ReflectionIndex();
 
         foreach (var proj in solution.Projects)
@@ -149,9 +151,11 @@ public static class FindDeadCodeTool
 
             foreach (var tree in comp.SyntaxTrees)
             {
-                if (!sourceTexts.TryAdd(tree, (await tree.GetTextAsync(ct)).ToString()))
+                if (!indexedTrees.Add(tree))
                     continue;
 
+                ct.ThrowIfCancellationRequested();
+                occurrences.Add(tree, await tree.GetTextAsync(ct));
                 reflection.Add(await tree.GetRootAsync(ct), ct);
             }
         }
@@ -168,11 +172,7 @@ public static class FindDeadCodeTool
             // file, it is likely referenced. Whole-token matching (not substring) so that
             // e.g. "OrderService" in another file does not mask a dead "Order" type.
             var declaringTree = symbol.DeclaringSyntaxReferences.FirstOrDefault()?.SyntaxTree;
-            var likelyReferenced = sourceTexts.Any(kvp =>
-                kvp.Key != declaringTree &&
-                ContainsIdentifier(kvp.Value, symbol.Name));
-
-            if (likelyReferenced) continue;
+            if (occurrences.AppearsOutside(symbol.Name, declaringTree)) continue;
 
             // Expensive but necessary for remaining candidates
             var references = await SymbolFinder.FindReferencesAsync(symbol, solution, ct);
@@ -270,30 +270,6 @@ public static class FindDeadCodeTool
         return null;
     }
 
-    /// <summary>
-    /// Checks whether <paramref name="name"/> occurs in <paramref name="text"/> as a whole
-    /// identifier token (not as a substring of a longer identifier).
-    /// </summary>
-    private static bool ContainsIdentifier(string text, string name)
-    {
-        var index = 0;
-        while ((index = text.IndexOf(name, index, StringComparison.Ordinal)) >= 0)
-        {
-            var before = index == 0 ? '\0' : text[index - 1];
-            var afterIndex = index + name.Length;
-            var after = afterIndex >= text.Length ? '\0' : text[afterIndex];
-
-            if (!IsIdentifierChar(before) && !IsIdentifierChar(after))
-                return true;
-
-            index += 1;
-        }
-
-        return false;
-    }
-
-    private static bool IsIdentifierChar(char c) => char.IsLetterOrDigit(c) || c == '_';
-
     private static bool MatchesKindFilter(ISymbol symbol, string kind) => kind.ToLowerInvariant() switch
     {
         "type" or "class" => symbol is INamedTypeSymbol,
@@ -303,8 +279,16 @@ public static class FindDeadCodeTool
         _ => symbol is INamedTypeSymbol or IMethodSymbol or IPropertySymbol
     };
 
-    private static bool ShouldSkip(ISymbol symbol)
+    private static bool ShouldSkip(
+        ISymbol symbol,
+        Dictionary<INamedTypeSymbol, HashSet<ISymbol>> interfaceImplementations)
     {
+        // Skip non-private members that could be used externally — only internal/private
+        // dead code is flagged. Checked first because it is the cheapest test and rejects
+        // most symbols.
+        if (symbol.DeclaredAccessibility == Accessibility.Public)
+            return true;
+
         // Skip constructors
         if (symbol is IMethodSymbol { MethodKind: MethodKind.Constructor or MethodKind.StaticConstructor })
             return true;
@@ -314,18 +298,9 @@ public static class FindDeadCodeTool
             return true;
 
         // Skip interface implementations
-        if (symbol.ContainingType is not null)
-        {
-            foreach (var iface in symbol.ContainingType.AllInterfaces)
-            {
-                foreach (var member in iface.GetMembers())
-                {
-                    var impl = symbol.ContainingType.FindImplementationForInterfaceMember(member);
-                    if (SymbolEqualityComparer.Default.Equals(impl, symbol))
-                        return true;
-                }
-            }
-        }
+        if (symbol.ContainingType is { } containingType
+            && InterfaceImplementations(containingType, interfaceImplementations).Contains(symbol))
+            return true;
 
         // Skip overrides
         if (symbol is IMethodSymbol { IsOverride: true })
@@ -355,12 +330,34 @@ public static class FindDeadCodeTool
                 return true;
         }
 
-        // Skip non-private members that could be used externally
-        // Only flag internal/private dead code
-        if (symbol.DeclaredAccessibility == Accessibility.Public)
-            return true;
-
         return false;
+    }
+
+    /// <summary>
+    /// Every member of <paramref name="type"/> that implements an interface member, computed
+    /// once per type rather than once per member — the per-member scan was quadratic in the
+    /// size of the type's interface surface.
+    /// </summary>
+    private static HashSet<ISymbol> InterfaceImplementations(
+        INamedTypeSymbol type,
+        Dictionary<INamedTypeSymbol, HashSet<ISymbol>> cache)
+    {
+        if (cache.TryGetValue(type, out var cached))
+            return cached;
+
+        var implementations = new HashSet<ISymbol>(SymbolEqualityComparer.Default);
+
+        foreach (var iface in type.AllInterfaces)
+        {
+            foreach (var member in iface.GetMembers())
+            {
+                if (type.FindImplementationForInterfaceMember(member) is { } implementation)
+                    implementations.Add(implementation);
+            }
+        }
+
+        cache[type] = implementations;
+        return implementations;
     }
 
     private static IEnumerable<Project> GetProjectsForScope(Solution solution, string scope, string? path) => scope switch
