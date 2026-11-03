@@ -528,8 +528,11 @@ returns callers from every service.
   can be passed straight back to file-addressed tools.
 - **Failures** — a solution file that cannot be read is reported in `Solutions[].Error`; the
   others still load. A project that fails to load is logged and skipped, as within one solution.
-- **Reloads** — a changed `.csproj` or `Directory.*` file (checked next to each solution)
-  reloads **all** configured solutions. A new source file is added in place to the project
+- **Reloads** — a changed solution file, `.csproj`, or shared build file reloads **all**
+  configured solutions. Shared build files are `Directory.Build.props`/`.targets`,
+  `Directory.Packages.props`, `global.json`, and `NuGet.config` in any directory from each
+  project or solution up to the file-system root — so `src/Directory.Build.props` or one above
+  the solution folder counts, as it does for MSBuild. A new source file is added in place to the project
   that owns it, in whichever solution; it causes a reload only when that project customizes
   its compile items (see [Scaling](#scaling)).
 - **Limits** — names must still be unique enough to resolve: if two services both define
@@ -586,8 +589,9 @@ One strategy for every solution size:
   its `Directory.Build.*` files. Otherwise the solution reloads so MSBuild can decide. Files
   under `bin/`, `obj/`, or dot-folders are ignored, and a file the project excluded is
   remembered so it never triggers a second reload.
-- **Reloads never take the workspace offline.** A changed `.csproj` or `Directory.*` file
-  reloads every solution in the background: the next workspace is opened beside the current
+- **Reloads never take the workspace offline.** A changed solution, `.csproj`, or shared build
+  file (`Directory.Build.*`, `Directory.Packages.props`, `global.json`, `NuGet.config`, in any
+  folder from a project up to the root) reloads every solution in the background: the next workspace is opened beside the current
   one while every tool call keeps answering from the last good snapshot, then swapped in
   atomically. Only the very first load returns `Loading`. Answers given during a reload carry
   a `WorkspaceWarning` saying they come from the previous snapshot, and

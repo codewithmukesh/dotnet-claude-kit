@@ -964,7 +964,12 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             }
         }
 
-        foreach (var sharedFile in EnumerateSharedBuildFiles())
+        // The solution files themselves: adding or removing a project changes what loads.
+        foreach (var solutionPath in _solutionPaths)
+            TrackBuildFile(solutionPath, stampsAtLoadStart);
+
+        var projectPaths = _solution.Projects.Select(p => p.FilePath).OfType<string>();
+        foreach (var sharedFile in EnumerateSharedBuildFiles(projectPaths, _solutionPaths))
             TrackBuildFile(sharedFile, stampsAtLoadStart);
 
         _projectsByDirectory = projectsByDirectory.ToDictionary(
@@ -981,39 +986,53 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             _knownDocuments.Count, _buildFiles.Count);
     }
 
+    /// <summary>File names MSBuild, the SDK resolver, and NuGet pick up from a project's directory or any above it.</summary>
+    private static readonly string[] SharedBuildFileNames =
+    [
+        "Directory.Build.props",
+        "Directory.Build.targets",
+        "Directory.Packages.props",
+        "global.json",
+        // NuGet accepts all three spellings; on a case-sensitive file system they are distinct.
+        "NuGet.config",
+        "nuget.config",
+        "NuGet.Config"
+    ];
+
     /// <summary>
-    /// Directory-scoped MSBuild files change the compilation of every project beneath
-    /// them — a bumped version in Directory.Packages.props is as significant as a csproj
-    /// edit — but they are not documents, so nothing else in the workspace notices them.
+    /// Directory-scoped files change the compilation of every project beneath them — a bumped
+    /// version in Directory.Packages.props is as significant as a csproj edit — but they are
+    /// not documents, so nothing else in the workspace notices them.
+    ///
+    /// <para>MSBuild imports the nearest Directory.Build.props/.targets walking up from each
+    /// <em>project</em>, not from the solution, and those commonly import the next one up; large
+    /// repos keep them in src/ and tests/ or above the solution folder. So every directory from
+    /// each project (and each solution, for global.json and NuGet.config) up to the file-system
+    /// root is checked. Directories shared by several projects are visited once, which keeps
+    /// this to a handful of stats per distinct folder.</para>
     /// </summary>
-    private IEnumerable<string> EnumerateSharedBuildFiles()
+    internal static IReadOnlyList<string> EnumerateSharedBuildFiles(
+        IEnumerable<string> projectPaths, IEnumerable<string> solutionPaths)
     {
-        string[] names =
-        [
-            "Directory.Build.props",
-            "Directory.Build.targets",
-            "Directory.Packages.props",
-            "global.json",
-            "nuget.config"
-        ];
+        var visited = new HashSet<string>(PathComparison.Comparer);
+        var found = new HashSet<string>(PathComparison.Comparer);
+        var result = new List<string>();
 
-        // Each solution's own directory: with several solutions, each service typically
-        // carries its own Directory.Packages.props.
-        var roots = _solutionPaths
-            .Select(Path.GetDirectoryName)
-            .OfType<string>()
-            .Distinct(PathComparison.Comparer);
-
-        foreach (var root in roots)
+        foreach (var start in projectPaths.Concat(solutionPaths).Select(Path.GetDirectoryName).OfType<string>())
         {
-            if (!Directory.Exists(root)) continue;
-
-            foreach (var name in names)
+            // Stops at the first directory already walked: everything above it was walked too.
+            for (var dir = start; dir is not null && visited.Add(dir); dir = Path.GetDirectoryName(dir))
             {
-                var path = Path.Combine(root, name);
-                if (File.Exists(path)) yield return path;
+                foreach (var name in SharedBuildFileNames)
+                {
+                    var path = Path.Combine(dir, name);
+                    if (File.Exists(path) && found.Add(path))
+                        result.Add(path);
+                }
             }
         }
+
+        return result;
     }
 
     /// <summary>
