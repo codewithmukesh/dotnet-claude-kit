@@ -6,8 +6,7 @@
       "File": "SampleDomain/UnusedHelper.cs",
       "Line": 9,
       "ContainingType": "UnusedHelper",
-      "Confidence": "high",
-      "Note": null
+      "Confidence": "high"
     },
     {
       "Name": "FormatUnused",
@@ -15,17 +14,14 @@
       "File": "SampleDomain/UnusedHelper.cs",
       "Line": 14,
       "ContainingType": "UnusedHelper",
-      "Confidence": "high",
-      "Note": null
+      "Confidence": "high"
     },
     {
       "Name": "UnusedHelper",
       "Kind": "class",
       "File": "SampleDomain/UnusedHelper.cs",
       "Line": 7,
-      "ContainingType": null,
-      "Confidence": "high",
-      "Note": null
+      "Confidence": "high"
     }
   ],
   "Count": 3,

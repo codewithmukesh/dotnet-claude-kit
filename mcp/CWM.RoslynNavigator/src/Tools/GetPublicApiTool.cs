@@ -25,7 +25,7 @@ public static class GetPublicApiTool
         var symbol = resolved.Symbol;
 
         if (symbol is not INamedTypeSymbol typeSymbol)
-            return JsonSerializer.Serialize(new ErrorResponse(
+            return ToolJson.Serialize(new ErrorResponse(
                 ErrorCodes.WrongSymbolKind,
                 $"'{typeName}' resolved to a {SymbolResolver.GetKindString(symbol)}, not a type."));
 
@@ -43,7 +43,7 @@ public static class GetPublicApiTool
         var typeKind = SymbolResolver.GetKindString(typeSymbol);
         var location = SymbolResolver.GetLocation(typeSymbol);
 
-        return JsonSerializer.Serialize(new PublicApiResult(
+        return ToolJson.Serialize(new PublicApiResult(
             typeKind, page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit,
             File: location is { } loc ? workspace.ToRelativePath(loc.File) : null,
             Line: location?.Line ?? 0));

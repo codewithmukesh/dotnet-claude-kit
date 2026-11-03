@@ -26,7 +26,7 @@ public static class GetDependencyGraphTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new DependencyGraphResult("unknown", [], 0, false));
+            return ToolJson.Serialize(new DependencyGraphResult("unknown", [], 0, false));
 
         var resolved = await SymbolResolver.ResolveOrErrorAsync(workspace, symbolName, file, line, ct: ct);
         if (resolved.Failed) return resolved.Error;
@@ -34,7 +34,7 @@ public static class GetDependencyGraphTool
         var symbol = resolved.Symbol;
 
         if (symbol is not IMethodSymbol rootMethod)
-            return JsonSerializer.Serialize(new ErrorResponse(
+            return ToolJson.Serialize(new ErrorResponse(
                 ErrorCodes.WrongSymbolKind,
                 $"'{symbolName}' resolved to a {SymbolResolver.GetKindString(symbol)}, not a method."));
 
@@ -53,7 +53,7 @@ public static class GetDependencyGraphTool
 
         await WalkDependenciesAsync(workspace, rootMethod, 1, depth, visited, dependencies, fileToProject, state, ct);
 
-        return JsonSerializer.Serialize(new DependencyGraphResult(
+        return ToolJson.Serialize(new DependencyGraphResult(
             RootSymbol: rootMethod.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat),
             Dependencies: dependencies,
             TotalNodes: dependencies.Count,

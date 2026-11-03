@@ -22,7 +22,7 @@ public static class GetTypeHierarchyTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new TypeHierarchyResult([], [], [], 0, false, Math.Max(1, maxResults)));
+            return ToolJson.Serialize(new TypeHierarchyResult([], [], [], 0, false, Math.Max(1, maxResults)));
 
         var resolved = await SymbolResolver.ResolveOrErrorAsync(workspace, typeName, ct: ct);
         if (resolved.Failed) return resolved.Error;
@@ -30,7 +30,7 @@ public static class GetTypeHierarchyTool
         var symbol = resolved.Symbol;
 
         if (symbol is not INamedTypeSymbol typeSymbol)
-            return JsonSerializer.Serialize(new ErrorResponse(
+            return ToolJson.Serialize(new ErrorResponse(
                 ErrorCodes.WrongSymbolKind,
                 $"'{typeName}' resolved to a {SymbolResolver.GetKindString(symbol)}, not a type."));
 
@@ -71,7 +71,7 @@ public static class GetTypeHierarchyTool
             maxResults);
         var location = SymbolResolver.GetLocation(typeSymbol);
 
-        return JsonSerializer.Serialize(new TypeHierarchyResult(
+        return ToolJson.Serialize(new TypeHierarchyResult(
             baseTypes, interfaces, page.Items, page.TotalFound, page.Truncated, page.Limit,
             File: location is { } loc ? workspace.ToRelativePath(loc.File) : null,
             Line: location?.Line ?? 0));

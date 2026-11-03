@@ -24,7 +24,7 @@ public static class DetectCircularDependenciesTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new CircularDependenciesResult([], 0));
+            return ToolJson.Serialize(new CircularDependenciesResult([], 0));
 
         if (ArgumentChecks.UnknownProject(solution, projectFilter) is { } unknown)
             return unknown;
@@ -33,7 +33,7 @@ public static class DetectCircularDependenciesTool
             ? await DetectTypeCyclesAsync(workspace, solution, projectFilter, ct)
             : DetectProjectCycles(solution);
 
-        return JsonSerializer.Serialize(new CircularDependenciesResult(cycles, cycles.Count));
+        return ToolJson.Serialize(new CircularDependenciesResult(cycles, cycles.Count));
     }
 
     private static List<CircularDependencyChain> DetectProjectCycles(Solution solution)

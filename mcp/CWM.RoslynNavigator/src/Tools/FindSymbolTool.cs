@@ -9,7 +9,7 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class FindSymbolTool
 {
-    [McpServerTool(Name = "find_symbol"), Description("Find where a type, method, or property is defined in the solution. Returns file path, line number, namespace, containing type, an IsGenerated flag marking source-generator or tooling output, and a SymbolId to pass as the name to other tools so they target exactly that symbol. Exact name by default; set match to 'prefix', 'camelhump' ('GBIA' or 'GetByAsync' finds GetByIdAsync), or 'substring' when you only know part of the name — fuzzy results are ranked exact > prefix > camelhump > substring, types before members, and each carries its Match tier.")]
+    [McpServerTool(Name = "find_symbol"), Description("Find where a type, method, or property is defined in the solution. Returns file path, line number, namespace, containing type, IsGenerated: true for source-generator or tooling output (omitted when false), and a SymbolId to pass as the name to other tools so they target exactly that symbol. Exact name by default; set match to 'prefix', 'camelhump' ('GBIA' or 'GetByAsync' finds GetByIdAsync), or 'substring' when you only know part of the name — fuzzy results are ranked exact > prefix > camelhump > substring, types before members, and each carries its Match tier.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
         [Description("Symbol name. Bare ('CreateAsync'), type-qualified ('OrderService.CreateAsync'), or fully qualified ('MyApp.Orders.OrderService.CreateAsync'), or a SymbolId (exact mode). Qualifying narrows results when a name is reused across types; with a fuzzy match the qualifier still matches exactly and only the last segment is fuzzy.")] string name,
@@ -23,7 +23,7 @@ public static class FindSymbolTool
 
         if (!SymbolMatcher.TryParseMode(match, out var mode))
         {
-            return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.InvalidArgument,
+            return ToolJson.Serialize(new ErrorResponse(ErrorCodes.InvalidArgument,
                 $"Unknown match '{match}'. Use 'exact', 'prefix', 'camelhump', or 'substring'."));
         }
 
@@ -50,7 +50,7 @@ public static class FindSymbolTool
 
         var page = Paging.Apply(all, maxResults);
 
-        return JsonSerializer.Serialize(new SymbolSearchResult(
+        return ToolJson.Serialize(new SymbolSearchResult(
             page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit));
     }
 

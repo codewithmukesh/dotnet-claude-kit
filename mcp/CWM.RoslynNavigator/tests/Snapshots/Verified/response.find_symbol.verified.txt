@@ -6,7 +6,6 @@
       "File": "SampleApi/OrderService.cs",
       "Line": 8,
       "Namespace": "SampleApi",
-      "IsGenerated": false,
       "SymbolId": "T:SampleApi.OrderService"
     }
   ],

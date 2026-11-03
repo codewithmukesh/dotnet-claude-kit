@@ -74,7 +74,7 @@ public static class GetEndpointMapTool
     }
 
     private static string Serialize(Paging.Page<EndpointEntry> page) =>
-        JsonSerializer.Serialize(new EndpointMapResult(
+        ToolJson.Serialize(new EndpointMapResult(
             page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit));
 
     /// <summary>

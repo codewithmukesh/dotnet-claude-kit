@@ -27,7 +27,7 @@ public static class GetDiagnosticsTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new DiagnosticsResult(
+            return ToolJson.Serialize(new DiagnosticsResult(
                 [], 0, 0, 0, 0, 0, false, Math.Max(1, maxResults)));
 
         HashSet<string>? fileScopePaths = null;
@@ -36,7 +36,7 @@ public static class GetDiagnosticsTool
         {
             var documents = DocumentResolver.FindDocuments(solution, path);
             if (documents.Count == 0)
-                return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.FileNotFound,
+                return ToolJson.Serialize(new ErrorResponse(ErrorCodes.FileNotFound,
                     $"File '{path}' is not part of any project in the solution."));
 
             fileScopePaths = documents.Select(d => d.FilePath!).ToHashSet(StringComparer.OrdinalIgnoreCase);
@@ -101,7 +101,7 @@ public static class GetDiagnosticsTool
 
         var page = Paging.Apply(ordered, maxResults);
 
-        return JsonSerializer.Serialize(new DiagnosticsResult(
+        return ToolJson.Serialize(new DiagnosticsResult(
             page.Items, page.Count, page.TotalFound, errors, warnings, info, page.Truncated, page.Limit));
     }
 

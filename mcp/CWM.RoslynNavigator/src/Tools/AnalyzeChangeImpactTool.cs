@@ -28,7 +28,7 @@ public static class AnalyzeChangeImpactTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new ErrorResponse(
+            return ToolJson.Serialize(new ErrorResponse(
                 ErrorCodes.InvalidArgument, "No solution is loaded."));
 
         var resolved = await SymbolResolver.ResolveOrErrorAsync(workspace, symbolName, file, line, ct: ct);
@@ -134,7 +134,7 @@ public static class AnalyzeChangeImpactTool
         if (walk.Stopped)
             rationale += $"; caller walk stopped at its {MaxCallerSearches}-search bound, so TransitiveCallerCount is a lower bound";
 
-        return JsonSerializer.Serialize(new ChangeImpactResult(
+        return ToolJson.Serialize(new ChangeImpactResult(
             Symbol: SymbolResolver.BuildQualifiedName(symbol),
             Kind: SymbolResolver.GetKindString(symbol),
             Accessibility: symbol.DeclaredAccessibility.ToString().ToLowerInvariant(),

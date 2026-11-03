@@ -181,7 +181,6 @@
     "TestFiles": 0,
     "GeneratedFiles": 0,
     "MigrationFiles": 0,
-    "SuppressionConfig": null,
     "GradeOn": "high-confidence findings only"
   },
   "Rules": [

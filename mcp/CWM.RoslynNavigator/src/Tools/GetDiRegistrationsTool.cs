@@ -30,7 +30,7 @@ public static class GetDiRegistrationsTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new DiRegistrationsResult(
+            return ToolJson.Serialize(new DiRegistrationsResult(
                 [], [], [], 0, 0, false, Math.Max(1, maxResults)));
 
         var seenFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -74,7 +74,7 @@ public static class GetDiRegistrationsTool
 
         var page = Paging.Apply(registrations, maxResults);
 
-        return JsonSerializer.Serialize(new DiRegistrationsResult(
+        return ToolJson.Serialize(new DiRegistrationsResult(
             page.Items, duplicates, captiveRisks, page.Count, page.TotalFound, page.Truncated, page.Limit,
             DiContainerSupport.BuildNote(registrations.Count, unrecognized)));
     }

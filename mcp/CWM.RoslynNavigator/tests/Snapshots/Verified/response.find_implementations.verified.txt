@@ -3,14 +3,12 @@
     {
       "Type": "CachedOrderRepository",
       "File": "SampleInfrastructure/CachedOrderRepository.cs",
-      "Line": 8,
-      "IsGenerated": false
+      "Line": 8
     },
     {
       "Type": "InMemoryOrderRepository",
       "File": "SampleInfrastructure/InMemoryOrderRepository.cs",
-      "Line": 8,
-      "IsGenerated": false
+      "Line": 8
     }
   ],
   "Count": 2,

@@ -83,7 +83,7 @@ public static class FindDeadCodeTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new DeadCodeResult([], 0, 0, false, Math.Max(1, maxResults)));
+            return ToolJson.Serialize(new DeadCodeResult([], 0, 0, false, Math.Max(1, maxResults)));
 
         if (scope == "project" && ArgumentChecks.UnknownProject(solution, path) is { } unknownProject)
             return unknownProject;
@@ -291,7 +291,7 @@ public static class FindDeadCodeTool
             }
         }
 
-        return JsonSerializer.Serialize(new DeadCodeResult(
+        return ToolJson.Serialize(new DeadCodeResult(
             deadCode, deadCode.Count, totalFound,
             totalFound > deadCode.Count, Math.Max(1, maxResults), conventionFiltered,
             reflection.AssemblyScanningDetected));

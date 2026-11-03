@@ -85,7 +85,7 @@ public static class PreviewRenameTool
         var conflicts = await FindIntroducedErrorsAsync(workspace, solution, renamed, changedDocuments, ct);
         var page = Paging.Apply(edits, maxResults);
 
-        return JsonSerializer.Serialize(new RenamePreviewResult(
+        return ToolJson.Serialize(new RenamePreviewResult(
             Symbol: SymbolResolver.BuildQualifiedName(symbol),
             Kind: SymbolResolver.GetKindString(symbol),
             SymbolId: SymbolResolver.GetSymbolId(symbol),
@@ -230,5 +230,5 @@ public static class PreviewRenameTool
     }
 
     private static string Error(string code, string message) =>
-        JsonSerializer.Serialize(new ErrorResponse(code, message));
+        ToolJson.Serialize(new ErrorResponse(code, message));
 }

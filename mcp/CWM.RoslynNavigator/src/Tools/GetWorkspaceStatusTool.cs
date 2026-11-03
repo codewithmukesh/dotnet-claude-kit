@@ -53,7 +53,7 @@ public static class GetWorkspaceStatusTool
             && problems.Count == 0
             && !diagnostics.Any(d => d.Kind == "failure");
 
-        return JsonSerializer.Serialize(new WorkspaceStatusResult(
+        return ToolJson.Serialize(new WorkspaceStatusResult(
             State: workspace.State.ToString(),
             Message: workspace.GetStatusMessage(),
             Healthy: healthy,

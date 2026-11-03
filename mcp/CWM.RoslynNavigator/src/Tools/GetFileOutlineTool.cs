@@ -24,13 +24,13 @@ public static class GetFileOutlineTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new FileOutlineResult(
+            return ToolJson.Serialize(new FileOutlineResult(
                 "unknown", null, 0, [], 0, 0, false, Math.Max(1, maxResults)));
 
         var matches = DocumentResolver.FindDocuments(solution, filePath);
 
         if (matches.Count == 0)
-            return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.FileNotFound,
+            return ToolJson.Serialize(new ErrorResponse(ErrorCodes.FileNotFound,
                 $"File '{filePath}' is not part of any project in the solution."));
 
         // A multi-targeted project loads once per target framework, so one file can back several
@@ -41,7 +41,7 @@ public static class GetFileOutlineTool
             .ToList();
 
         if (distinctPaths.Count > 1)
-            return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.AmbiguousMatch,
+            return ToolJson.Serialize(new ErrorResponse(ErrorCodes.AmbiguousMatch,
                 $"'{filePath}' matches {distinctPaths.Count} files. Re-query with a longer path.",
                 distinctPaths.Take(10)
                     .Select(p =>
@@ -55,7 +55,7 @@ public static class GetFileOutlineTool
 
         var root = await document.GetSyntaxRootAsync(ct);
         if (root is null)
-            return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.NoSource,
+            return ToolJson.Serialize(new ErrorResponse(ErrorCodes.NoSource,
                 $"File '{filePath}' has no syntax tree."));
 
         var usingCount = root.DescendantNodes(n => n is CompilationUnitSyntax or BaseNamespaceDeclarationSyntax)
@@ -75,7 +75,7 @@ public static class GetFileOutlineTool
             types.Add(BuildTypeOutline(typeDecl, depth: 1, budget));
         }
 
-        return JsonSerializer.Serialize(new FileOutlineResult(
+        return ToolJson.Serialize(new FileOutlineResult(
             File: workspace.ToRelativePath(document.FilePath!),
             Namespace: namespaceName,
             UsingCount: usingCount,

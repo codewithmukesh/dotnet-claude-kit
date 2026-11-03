@@ -31,5 +31,5 @@ internal readonly struct SymbolResolution
     public static SymbolResolution Success(ISymbol symbol) => new(symbol, null);
 
     public static SymbolResolution Failure(ErrorResponse error) =>
-        new(null, JsonSerializer.Serialize(error));
+        new(null, ToolJson.Serialize(error));
 }

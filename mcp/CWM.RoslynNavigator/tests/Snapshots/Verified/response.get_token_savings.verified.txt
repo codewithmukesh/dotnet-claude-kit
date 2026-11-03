@@ -10,6 +10,5 @@
   "ZeroResultCalls": 0,
   "NotReadyCalls": 0,
   "ErrorCalls": 0,
-  "ByTool": [],
-  "Method": null
+  "ByTool": []
 }

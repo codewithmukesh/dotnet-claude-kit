@@ -29,7 +29,7 @@ public static class GetProjectGraphTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new ProjectGraphResult("unknown", [], 0, 0, false, Math.Max(1, maxResults)));
+            return ToolJson.Serialize(new ProjectGraphResult("unknown", [], 0, 0, false, Math.Max(1, maxResults)));
 
         // Membership is noise with one solution, so single-solution output is unchanged.
         var multiSolution = workspace.LoadedSolutions.Count > 1;
@@ -47,7 +47,7 @@ public static class GetProjectGraphTool
         var nodes = BuildNodes(solution, workspace, multiSolution, ct);
 
         if (summary)
-            return JsonSerializer.Serialize(Summarize(solutionName, nodes, solutions));
+            return ToolJson.Serialize(Summarize(solutionName, nodes, solutions));
 
         var selected = nodes;
         if (project is not null)
@@ -57,7 +57,7 @@ public static class GetProjectGraphTool
                 || n.Info.Path.Contains(project.Replace('\\', '/'), StringComparison.OrdinalIgnoreCase))];
 
             if (selected.Count == 0)
-                return JsonSerializer.Serialize(new ErrorResponse(ErrorCodes.InvalidArgument,
+                return ToolJson.Serialize(new ErrorResponse(ErrorCodes.InvalidArgument,
                     $"No project name or path contains '{project}'. Call get_project_graph with summary=true for an overview."));
 
             // Who depends on each match — the question a filtered query is usually asking.
@@ -75,7 +75,7 @@ public static class GetProjectGraphTool
 
         var page = Paging.Apply(selected.Select(n => n.Info).ToList(), maxResults);
 
-        return JsonSerializer.Serialize(new ProjectGraphResult(
+        return ToolJson.Serialize(new ProjectGraphResult(
             solutionName, page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit, solutions));
     }
 
@@ -99,10 +99,10 @@ public static class GetProjectGraphTool
             ct.ThrowIfCancellationRequested();
             var first = group.First();
 
-            List<string> frameworks = group.Count() > 1
-                    && group.Select(p => ExtractTfmFromProjectName(p.Name)).ToList() is var named
-                    && named.All(t => t is not null)
-                ? [.. named.Distinct(StringComparer.OrdinalIgnoreCase)!]
+            // Flavor names carry the framework exactly; a single project reads its csproj.
+            var named = group.Select(p => ExtractTfmFromProjectName(p.Name)).OfType<string>().ToList();
+            List<string> frameworks = group.Count() > 1 && named.Count == group.Count()
+                ? [.. named.Distinct(StringComparer.OrdinalIgnoreCase)]
                 : [.. group.Select(DetectTargetFramework).Distinct(StringComparer.OrdinalIgnoreCase)];
 
             var references = DirectReferences(solution, group.ToList(), first.FilePath);

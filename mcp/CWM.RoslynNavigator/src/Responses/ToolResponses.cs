@@ -66,7 +66,7 @@ internal sealed record SymbolLocation(
     string File,
     int Line,
     string Namespace,
-    bool IsGenerated,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool IsGenerated,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Match = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ContainingType = null,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? SymbolId = null,
@@ -80,12 +80,16 @@ internal sealed record ReferenceLocation(
     int Line,
     string Snippet,
     string Kind,
-    bool IsGenerated,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool IsGenerated,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<string>? TargetFrameworks = null);
 
 internal sealed record ReferencesResult(List<ReferenceLocation> References, int Count, int TotalFound, bool Truncated, int Limit);
 
-internal sealed record ImplementationInfo(string Type, string File, int Line, bool IsGenerated);
+internal sealed record ImplementationInfo(
+    string Type,
+    string File,
+    int Line,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool IsGenerated);
 
 
 internal sealed record ImplementationsResult(List<ImplementationInfo> Implementations, int Count, int TotalFound, bool Truncated, int Limit);
@@ -229,13 +233,18 @@ internal sealed record CallerInfo(
     string ContainingType,
     string File,
     int Line,
-    bool IsGenerated,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool IsGenerated,
     string Via = "direct",
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ViaSymbol = null);
 
 internal sealed record CallersResult(List<CallerInfo> Callers, int Count, int TotalFound, bool Truncated, int Limit);
 
-internal sealed record OverrideInfo(string Method, string ContainingType, string File, int Line, bool IsGenerated);
+internal sealed record OverrideInfo(
+    string Method,
+    string ContainingType,
+    string File,
+    int Line,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool IsGenerated);
 
 internal sealed record OverridesResult(List<OverrideInfo> Overrides, int Count, int TotalFound, bool Truncated, int Limit);
 
@@ -483,7 +492,7 @@ internal sealed record SymbolAtResult(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ConvertedType,
     string DefinitionFile,
     int DefinitionLine,
-    bool IsGenerated,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool IsGenerated,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Assembly = null);
 
 // Rename preview

@@ -46,7 +46,7 @@ public static class DetectAntiPatternsTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new AntiPatternsResult(
+            return ToolJson.Serialize(new AntiPatternsResult(
                 [], 0, 0, false, Math.Max(1, maxResults)));
 
         if (ArgumentChecks.UnknownProject(solution, projectFilter) is { } unknown)
@@ -115,7 +115,7 @@ public static class DetectAntiPatternsTool
             // later flavor adds only what the earlier ones did not find (code under #if).
             var path = plan[i].Tree.FilePath ?? "";
             var firstSeen = !seenFiles.TryGetValue(path, out var known);
-            if (firstSeen)
+            if (known is null)
             {
                 seenFiles[path] = known = [];
                 accumulator.CountFile(scans[i].Kind);
@@ -128,7 +128,7 @@ public static class DetectAntiPatternsTool
                     accumulator.Add(v, scans[i].Kind, finding.RelativePath, finding.Suppressed);
             }
         }
-        return JsonSerializer.Serialize(accumulator.Build(maxResults, minConfidence, suppressions));
+        return ToolJson.Serialize(accumulator.Build(maxResults, minConfidence, suppressions));
     }
 
     private readonly record struct Finding(AntiPatternViolation Violation, string RelativePath, bool Suppressed);

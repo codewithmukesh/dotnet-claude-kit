@@ -58,7 +58,7 @@ public static class GetSymbolDetailTool
             File: location is { } loc ? workspace.ToRelativePath(loc.File) : "unknown",
             Line: location?.Line ?? 0);
 
-        return JsonSerializer.Serialize(detail);
+        return ToolJson.Serialize(detail);
     }
 
     private static string? ExtractXmlSummary(string? xmlDoc)

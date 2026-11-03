@@ -36,7 +36,7 @@ public static class GetTestCoverageMapTool
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return JsonSerializer.Serialize(new TestCoverageMapResult([], 0, 0, 0));
+            return ToolJson.Serialize(new TestCoverageMapResult([], 0, 0, 0));
 
         // Identify test projects vs production projects
         var testProjects = new List<Project>();
@@ -174,7 +174,7 @@ public static class GetTestCoverageMapTool
         var notApplicableReason = DetermineNotApplicableReason(
             percentage, testMethodCount, totalTypes, usesIntegrationHarness);
 
-        return JsonSerializer.Serialize(new TestCoverageMapResult(
+        return ToolJson.Serialize(new TestCoverageMapResult(
             coverage,
             totalTypes,
             testedTypes,
