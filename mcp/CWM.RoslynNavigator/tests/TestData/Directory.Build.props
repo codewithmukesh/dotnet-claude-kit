@@ -1,0 +1,3 @@
+<!-- Guard: stops MSBuild walking up into the navigator's own build files, so the sample
+     solutions load exactly as a standalone repo would. Intentionally empty. -->
+<Project />

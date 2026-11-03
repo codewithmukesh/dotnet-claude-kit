@@ -27,9 +27,9 @@ public class GetNugetPackagesTests(TestSolutionFixture fixture)
         var result = JsonSerializer.Deserialize<NugetPackagesResult>(json)!;
 
         var project = Assert.Single(result.Projects);
-        // No Cpm assertion here: the walk-up mirrors MSBuild and finds this repo's own
-        // Directory.Packages.props above the test output directory. CPM detection is
-        // covered deterministically by the ParseProjectPackages unit tests below.
+        // TestData's guard Directory.Packages.props stops the walk-up before this repo's own,
+        // so the sample is a plain non-CPM project and the version comes from the csproj.
+        Assert.False(project.Cpm);
 
         var package = Assert.Single(project.Packages);
         Assert.Equal("Microsoft.Extensions.Logging.Abstractions", package.Id);
