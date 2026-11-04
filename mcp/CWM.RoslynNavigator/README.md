@@ -6,9 +6,9 @@
 
 CWM.RoslynNavigator is a Model Context Protocol (MCP) server that provides Claude Code with semantic understanding of .NET solutions. Instead of reading entire source files (hundreds of tokens), Claude can query for specific symbols, references, and type hierarchies (tens of tokens).
 
-On five open-source solutions, from a 9-project template to a 270-project framework, the same 12 agent tasks used 75–97% fewer tokens than grep + read. Compared with the published 0.8.0, the server is ready 1.5–2.4× sooner, `find_dead_code` is 6–28× faster and `get_test_coverage_map` 44–100× faster:
+On five open-source solutions, from a 9-project template to a 270-project framework, the same 12 agent tasks used 75–97% fewer tokens than an agent's default route of Grep, then Read on every file the answer lives in (what Claude Code does without this server), and 12 tool calls instead of 37–319. Compared with the published 0.8.0, the server is ready 1.5–2.4× sooner, `find_dead_code` is 6–28× faster and `get_test_coverage_map` 44–100× faster:
 
-| Solution | Projects | Tokens saved vs grep + read | Ready, 0.8.0 → now | `find_dead_code`, 0.8.0 → now |
+| Solution | Projects | Tokens saved vs Grep + Read | Ready, 0.8.0 → now | `find_dead_code`, 0.8.0 → now |
 |---|---:|---:|---:|---:|
 | CleanArchitecture | 9 | 75% | 7.6 s → 3.2 s | 0.49 s → 0.08 s |
 | eShop | 28 | 87% | 8.5 s → 4.5 s | 1.3 s → 0.16 s |
