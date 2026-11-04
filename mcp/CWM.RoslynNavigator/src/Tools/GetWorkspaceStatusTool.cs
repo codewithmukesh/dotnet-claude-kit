@@ -8,10 +8,10 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class GetWorkspaceStatusTool
 {
-    [McpServerTool(Name = "get_workspace_status"), Description("Report what the server has loaded and how completely: workspace state, loaded solutions, project and document counts, background compilation warm-up progress (Compiled of Total), snapshot version, whether a background reload is in flight (Reloading) or the last one failed (LastReloadError), and every project that loaded or compiled incompletely (load failures, no documents, unresolved core library, compilation errors thrown, missing analyzers/generators) plus raw workspace load diagnostics. Healthy=false means answers from other tools may be missing results. Call it when a result looks suspiciously empty, or before trusting dead-code or reference counts on an unfamiliar solution. Works while loading.")]
+    [McpServerTool(Name = "get_workspace_status"), Description("What is loaded and how healthy: solutions, project and document counts, warm-up progress, reload state, and projects that loaded incompletely. Healthy=false means other tools may miss results. Call when a result looks suspiciously empty. Works while loading.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Maximum entries in each of IncompleteProjects and LoadDiagnostics")] int maxResults = 50,
+        [Description("Cap per list")] int maxResults = 50,
         CancellationToken ct = default)
     {
         // Triggers roots discovery / error retry like every tool, but a not-ready workspace is

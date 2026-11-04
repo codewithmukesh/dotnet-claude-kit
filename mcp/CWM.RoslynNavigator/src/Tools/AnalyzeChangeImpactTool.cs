@@ -13,14 +13,14 @@ public static class AnalyzeChangeImpactTool
 {
     private const int MaxDepth = 5;
 
-    [McpServerTool(Name = "analyze_change_impact"), Description("Answer 'what breaks if I change this?' for one symbol. Reports direct references grouped by project and file, how many are tests, implementations and overrides that must change alongside a signature, transitive callers up to a depth (including calls made through an interface or base member, counted in IndirectCallers), whether the change crosses an assembly boundary, and an overall risk rating with its rationale. Use before renaming, changing a signature, or deleting — it replaces stitching together find_references, find_implementations, find_overrides, and the project graph.")]
+    [McpServerTool(Name = "analyze_change_impact"), Description("Blast radius of changing one symbol: references by project and file, tests, implementations and overrides that must change too, transitive callers (through interface or base members too), and a risk rating. Use before renaming, changing a signature, or deleting.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Symbol to analyze. Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).")] string symbolName,
-        [Description("Optional: file path to disambiguate")] string? file = null,
-        [Description("Optional: line number to disambiguate")] int? line = null,
-        [Description("How many call levels to walk for transitive callers (1-5)")] int depth = 2,
-        [Description("Maximum entries per list in the response")] int maxResults = 50,
+        [Description("Symbol name or SymbolId")] string symbolName,
+        string? file = null,
+        int? line = null,
+        [Description("Caller levels to walk, 1-5")] int depth = 2,
+        [Description("Cap per list")] int maxResults = 50,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);

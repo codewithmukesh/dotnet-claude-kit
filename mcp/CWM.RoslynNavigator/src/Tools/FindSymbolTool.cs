@@ -9,14 +9,14 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class FindSymbolTool
 {
-    [McpServerTool(Name = "find_symbol"), Description("Find where a type, method, or property is defined in the solution. Returns file path, line number, namespace, containing type, IsGenerated: true for source-generator or tooling output (omitted when false), and a SymbolId to pass as the name to other tools so they target exactly that symbol. Exact name by default; set match to 'prefix', 'camelhump' ('GBIA' or 'GetByAsync' finds GetByIdAsync), or 'substring' when you only know part of the name — fuzzy results are ranked exact > prefix > camelhump > substring, types before members, and each carries its Match tier.")]
+    [McpServerTool(Name = "find_symbol"), Description("Locate where a type or member is declared: file, line, kind, namespace, containing type, and a SymbolId for other tools. Exact name by default; set match for partial names.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Symbol name. Bare ('CreateAsync'), type-qualified ('OrderService.CreateAsync'), or fully qualified ('MyApp.Orders.OrderService.CreateAsync'), or a SymbolId (exact mode). Qualifying narrows results when a name is reused across types; with a fuzzy match the qualifier still matches exactly and only the last segment is fuzzy.")] string name,
-        [Description("Filter by kind: 'type', 'class', 'interface', 'struct', 'enum', 'record', 'method', 'property', 'field', or 'any'")] string kind = "any",
-        [Description("Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 50,
-        [Description("Skip this many results; pass NextOffset from the previous response for the next page.")] int offset = 0,
-        [Description("Name matching: 'exact' (default, case-sensitive), 'prefix', 'camelhump', or 'substring' (case-insensitive). Each looser mode includes the tighter ones.")] string match = "exact",
+        [Description("Name, Type.Member, fully qualified name, or SymbolId. With a fuzzy match only the last segment is fuzzy.")] string name,
+        [Description("any, type, class, interface, struct, enum, record, method, property, or field")] string kind = "any",
+        int maxResults = 50,
+        int offset = 0,
+        [Description("exact (case-sensitive), prefix, camelhump (GBIA finds GetByIdAsync), or substring. Fuzzy modes ignore case and rank tighter matches first.")] string match = "exact",
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);

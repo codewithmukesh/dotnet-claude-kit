@@ -24,13 +24,13 @@ public static class GetEndpointMapTool
         ["HttpOptions"] = "OPTIONS",
     };
 
-    [McpServerTool(Name = "get_endpoint_map"), Description("Inventory of ASP.NET Core endpoints: Minimal API Map{Get,Post,Put,Delete,Patch} calls (MapGroup prefixes composed when statically resolvable) and controller actions with Http* attributes. Reports auth posture per endpoint: 'authorized' ([Authorize]/RequireAuthorization), 'anonymous' ([AllowAnonymous]/AllowAnonymous()), or 'unmarked'. Best-effort static analysis: only string-literal routes resolve (dynamic routes show '?'), group variables are tracked per file only, and conventions applied elsewhere (global filters, UseEndpoints conventions) are not seen.")]
+    [McpServerTool(Name = "get_endpoint_map"), Description("ASP.NET Core endpoints: Minimal API Map calls (MapGroup prefixes composed) and controller actions, with HTTP method, route, file, and auth (authorized, anonymous, or unmarked). Static analysis: only literal routes resolve; others show ?.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Optional: filter to endpoints in files whose path contains this value. A value matching no file returns a FileNotFound error.")] string? file = null,
-        [Description("Maximum endpoints to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 500,
-        [Description("Skip this many endpoints; pass NextOffset from the previous response for the next page.")] int offset = 0,
-        [Description("'auto' (full entries when they fit, else compact 'line METHOD route auth' strings grouped by file), 'full', or 'compact'.")] string format = ListFormat.Auto,
+        [Description("Path substring filter")] string? file = null,
+        int maxResults = 500,
+        int offset = 0,
+        [Description("auto, full, or compact")] string format = ListFormat.Auto,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);

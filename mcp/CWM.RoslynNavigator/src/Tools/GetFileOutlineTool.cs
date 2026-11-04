@@ -12,11 +12,11 @@ public static class GetFileOutlineTool
 {
     private const int MaxNestingDepth = 3;
 
-    [McpServerTool(Name = "get_file_outline"), Description("Get a token-cheap skeleton of one source file: namespace, types, and member signatures with line numbers — no bodies, no usings. Use before reading a file to decide which lines are worth reading. Nested types are included up to 3 levels deep.")]
+    [McpServerTool(Name = "get_file_outline"), Description("Skeleton of one file: namespace, types, and member signatures with line numbers, no bodies. Use before reading a file to pick the lines worth reading.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("File path (suffix match on directory boundaries, e.g. 'OrderService.cs' or 'Services/OrderService.cs'; './' prefixes and backslashes are accepted). Returns AmbiguousMatch with candidates if several files match.")] string filePath,
-        [Description("Maximum members to return across all types. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 200,
+        [Description("Path suffix, e.g. Services/OrderService.cs")] string filePath,
+        [Description("Max members")] int maxResults = 200,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);

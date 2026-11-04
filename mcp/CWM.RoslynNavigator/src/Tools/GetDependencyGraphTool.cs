@@ -11,14 +11,14 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class GetDependencyGraphTool
 {
-    [McpServerTool(Name = "get_dependency_graph"), Description("Get the call dependency graph for a method, showing all methods it calls recursively up to a specified depth. Useful for impact analysis and understanding code flow.")]
+    [McpServerTool(Name = "get_dependency_graph"), Description("What a method calls (callees), recursively to a depth. For who calls it, use find_callers.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Method to analyze. Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).")] string symbolName,
-        [Description("Optional: file path to disambiguate")] string? file = null,
-        [Description("Optional: line number to disambiguate")] int? line = null,
-        [Description("Maximum recursion depth (1-5)")] int depth = 3,
-        [Description("Maximum nodes to return. The response's Truncated flag reports whether the walk was cut short; re-query with a higher value or lower depth for a complete graph.")] int maxResults = 100,
+        [Description("Method name or SymbolId")] string symbolName,
+        string? file = null,
+        int? line = null,
+        [Description("1-5")] int depth = 3,
+        [Description("Max nodes")] int maxResults = 100,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);

@@ -10,13 +10,13 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class FindOverridesTool
 {
-    [McpServerTool(Name = "find_overrides"), Description("Find all overrides of a virtual or abstract method across the solution. Useful for understanding polymorphic behavior. A generated override carries IsGenerated: true (omitted when false) so it can be skipped.")]
+    [McpServerTool(Name = "find_overrides"), Description("Overrides of a virtual or abstract method across the solution.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("The virtual or abstract method name to find overrides for. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).")] string methodName,
-        [Description("Optional: containing class name to disambiguate")] string? className = null,
-        [Description("Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 200,
-        [Description("Skip this many results; pass NextOffset from the previous response for the next page.")] int offset = 0,
+        [Description("Method name or SymbolId")] string methodName,
+        string? className = null,
+        int maxResults = 200,
+        int offset = 0,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);

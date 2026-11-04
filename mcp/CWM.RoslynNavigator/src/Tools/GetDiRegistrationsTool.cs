@@ -18,13 +18,13 @@ public static class GetDiRegistrationsTool
         "TryAddKeyedSingleton", "TryAddKeyedScoped", "TryAddKeyedTransient",
     ];
 
-    [McpServerTool(Name = "get_di_registrations"), Description("Map of dependency-injection registrations: service, implementation, lifetime, and file:line. Supported containers: Microsoft.Extensions.DependencyInjection (Add{Singleton,Scoped,Transient}/AddKeyed*/TryAdd*), Prism IContainerRegistry (Register/RegisterSingleton/RegisterScoped/RegisterInstance/RegisterMany, matched by receiver type), and Autofac ContainerBuilder (RegisterType/Register/RegisterInstance with As<>/SingleInstance/InstancePerLifetimeScope chains). Flags duplicate registrations of the same service (which may be intentional multi-registration) and captive-dependency risks — a singleton implementation whose constructor takes a service registered as scoped. Best-effort static analysis: factory-lambda registrations report '(factory)' and instances '(instance)' as the implementation, matching is by type name, and registrations built via reflection, Scrutor/assembly scanning, or extension-method indirection are not seen. When calls against other containers (DryIoc, Unity, Castle Windsor, SimpleInjector, Ninject, ...) are seen but not mapped, the response carries a Note with the counts — so Count 0 with a Note does not mean no DI.")]
+    [McpServerTool(Name = "get_di_registrations"), Description("Dependency-injection registrations (Microsoft.Extensions.DependencyInjection, Prism, Autofac): service, implementation, lifetime, file and line, flagging duplicates and captive dependencies (singleton taking a scoped service). Static: assembly scanning, reflection, and extension-method indirection are missed; a Note lists unmapped containers, so Count 0 with a Note does not mean no DI.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Optional: filter to registrations in files whose path contains this value. A value matching no file returns a FileNotFound error.")] string? file = null,
-        [Description("Maximum registrations to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count. Duplicates and captive risks are always computed from the full set.")] int maxResults = 500,
-        [Description("Skip this many registrations; pass NextOffset from the previous response for the next page.")] int offset = 0,
-        [Description("'auto' (full entries when they fit, else compact 'line lifetime Service -> Impl' strings grouped by file), 'full', or 'compact'.")] string format = ListFormat.Auto,
+        [Description("Path substring filter")] string? file = null,
+        int maxResults = 500,
+        int offset = 0,
+        [Description("auto, full, or compact")] string format = ListFormat.Auto,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);

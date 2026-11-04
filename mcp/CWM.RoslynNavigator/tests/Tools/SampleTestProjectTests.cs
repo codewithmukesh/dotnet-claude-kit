@@ -63,6 +63,6 @@ public sealed class SampleTestProjectTests(TestSolutionFixture fixture)
 
         // Assert
         var result = JsonSerializer.Deserialize<ReferencesResult>(json)!;
-        Assert.Equal(3, result.References.Count(r => r.File == "SampleTests/OrderTests.cs"));
+        Assert.Equal(3, result.References!.Count(r => r.File == "SampleTests/OrderTests.cs"));
     }
 }

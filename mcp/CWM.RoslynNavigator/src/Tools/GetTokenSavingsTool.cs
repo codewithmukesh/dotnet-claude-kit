@@ -9,11 +9,11 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class GetTokenSavingsTool
 {
-    [McpServerTool(Name = "get_token_savings"), Description("Report how many tokens this server's tools have saved in this repository, against a defensible baseline: the on-disk size of the source files each answer was derived from. Includes a per-tool leaderboard and separate zero-result, not-ready, and error counts. Telemetry is opt-in (CWM_ROSLYN_TELEMETRY=on) and never leaves the machine; when off, the tool says so and reports nothing.")]
+    [McpServerTool(Name = "get_token_savings"), Description("Tokens this server saved in this repository versus reading the source files, with a per-tool leaderboard. Requires CWM_ROSLYN_TELEMETRY=on; data stays local.")]
     public static Task<string> ExecuteAsync(
         IServiceProvider services,
         WorkspaceManager workspace,
-        [Description("Maximum tools to list in the leaderboard")] int maxResults = 25,
+        [Description("Leaderboard size")] int maxResults = 25,
         CancellationToken ct = default)
     {
         // Resolved rather than injected: the telemetry types stay internal, so they cannot

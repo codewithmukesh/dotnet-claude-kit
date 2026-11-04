@@ -55,7 +55,7 @@ public sealed class MultiTargetDedupTests(MultiTargetSolutionFixture fixture) : 
 
         // Assert — Welcome, Farewell, LegacyShim.Run (net8.0 only), and base.Greet in LoudGreeter.
         var result = JsonSerializer.Deserialize<ReferencesResult>(json)!;
-        Assert.Equal(result.References.Count, result.References.DistinctBy(r => (r.File, r.Line, r.Snippet)).Count());
+        Assert.Equal(result.References!.Count, result.References.DistinctBy(r => (r.File, r.Line, r.Snippet)).Count());
         Assert.Equal(result.References.Count, result.TotalFound);
         Assert.False(result.Truncated);
         Assert.Equal(["net8.0"], Assert.Single(result.References, r => r.Snippet.Contains("legacy")).TargetFrameworks);
@@ -72,7 +72,7 @@ public sealed class MultiTargetDedupTests(MultiTargetSolutionFixture fixture) : 
             await FindReferencesTool.ExecuteAsync(Workspace, "Lib.IGreeter.Greet", maxResults: 1, ct: Ct))!;
 
         // Assert
-        ToolGapTests.AssertTruncated(capped.References.Count, capped.Count, capped.TotalFound, capped.Truncated, capped.Limit, total: all.TotalFound);
+        ToolGapTests.AssertTruncated(capped.References!.Count, capped.Count, capped.TotalFound, capped.Truncated, capped.Limit, total: all.TotalFound);
     }
 
     [Fact]
@@ -156,7 +156,7 @@ public sealed class MultiTargetDedupTests(MultiTargetSolutionFixture fixture) : 
 
         // Assert
         var result = JsonSerializer.Deserialize<ProjectGraphResult>(json)!;
-        var project = Assert.Single(result.Projects);
+        var project = Assert.Single(result.Projects!);
         Assert.Equal("Lib", project.Name);
         Assert.Equal(["net10.0", "net8.0"], project.TargetFrameworks.Order());
         Assert.Equal(1, result.TotalFound);

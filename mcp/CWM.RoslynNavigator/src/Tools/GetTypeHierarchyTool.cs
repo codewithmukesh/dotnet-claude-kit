@@ -10,12 +10,12 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class GetTypeHierarchyTool
 {
-    [McpServerTool(Name = "get_type_hierarchy"), Description("Get the full inheritance chain, interfaces, and derived types for a type. For interfaces, derived types include both derived interfaces and implementing types.")]
+    [McpServerTool(Name = "get_type_hierarchy"), Description("Inheritance of a type: base chain, interfaces, and derived types (for an interface, derived interfaces and implementers).")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Type name. Bare ('OrderService') or namespace-qualified ('MyApp.Orders.OrderService'). Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).")] string typeName,
-        [Description("Maximum derived types to return. TotalDerived in the response reports the full count; re-query with a higher value if it exceeds the list length.")] int maxResults = 500,
-        [Description("Skip this many derived types; pass NextOffset from the previous response for the next page.")] int offset = 0,
+        [Description("Type name or SymbolId")] string typeName,
+        [Description("Max derived types")] int maxResults = 500,
+        int offset = 0,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);

@@ -47,7 +47,7 @@ public sealed class FeatureSolutionGapTests(FeatureSolutionFixture fixture) : IC
 
         // Assert
         var result = JsonSerializer.Deserialize<DiRegistrationsResult>(json)!;
-        Assert.Equal(["scoped", "singleton", "transient"], result.Registrations.Select(r => r.Lifetime).Order());
+        Assert.Equal(["scoped", "singleton", "transient"], result.Registrations!.Select(r => r.Lifetime).Order());
         Assert.Equal(3, result.TotalFound);
         Assert.False(result.Truncated);
     }
@@ -60,7 +60,7 @@ public sealed class FeatureSolutionGapTests(FeatureSolutionFixture fixture) : IC
 
         // Assert
         var result = JsonSerializer.Deserialize<DiRegistrationsResult>(json)!;
-        ToolGapTests.AssertTruncated(result.Registrations.Count, result.Count, result.TotalFound, result.Truncated, result.Limit, total: 3);
+        ToolGapTests.AssertTruncated(result.Registrations!.Count, result.Count, result.TotalFound, result.Truncated, result.Limit, total: 3);
     }
 
     [Fact]
@@ -81,7 +81,7 @@ public sealed class FeatureSolutionGapTests(FeatureSolutionFixture fixture) : IC
 
         // Assert
         var result = JsonSerializer.Deserialize<DiRegistrationsResult>(json)!;
-        Assert.Empty(result.Registrations);
+        Assert.Empty(result.Registrations!);
         Assert.Equal(0, result.TotalFound);
     }
 
@@ -93,6 +93,6 @@ public sealed class FeatureSolutionGapTests(FeatureSolutionFixture fixture) : IC
 
         // Assert
         var result = JsonSerializer.Deserialize<EndpointMapResult>(json)!;
-        Assert.Empty(result.Endpoints);
+        Assert.Empty(result.Endpoints!);
     }
 }

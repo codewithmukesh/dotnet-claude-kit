@@ -81,8 +81,8 @@ public sealed class MultiSolutionTests(MultiSolutionFixture fixture) : IClassFix
             Workspace, "IOrderRepository", maxResults: 200, ct: TestContext.Current.CancellationToken);
         var result = JsonSerializer.Deserialize<ReferencesResult>(json)!;
 
-        Assert.Contains(result.References, r => r.File.StartsWith("SampleSolution/SampleApi/", StringComparison.Ordinal));
-        Assert.Contains(result.References, r => r.File.StartsWith("SecondSolution/ShippingService/", StringComparison.Ordinal));
+        Assert.Contains(result.References!, r => r.File.StartsWith("SampleSolution/SampleApi/", StringComparison.Ordinal));
+        Assert.Contains(result.References!, r => r.File.StartsWith("SecondSolution/ShippingService/", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -92,7 +92,7 @@ public sealed class MultiSolutionTests(MultiSolutionFixture fixture) : IClassFix
             Workspace, "IOrderRepository", maxResults: 200, ct: TestContext.Current.CancellationToken);
         var result = JsonSerializer.Deserialize<ReferencesResult>(json)!;
 
-        Assert.All(result.References, r => Assert.DoesNotContain("..", r.File));
+        Assert.All(result.References!, r => Assert.DoesNotContain("..", r.File));
     }
 
     [Fact]
@@ -122,9 +122,9 @@ public sealed class MultiSolutionTests(MultiSolutionFixture fixture) : IClassFix
     {
         var result = await GetProjectGraphAsync();
 
-        Assert.Equal([Primary, Second], result.Projects.Single(p => p.Name == "SampleDomain").Solutions!);
-        Assert.Equal([Primary], result.Projects.Single(p => p.Name == "SampleApi").Solutions!);
-        Assert.Equal([Second], result.Projects.Single(p => p.Name == "ShippingService").Solutions!);
+        Assert.Equal([Primary, Second], result.Projects!.Single(p => p.Name == "SampleDomain").Solutions!);
+        Assert.Equal([Primary], result.Projects!.Single(p => p.Name == "SampleApi").Solutions!);
+        Assert.Equal([Second], result.Projects!.Single(p => p.Name == "ShippingService").Solutions!);
     }
 
     [Fact]

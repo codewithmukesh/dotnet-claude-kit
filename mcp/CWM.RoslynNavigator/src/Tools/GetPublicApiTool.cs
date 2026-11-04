@@ -9,12 +9,12 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class GetPublicApiTool
 {
-    [McpServerTool(Name = "get_public_api"), Description("Get the public members of a type without reading the full source file. Returns method signatures, properties, events.")]
+    [McpServerTool(Name = "get_public_api"), Description("Public members of a type (method, property, and event signatures) without reading the file.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Type name. Bare ('OrderService') or namespace-qualified ('MyApp.Orders.OrderService'). Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).")] string typeName,
-        [Description("Maximum members to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 50,
-        [Description("Skip this many members; pass NextOffset from the previous response for the next page.")] int offset = 0,
+        [Description("Type name or SymbolId")] string typeName,
+        int maxResults = 50,
+        int offset = 0,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);

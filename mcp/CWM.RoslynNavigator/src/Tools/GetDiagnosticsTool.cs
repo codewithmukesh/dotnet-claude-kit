@@ -12,14 +12,14 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class GetDiagnosticsTool
 {
-    [McpServerTool(Name = "get_diagnostics"), Description("Get compiler diagnostics (errors, warnings) scoped to a file, project, or the entire solution. File scope takes a suffix path ('./' prefixes and backslashes accepted): a path matching no document returns a FileNotFound error rather than an empty result, and a path matching several files returns diagnostics for all of them, each tagged with its File. Does not run NuGet analyzers. Results are ordered errors-first; per-severity totals are always reported.")]
+    [McpServerTool(Name = "get_diagnostics"), Description("Compiler errors and warnings for a file, project, or the solution, errors first, with per-severity totals. NuGet analyzers are not run.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Scope: 'file', 'project', or 'solution'")] string scope = "solution",
-        [Description("File or project path (required for 'file' and 'project' scopes)")] string? path = null,
-        [Description("Severity filter: 'error', 'warning', or 'all' (info and above; hidden diagnostics are always excluded)")] string severityFilter = "all",
-        [Description("Maximum diagnostics to return. TotalFound and the per-severity counts in the response report the full picture; re-query with a higher value if it exceeds Count.")] int maxResults = 100,
-        [Description("Skip this many diagnostics; pass NextOffset from the previous response for the next page.")] int offset = 0,
+        [Description("file, project, or solution")] string scope = "solution",
+        [Description("File or project; required unless scope is solution")] string? path = null,
+        [Description("error, warning, or all")] string severityFilter = "all",
+        int maxResults = 100,
+        int offset = 0,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);

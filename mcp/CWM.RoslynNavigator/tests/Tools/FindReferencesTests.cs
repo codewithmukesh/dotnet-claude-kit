@@ -47,7 +47,7 @@ public class FindReferencesTests(TestSolutionFixture fixture)
         var result = JsonSerializer.Deserialize<ReferencesResult>(json)!;
 
         Assert.Equal(0, result.TotalFound);
-        Assert.Empty(result.References);
+        Assert.Empty(result.References!);
     }
 
     [Fact]
@@ -76,8 +76,8 @@ public class FindReferencesTests(TestSolutionFixture fixture)
         var json = await FindReferencesTool.ExecuteAsync(fixture.WorkspaceManager, "Order", ct: TestContext.Current.CancellationToken);
         var result = JsonSerializer.Deserialize<ReferencesResult>(json)!;
 
-        Assert.NotEmpty(result.References);
-        Assert.All(result.References, r =>
+        Assert.NotEmpty(result.References!);
+        Assert.All(result.References!, r =>
         {
             Assert.DoesNotContain(":", r.File);       // no Windows drive prefix (e.g. C:\)
             Assert.False(r.File.StartsWith('/'));      // no Unix absolute root

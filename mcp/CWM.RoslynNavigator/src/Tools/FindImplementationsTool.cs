@@ -10,12 +10,12 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class FindImplementationsTool
 {
-    [McpServerTool(Name = "find_implementations"), Description("Find all types that implement an interface or derive from a base class. A generated implementation carries IsGenerated: true (omitted when false) so it can be skipped.")]
+    [McpServerTool(Name = "find_implementations"), Description("Types that implement an interface or derive from a base class. For base types and interfaces too, use get_type_hierarchy.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("The interface or base class name to find implementations for. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).")] string interfaceName,
-        [Description("Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 200,
-        [Description("Skip this many results; pass NextOffset from the previous response for the next page.")] int offset = 0,
+        [Description("Interface or base class name, or SymbolId")] string interfaceName,
+        int maxResults = 200,
+        int offset = 0,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
