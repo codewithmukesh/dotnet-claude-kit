@@ -64,13 +64,13 @@ public static class FindDeadCodeTool
         "Module", "Installer", "Registrar", "Factory", "Converter"
     ];
 
-    [McpServerTool(Name = "find_dead_code"), Description("Find unused types, methods, and properties across the solution. Identifies symbols with zero references that are not public API entry points, interface implementations, or overrides. Symbols discovered by convention (EF entity configurations, hosted services, migrations, extension-method hosts) are filtered out because a reference search cannot see assembly scanning or DI registration; the count removed is reported as conventionFiltered. Findings are graded: 'low' when the name appears in a string literal (likely reflection-bound), 'medium' when it matches a convention suffix, 'high' otherwise — delete only high-confidence hits without checking. AssemblyScanningDetected reports whether the solution registers types by scanning at all, which softens every result. Uses a fast identifier-match pre-filter: symbols whose exact name appears as an identifier token in another file are assumed referenced without a full reference search, so occasional false negatives are possible for heavily-reused names.")]
+    [McpServerTool(Name = "find_dead_code"), Description("Unused types, methods, and properties, skipping public entry points, interface implementations, overrides, and convention-discovered types (EF configurations, hosted services, migrations). Confidence high is safe to delete; medium matches a convention suffix; low appears in a string (likely reflection). AssemblyScanningDetected weakens all results.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Scope: 'file', 'project', or 'solution'")] string scope = "solution",
-        [Description("Optional: file path or project name depending on scope")] string? path = null,
-        [Description("Kind filter: 'type', 'method', 'property', or 'all'")] string kind = "all",
-        [Description("Maximum results to return")] int maxResults = 50,
+        [Description("file, project, or solution")] string scope = "solution",
+        [Description("File path or project name for that scope")] string? path = null,
+        [Description("type, method, property, or all")] string kind = "all",
+        int maxResults = 50,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);

@@ -9,12 +9,12 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class ResolveStackTraceTool
 {
-    [McpServerTool(Name = "resolve_stack_trace"), Description("Map a .NET exception stack trace onto the solution. Undoes compiler rewrites for async methods, lambdas, and local functions, then resolves each frame to a file and line. Frames are marked InSolution so framework noise can be skipped, and FirstSolutionFrame points at the topmost frame in your own code — usually where the investigation starts. Paste the trace verbatim; the exception header is parsed too.")]
+    [McpServerTool(Name = "resolve_stack_trace"), Description("Map a .NET stack trace to source files and lines, undoing async, lambda, and local-function name rewrites. InSolution marks your frames; FirstSolutionFrame is where to start. Paste the trace verbatim.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("The raw stack trace, including the exception header line if available")] string stackTrace,
-        [Description("Only return frames that resolve to solution source, dropping framework frames")] bool solutionOnly = false,
-        [Description("Maximum frames to return. TotalFound reports the full count.")] int maxResults = 50,
+        [Description("Raw trace, exception header included")] string stackTrace,
+        [Description("Drop framework frames")] bool solutionOnly = false,
+        int maxResults = 50,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);

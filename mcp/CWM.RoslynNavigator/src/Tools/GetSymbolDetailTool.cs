@@ -9,11 +9,11 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class GetSymbolDetailTool
 {
-    [McpServerTool(Name = "get_symbol_detail"), Description("Get detailed information about a symbol including full signature, parameters, return type, modifiers, and XML documentation. Perfect for understanding APIs without reading the whole file.")]
+    [McpServerTool(Name = "get_symbol_detail"), Description("Signature, parameters, return type, modifiers, and XML docs of one symbol, without its body.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Symbol name (type, method, property). Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).")] string symbolName,
-        [Description("Optional: containing type name for methods/properties")] string? containingType = null,
+        [Description("Symbol name or SymbolId")] string symbolName,
+        string? containingType = null,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);

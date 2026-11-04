@@ -13,13 +13,13 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class FindReferencesTool
 {
-    [McpServerTool(Name = "find_references"), Description("Find all usages of a symbol across the solution. Returns file, line, snippet, and reference kind (usage, inheritance, invocation, instantiation, parameter, type-argument, assignment, implementation). A reference in generated code carries IsGenerated: true (omitted when false) so it can be skipped.")]
+    [McpServerTool(Name = "find_references"), Description("Every usage of a symbol: file, line, snippet, and kind (invocation, instantiation, inheritance, parameter, type-argument, assignment, implementation, usage). For calling methods only, use find_callers.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Symbol to find references for. Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified. Qualify when the name is reused across types. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).")] string symbolName,
-        [Description("Optional: file path to disambiguate (e.g., 'IOrderRepository.cs')")] string? file = null,
-        [Description("Optional: line number to disambiguate")] int? line = null,
-        [Description("Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 50,
+        [Description("Symbol name or SymbolId")] string symbolName,
+        string? file = null,
+        int? line = null,
+        int maxResults = 50,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);

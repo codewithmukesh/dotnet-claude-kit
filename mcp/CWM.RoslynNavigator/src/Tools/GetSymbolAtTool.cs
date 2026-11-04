@@ -13,14 +13,14 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class GetSymbolAtTool
 {
-    [McpServerTool(Name = "get_symbol_at"), Description("Resolve the symbol at a position in a file: what an identifier on a given line actually binds to. Pass the identifier's text instead of a column — counting columns is error-prone — or a 1-based column; with neither, the first identifier on the line that binds to a symbol is used. Returns kind, full signature, containing type, a stable SymbolId (pass it as the name to find_references, find_callers, get_symbol_detail, etc. to target exactly this symbol, overload included), the definition location, and for locals, parameters and expressions the declared type and nullability plus the compiler's expression type and null-state.")]
+    [McpServerTool(Name = "get_symbol_at"), Description("What the identifier at a file line binds to: kind, signature, containing type, definition location, SymbolId, and for locals and expressions the declared and inferred type with nullability.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("File path; a suffix such as 'Orders/OrderService.cs' is enough ('./' and backslashes accepted)")] string file,
-        [Description("1-based line number")] int line,
-        [Description("Identifier text on that line to resolve, e.g. 'GetByIdAsync' (preferred over column)")] string? text = null,
-        [Description("1-based column, used when text is not given")] int? column = null,
-        [Description("Which occurrence of text on the line, when it appears more than once (1-based)")] int occurrence = 1,
+        [Description("Path suffix")] string file,
+        [Description("1-based line")] int line,
+        [Description("Identifier on that line (preferred over column)")] string? text = null,
+        [Description("1-based; used when text is absent")] int? column = null,
+        [Description("Which occurrence of text on the line, 1-based")] int occurrence = 1,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);

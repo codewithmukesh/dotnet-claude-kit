@@ -24,11 +24,11 @@ public static class GetTestCoverageMapTool
         "WireMock.Net"
     ];
 
-    [McpServerTool(Name = "get_test_coverage_map"), Description("Heuristic test coverage map: identifies which production types have corresponding test classes. Matches by naming convention (e.g., OrderService → OrderServiceTests). Not runtime coverage — structural analysis only. IMPORTANT: this metric is only valid for suites written one test class per production type. For integration- or feature-driven suites it returns applicable=false with the real test-method count; in that case the percentage is meaningless and must not be graded or reported as coverage.")]
+    [McpServerTool(Name = "get_test_coverage_map"), Description("Which production types have a test class named after them (OrderServiceTests for OrderService). Structural, not runtime coverage. When applicable=false (integration or feature-style suites) the percentage is meaningless: do not report it as coverage.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Optional: production project name to check coverage for. An unknown name returns an InvalidArgument error.")] string? projectFilter = null,
-        [Description("Maximum results to return")] int maxResults = 50,
+        [Description("Production project name")] string? projectFilter = null,
+        int maxResults = 50,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);

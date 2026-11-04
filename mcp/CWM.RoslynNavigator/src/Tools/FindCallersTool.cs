@@ -10,12 +10,12 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class FindCallersTool
 {
-    [McpServerTool(Name = "find_callers"), Description("Find all methods that call a specific method. Useful for impact analysis and understanding dependencies. Includes callers that reach it through dispatch: Via is 'direct', 'interface' (called through an interface member it implements — the usual DI case), 'base' (through a base member it overrides), or 'implementation' (through an implementation/override of it), with ViaSymbol naming the member actually called. A caller in generated code carries IsGenerated: true (omitted when false) so it can be skipped.")]
+    [McpServerTool(Name = "find_callers"), Description("Methods that call a method, including calls through an interface or base member it implements or overrides (Via: direct, interface, base, implementation; ViaSymbol is the member called). For what a method calls, use get_dependency_graph.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Method to find callers for. Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified. Qualify when the name is reused across types. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).")] string methodName,
-        [Description("Optional: containing class name to disambiguate")] string? className = null,
-        [Description("Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 50,
+        [Description("Method name or SymbolId")] string methodName,
+        string? className = null,
+        int maxResults = 50,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);

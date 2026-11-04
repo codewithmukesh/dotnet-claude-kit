@@ -16,12 +16,12 @@ public static class GetProjectGraphTool
     private const int SummaryExamples = 5;
     private const int SummaryTop = 10;
 
-    [McpServerTool(Name = "get_project_graph"), Description("Get the solution's project dependency graph: one entry per csproj with its name, solution-relative path, target frameworks (a multi-targeted csproj is one entry listing all of them), and the projects its csproj references directly (omitted when none). Large solutions are paged: Count/TotalFound/Truncated report it, and summary=true or a project filter is cheaper than raising maxResults. summary=true returns counts, frameworks, top-level folders, dependency layers, and the most directly referenced projects instead of the list. project='Name' returns the matching projects with ReferencedBy (who depends on them). When several solutions are loaded, also lists them (Solutions) and which solution(s) each project belongs to.")]
+    [McpServerTool(Name = "get_project_graph"), Description("Project dependency graph: per csproj its path, target frameworks, and direct project references. On large solutions prefer summary=true (counts, frameworks, layers, most-referenced projects) or a project filter over raising maxResults.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Optional: only projects whose name or path contains this value (case-insensitive). Each match also lists ReferencedBy.")] string? project = null,
-        [Description("True: return the solution's shape (counts, frameworks, folders, dependency layers, most-referenced projects) instead of the project list.")] bool summary = false,
-        [Description("Maximum projects to return. TotalFound in the response reports the full count; re-query with a higher value, a project filter, or summary=true if it exceeds Count.")] int maxResults = 100,
+        [Description("Name or path substring; matches also list ReferencedBy")] string? project = null,
+        [Description("Return the solution shape instead of the list")] bool summary = false,
+        int maxResults = 100,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
