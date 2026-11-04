@@ -66,7 +66,7 @@ An **action layer** on top of the knowledge layer — Claude doesn't just know t
 
 | Capability | What It Does |
 |-----------|-------------|
-| **Surgical Code Analysis** | 26 Roslyn-powered MCP tools with guaranteed bounded responses. `get_symbol_source` reads ONE method body instead of the whole file. `get_file_outline` shows what's in a file before reading it. `resolve_stack_trace` turns an exception into file:line in your own code. `analyze_change_impact` answers "what breaks if I change this?" in one call. Every list-returning tool reports `Truncated` — no tool can blow your context window. On five real open-source solutions it used **75–97% fewer tokens** than Claude Code's default Grep + Read for the same answers ([benchmarks](#benchmarks)). |
+| **Surgical Code Analysis** | 26 Roslyn-powered MCP tools with guaranteed bounded responses. `get_symbol_source` reads ONE method body instead of the whole file. `get_file_outline` shows what's in a file before reading it. `resolve_stack_trace` turns an exception into file:line in your own code. `analyze_change_impact` answers "what breaks if I change this?" in one call. Every list-returning tool reports `Truncated` — no tool can blow your context window. In real Claude Code sessions on five open-source solutions, answers came back **32% faster** and **31% cheaper**, and were far more accurate (**90 vs 61** out of 100) than with the default Grep + Read ([benchmarks](#benchmarks)). |
 | **Architecture Enforcement** | `/arch-check` verifies the code still matches its declared architecture (VSA, Clean, DDD, Modular Monolith): dependency direction, layer violations, module leaks, cycles — with file:line evidence and fixes. |
 | **Dependency Health** | `/outdated` reports stale packages, CVEs, and commercial-license traps (MediatR 13+, MassTransit 9+, FluentAssertions 8+, AutoMapper 15+) before an innocent update-all changes your legal position. |
 | **Security Mapping** | `get_endpoint_map` inventories every route with its auth posture (`authorized`/`anonymous`/`unmarked`) in one token-cheap call — `/security-scan` starts every auth audit there. |
@@ -387,42 +387,38 @@ See [mcp/CWM.RoslynNavigator/README.md](mcp/CWM.RoslynNavigator/README.md) for d
 
 ### Benchmarks
 
-We benchmarked the navigator on five open-source .NET solutions, from a 9-project template to a 270-project framework. Each one gets the same 12 everyday agent tasks: find a definition, find usages, list implementations, outline a file, read one method, find callers, type hierarchy, project graph, DI registrations, endpoint map, resolve a stack trace, and diagnostics for a file. Everything was measured on one machine in one session (Windows, 24 threads, .NET SDK 10.0.403, 2026-11-04).
+We measured the navigator on five open-source .NET solutions, from a 9-project template to a 270-project framework, in two ways. First, real Claude Code sessions answering the same questions with and without the navigator. Second, the published 0.8.0 against the current build. Everything ran on one machine (Windows, 24 threads, .NET SDK 10.0.403) on 2026-11-04.
 
-#### Without the navigator vs with it
+#### Real Claude Code sessions: with vs without the navigator
 
-Without the navigator, Claude Code answers a code question with its built-in text tools, and most other AI coding agents do the same. It runs Grep to find matches, then calls Read on each file the answer lives in. Grep doesn't know which `GetParent` is which, so the agent has to open the files and work it out from the source. With the navigator, the same question is one Roslyn query that returns just the answer.
+Without the navigator, Claude Code answers a code question with its built-in Grep, Glob and Read tools, and most AI coding agents work the same way. We asked Claude Code (Sonnet 5.5) 11 everyday questions on each solution, such as "Which methods call `AbpModule.IsAbpModule`?", "Which classes implement `IShape`?" and "Map this stack trace to the source". Each question ran as a fresh headless session, once with only the default tools and once with the navigator added. Time runs from asking to the final answer and includes every model round trip. A separate, blinded judge session then scored each answer from 0 to 100 for correctness and completeness.
 
-The "without" side below copies how Claude Code's tools behave (Grep output capped at its 250-line default, then one Read per file) and counts each file only once. It leaves out the line numbers Read adds and the extra Read calls a large file needs, so it is the cheapest the default route can be.
+| Size | Solution | Projects | Time for 11 questions | Accuracy (0–100) | Cost |
+|---|---|---:|---:|---:|---:|
+| Small | [CleanArchitecture](https://github.com/ardalis/CleanArchitecture) | 9 | 92 s → **56 s** | 61 → **95** | $0.23 → **$0.13** |
+| Small | [eShop](https://github.com/dotnet/eShop) | 28 | 83 s → **56 s** | 78 → **96** | $0.18 → **$0.11** |
+| Medium | [Jellyfin](https://github.com/jellyfin/jellyfin) | 41 | 161 s → **106 s** | 66 → **91** | $0.62 → **$0.27** |
+| Large | [OrchardCore](https://github.com/OrchardCMS/OrchardCore) | 257 | 163 s → **135 s** | 46 → **85** | $0.44 → $0.45 |
+| XL | [ABP Framework](https://github.com/abpframework/abp) | 270 | 155 s → **94 s** | 52 → **85** | $0.41 → **$0.33** |
+| | **All 55 questions** | | **654 s → 447 s (−32%)** | **61 → 90** | **$1.88 → $1.29 (−31%)** |
 
-| Size | Solution | Projects | Without: tokens | Without: tool calls | With: tokens | With: tool calls | Tokens saved |
-|---|---|---:|---:|---:|---:|---:|---:|
-| Small | [CleanArchitecture](https://github.com/ardalis/CleanArchitecture) | 9 | 11,210 | 37 | 2,800 | 12 | **75%** (4×) |
-| Small | [eShop](https://github.com/dotnet/eShop) | 28 | 71,699 | 81 | 9,458 | 12 | **87%** (7.6×) |
-| Medium | [Jellyfin](https://github.com/jellyfin/jellyfin) | 41 | 670,085 | 132 | 23,487 | 12 | **97%** (28.5×) |
-| Large | [OrchardCore](https://github.com/OrchardCMS/OrchardCore) | 257 | 474,615 | 319 | 43,417 | 12 | **91%** (10.9×) |
-| XL | [ABP Framework](https://github.com/abpframework/abp) | 270 | 282,739 | 274 | 25,161 | 12 | **91%** (11.2×) |
+With the navigator, Claude answered faster on 46 of the 55 questions and more accurately on 53. The median question took 6.7 s instead of 11.2 s, and 50 answers scored 80 or more, against 20 without it. Speed is the smaller part of the story. Without the navigator, Claude answers from Grep's matching lines instead of opening every file, which is quick but often wrong:
 
-One task, both ways:
-
-| Task | Without the navigator | With the navigator |
+| Question | Without the navigator | With the navigator |
 |---|---|---|
-| Find every caller of `BaseItem.GetParent` (Jellyfin) | 1 Grep + 12 Reads, 144,750 tokens | 1 call, 1,158 tokens |
-| Read the body of `BaseItem.GetParent` (Jellyfin) | 1 Grep + 1 Read of a 30k-token file, 31,746 tokens | 1 call, 115 tokens |
-| Map every HTTP endpoint (OrchardCore) | 1 Grep + 41 Reads, 92,578 tokens | 1 call, 4,956 tokens |
-| Type hierarchy of `AbpModule` (ABP) | 1 Grep + 1 Read, 11,850 tokens | 1 call, 117 tokens |
+| Which methods call `BaseItem.GetParent`? (Jellyfin) | 22.6 s, accuracy 8: wrong line numbers for nearly every caller | 11.9 s, accuracy 100: all 26 callers, exact lines |
+| Which methods call `AbpModule.IsAbpModule`? (ABP) | 14.6 s, accuracy 30: right methods, every line number wrong | 7.2 s, accuracy 100 |
+| Which classes implement `ITransientDependency`? (ABP) | 15.9 s, accuracy 12: a rough count and a partial sample | 6.7 s, accuracy 95: the exact list with files |
+| Show the type hierarchy of `StartupBase` (OrchardCore) | 18.7 s, 6 tool calls, accuracy 40 | 10.1 s, 1 tool call, accuracy 88 |
 
-**What that means in seconds.** Every token a tool returns is a token the model has to read before it can answer, and every tool call is another model round trip. Counting only the reading time, at an assumed 10,000 input tokens per second, the 12 tasks take:
+A few honest notes:
 
-| Solution | Without the navigator | With the navigator |
-|---|---:|---:|
-| CleanArchitecture | 1.1 s | **0.3 s** |
-| eShop | 7.2 s | **0.9 s** |
-| Jellyfin | 67.0 s | **2.3 s** |
-| OrchardCore | 47.5 s | **4.3 s** |
-| ABP Framework | 28.3 s | **2.5 s** |
-
-These times are modelled, not measured. They leave out the time for each extra model round trip (37 to 319 calls without the navigator, 12 with it), which is usually the bigger cost, so the real gap is wider. The tools themselves are quick either way: the navigator answered all 12 tasks in 19–657 ms of total tool time, and Grep plus the file reads took 66 ms–3.2 s.
+- **The navigator sends more input tokens, not fewer.** Its 26 tool definitions add about 21k tokens to every request (2.39M against 1.36M in total). Most of those are cheap prompt-cache reads, so uncached input actually halved (271k → 138k) and the bill went down.
+- **It is not faster on every question.** OrchardCore's endpoint map took 34 s against 15 s, and a few small lookups were a wash.
+- **It's one session per question per arm.** Model runs vary, so trust the totals more than any single row.
+- **The judge is a model, not a human reviewer.** It is blinded to which arm wrote which answer. It checks each answer against the navigator's compiler-backed output and is told not to penalise correct items missing from it.
+- **Both arms ran without Bash**, so neither could run `rg` or `dotnet build`.
+- **Navigator startup isn't in these times.** On a large solution the first question of a session can wait for the load (see the next table).
 
 #### Before vs after: the published 0.8.0 vs the current build
 
@@ -440,11 +436,10 @@ Tool times are the first call after warm-up, so they include any compilation the
 
 A few honest notes:
 
-- Token counts are estimated as bytes ÷ 3.5 and haven't been calibrated against a real tokenizer yet. Both columns use the same divisor, so the percentages hold, but the absolute counts are approximate.
 - Some first calls are no faster than 0.8.0. On OrchardCore, the first `find_references` and `find_callers` take 1.6–1.8 s against 1.0–1.2 s, because those searches now cover interface and base-class callers.
 - Faster loading on eShop and ABP comes from loading through several MSBuild processes at once, which uses more memory while it runs (ABP peaked at 4.5 GB). Use `--load-parallelism 1` if memory matters more than startup time.
 
-The full results, including per-task tokens, per-tool latency and memory, are in [the benchmark report](mcp/CWM.RoslynNavigator/bench/results/2026-11-04-final/report.md). To run it yourself, see [the benchmark harness](mcp/CWM.RoslynNavigator/bench/README.md).
+Full results: [the A/B report](mcp/CWM.RoslynNavigator/bench/results/2026-11-04-ab/report.md) has every question, answer, score and token count. [The server benchmark](mcp/CWM.RoslynNavigator/bench/results/2026-11-04-final/report.md) has per-tool latency, memory, and response sizes. To run either yourself, see [the A/B harness](mcp/CWM.RoslynNavigator/bench/ab/README.md) and [the benchmark harness](mcp/CWM.RoslynNavigator/bench/README.md).
 
 ## Knowledge Base
 

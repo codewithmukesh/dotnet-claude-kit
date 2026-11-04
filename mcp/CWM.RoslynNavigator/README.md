@@ -6,17 +6,17 @@
 
 CWM.RoslynNavigator is a Model Context Protocol (MCP) server that provides Claude Code with semantic understanding of .NET solutions. Instead of reading entire source files (hundreds of tokens), Claude can query for specific symbols, references, and type hierarchies (tens of tokens).
 
-On five open-source solutions, from a 9-project template to a 270-project framework, the same 12 agent tasks used 75–97% fewer tokens than an agent's default route of Grep, then Read on every file the answer lives in (what Claude Code does without this server), and 12 tool calls instead of 37–319. Compared with the published 0.8.0, the server is ready 1.5–2.4× sooner, `find_dead_code` is 6–28× faster and `get_test_coverage_map` 44–100× faster:
+We asked Claude Code (Sonnet 5.5) the same 11 everyday questions on five open-source solutions, once with only its built-in Grep, Glob and Read tools and once with this server added. A blinded judge scored every answer from 0 to 100. Across all 55 questions, answers came back 32% faster (654 s → 447 s) and 31% cheaper ($1.88 → $1.29), and accuracy went from 61 to 90:
 
-| Solution | Projects | Tokens saved vs Grep + Read | Ready, 0.8.0 → now | `find_dead_code`, 0.8.0 → now |
+| Solution | Projects | Time, without → with | Accuracy, without → with | Ready, 0.8.0 → now |
 |---|---:|---:|---:|---:|
-| CleanArchitecture | 9 | 75% | 7.6 s → 3.2 s | 0.49 s → 0.08 s |
-| eShop | 28 | 87% | 8.5 s → 4.5 s | 1.3 s → 0.16 s |
-| Jellyfin | 41 | 97% | 12.7 s → 8.5 s | 13.7 s → 1.0 s |
-| OrchardCore | 257 | 91% | 93.5 s → 44.4 s | 25.1 s → 0.9 s |
-| ABP Framework | 270 | 91% | 77.2 s → 47.2 s | 15.5 s → 0.9 s |
+| CleanArchitecture | 9 | 92 s → 56 s | 61 → 95 | 7.6 s → 3.2 s |
+| eShop | 28 | 83 s → 56 s | 78 → 96 | 8.5 s → 4.5 s |
+| Jellyfin | 41 | 161 s → 106 s | 66 → 91 | 12.7 s → 8.5 s |
+| OrchardCore | 257 | 163 s → 135 s | 46 → 85 | 93.5 s → 44.4 s |
+| ABP Framework | 270 | 155 s → 94 s | 52 → 85 | 77.2 s → 47.2 s |
 
-Tokens are estimated as bytes ÷ 3.5 (not yet calibrated). The method, caveats and full results are in the [root README](https://github.com/codewithmukesh/dotnet-claude-kit#benchmarks), the [report](https://github.com/codewithmukesh/dotnet-claude-kit/blob/main/mcp/CWM.RoslynNavigator/bench/results/2026-11-04-final/report.md) and the [harness](https://github.com/codewithmukesh/dotnet-claude-kit/blob/main/mcp/CWM.RoslynNavigator/bench/README.md).
+The 26 tool definitions add about 21k input tokens to every request, mostly cheap cache reads, which is why the cost still drops. The method and caveats are in the [root README](https://github.com/codewithmukesh/dotnet-claude-kit#benchmarks). Every question and answer is in the [A/B report](https://github.com/codewithmukesh/dotnet-claude-kit/blob/main/mcp/CWM.RoslynNavigator/bench/results/2026-11-04-ab/report.md), and per-tool latency and memory are in the [server benchmark](https://github.com/codewithmukesh/dotnet-claude-kit/blob/main/mcp/CWM.RoslynNavigator/bench/results/2026-11-04-final/report.md).
 
 ## Prerequisites
 

@@ -14,6 +14,8 @@ It answers three questions:
 The committed run is in [`results/`](results/). Each folder holds one JSON file per
 (corpus × build) and a `report.md` that combines them.
 
+For real Claude Code sessions with and without the navigator (time, cost, and accuracy as a user sees them), see [`ab/`](ab/README.md).
+
 ## Corpora
 
 | Tier | Corpus | Commit | Solution | Restore |
