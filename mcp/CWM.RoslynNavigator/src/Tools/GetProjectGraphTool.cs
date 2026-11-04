@@ -22,8 +22,8 @@ public static class GetProjectGraphTool
         [Description("Name or path substring; matches also list ReferencedBy")] string? project = null,
         [Description("Return the solution shape instead of the list")] bool summary = false,
         int maxResults = 500,
-        int offset = 0,
-        [Description("auto, full, or compact")] string format = ListFormat.Auto,
+        int? offset = null,
+        string? format = null,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
@@ -76,7 +76,7 @@ public static class GetProjectGraphTool
             })];
         }
 
-        var page = Paging.Apply(selected.Select(n => n.Info).ToList(), maxResults, offset);
+        var page = Paging.Apply(selected.Select(n => n.Info).ToList(), maxResults, offset ?? 0);
         var frameworks = CountBy(selected.SelectMany(n => n.Info.TargetFrameworks));
 
         return ListFormat.Render(

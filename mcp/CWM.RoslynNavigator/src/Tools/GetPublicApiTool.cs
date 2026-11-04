@@ -14,7 +14,7 @@ public static class GetPublicApiTool
         WorkspaceManager workspace,
         [Description("Type name or SymbolId")] string typeName,
         int maxResults = 50,
-        int offset = 0,
+        int? offset = null,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
@@ -40,7 +40,7 @@ public static class GetPublicApiTool
                 Accessibility: m.DeclaredAccessibility.ToString().ToLowerInvariant()))
             .ToList();
 
-        var page = Paging.Apply(allMembers, maxResults, offset);
+        var page = Paging.Apply(allMembers, maxResults, offset ?? 0);
         var typeKind = SymbolResolver.GetKindString(typeSymbol);
         var location = SymbolResolver.GetLocation(typeSymbol);
         var file = location is { } loc ? workspace.ToRelativePath(loc.File) : null;

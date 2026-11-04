@@ -19,7 +19,7 @@ public static class GetDiagnosticsTool
         [Description("File or project; required unless scope is solution")] string? path = null,
         [Description("error, warning, or all")] string severityFilter = "all",
         int maxResults = 100,
-        int offset = 0,
+        int? offset = null,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
@@ -98,7 +98,7 @@ public static class GetDiagnosticsTool
             .Select(m => m.Info)
             .ToList();
 
-        var page = Paging.Apply(ordered, maxResults, offset);
+        var page = Paging.Apply(ordered, maxResults, offset ?? 0);
 
         return Paging.Fit(page, p => ToolJson.Serialize(new DiagnosticsResult(
             p.Items, p.Count, p.TotalFound, errors, warnings, info, p.Truncated, p.Limit, p.Offset, p.NextOffset)));

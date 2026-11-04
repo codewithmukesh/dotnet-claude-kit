@@ -20,8 +20,8 @@ public static class FindReferencesTool
         string? file = null,
         int? line = null,
         int maxResults = 500,
-        int offset = 0,
-        [Description("auto, full, or compact")] string format = ListFormat.Auto,
+        int? offset = null,
+        string? format = null,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
@@ -57,7 +57,7 @@ public static class FindReferencesTool
         // call; Roslyn's own order follows its parallel search.
         unique = [.. unique.OrderBy(f => f.Path, StringComparer.Ordinal).ThenBy(f => f.Position)];
 
-        var page = Paging.Apply(unique, limit, offset);
+        var page = Paging.Apply(unique, limit, offset ?? 0);
         var results = await BuildEntriesAsync(workspace, solution, page.Items, ct);
         var entries = page.WithItems(results);
 

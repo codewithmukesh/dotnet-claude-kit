@@ -26,7 +26,7 @@ public static class PreviewRenameTool
         bool renameInStrings = false,
         bool renameInComments = false,
         [Description("Max changed lines")] int maxResults = 100,
-        int offset = 0,
+        int? offset = null,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
@@ -84,7 +84,7 @@ public static class PreviewRenameTool
             : StringComparer.OrdinalIgnoreCase.Compare(a.File, b.File));
 
         var conflicts = await FindIntroducedErrorsAsync(workspace, solution, renamed, changedDocuments, ct);
-        var page = Paging.Apply(edits, maxResults, offset);
+        var page = Paging.Apply(edits, maxResults, offset ?? 0);
 
         var files = edits.Select(e => e.File).Distinct(StringComparer.OrdinalIgnoreCase).Count();
 

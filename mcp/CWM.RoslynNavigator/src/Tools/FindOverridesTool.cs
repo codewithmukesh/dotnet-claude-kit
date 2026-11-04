@@ -16,7 +16,7 @@ public static class FindOverridesTool
         [Description("Method name or SymbolId")] string methodName,
         string? className = null,
         int maxResults = 200,
-        int offset = 0,
+        int? offset = null,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
@@ -54,7 +54,7 @@ public static class FindOverridesTool
 
         // A multi-targeted project declares each override once per target framework.
         return Serialize(Paging.Apply(
-            all.OrderBy(o => o.File, StringComparer.Ordinal).ThenBy(o => o.Line), maxResults, o => (o.ContainingType, o.Method, o.File, o.Line), offset));
+            all.OrderBy(o => o.File, StringComparer.Ordinal).ThenBy(o => o.Line), maxResults, o => (o.ContainingType, o.Method, o.File, o.Line), offset ?? 0));
     }
 
     private static string Serialize(Paging.Page<OverrideInfo> page) =>

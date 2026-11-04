@@ -15,7 +15,7 @@ public static class FindSymbolTool
         [Description("Name, Type.Member, fully qualified name, or SymbolId. With a fuzzy match only the last segment is fuzzy.")] string name,
         [Description("any, type, class, interface, struct, enum, record, method, property, or field")] string kind = "any",
         int maxResults = 50,
-        int offset = 0,
+        int? offset = null,
         [Description("exact (case-sensitive), prefix, camelhump (GBIA finds GetByIdAsync), or substring. Fuzzy modes ignore case and rank tighter matches first.")] string match = "exact",
         CancellationToken ct = default)
     {
@@ -49,7 +49,7 @@ public static class FindSymbolTool
             s => (s.File, s.Line, s.Kind, s.Name, s.ContainingType),
             (s, tfms) => s with { TargetFrameworks = tfms });
 
-        var page = Paging.Apply(all, maxResults, offset);
+        var page = Paging.Apply(all, maxResults, offset ?? 0);
 
         return Paging.Fit(page, p => ToolJson.Serialize(new SymbolSearchResult(
             p.Items, p.Count, p.TotalFound, p.Truncated, p.Limit, p.Offset, p.NextOffset)));

@@ -15,7 +15,7 @@ public static class FindImplementationsTool
         WorkspaceManager workspace,
         [Description("Interface or base class name, or SymbolId")] string interfaceName,
         int maxResults = 200,
-        int offset = 0,
+        int? offset = null,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
@@ -57,7 +57,7 @@ public static class FindImplementationsTool
 
         // A multi-targeted project can declare each implementation once per target framework.
         return Serialize(Paging.Apply(
-            all.OrderBy(i => i.File, StringComparer.Ordinal).ThenBy(i => i.Line), maxResults, i => (i.Type, i.File, i.Line), offset));
+            all.OrderBy(i => i.File, StringComparer.Ordinal).ThenBy(i => i.Line), maxResults, i => (i.Type, i.File, i.Line), offset ?? 0));
     }
 
     private static string Serialize(Paging.Page<ImplementationInfo> page) =>

@@ -29,8 +29,8 @@ public static class GetEndpointMapTool
         WorkspaceManager workspace,
         [Description("Path substring filter")] string? file = null,
         int maxResults = 500,
-        int offset = 0,
-        [Description("auto, full, or compact")] string format = ListFormat.Auto,
+        int? offset = null,
+        string? format = null,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
@@ -83,7 +83,7 @@ public static class GetEndpointMapTool
         });
 
         var all = perDocument.SelectMany(entries => entries).ToList();
-        var page = Paging.Apply(all, maxResults, offset);
+        var page = Paging.Apply(all, maxResults, offset ?? 0);
         var entries = page.WithItems(page.Items.Select(e => e.Entry).ToList());
 
         var byProject = entries.Truncated || entries.Offset > 0 ? ListFormat.CountBy(all, e => e.Project) : null;

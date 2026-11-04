@@ -23,8 +23,8 @@ public static class GetDiRegistrationsTool
         WorkspaceManager workspace,
         [Description("Path substring filter")] string? file = null,
         int maxResults = 500,
-        int offset = 0,
-        [Description("auto, full, or compact")] string format = ListFormat.Auto,
+        int? offset = null,
+        string? format = null,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
@@ -85,7 +85,7 @@ public static class GetDiRegistrationsTool
         var captiveRisks = FindCaptiveRisks(registrations, typeDeclarations);
         var note = DiContainerSupport.BuildNote(registrations.Count, unrecognized);
 
-        var page = Paging.Apply(registrations, maxResults, offset);
+        var page = Paging.Apply(registrations, maxResults, offset ?? 0);
         var byLifetime = ListFormat.CountBy(registrations, r => r.Lifetime);
         var byProject = page.Truncated || page.Offset > 0 ? ListFormat.CountBy(projects, p => p) : null;
 

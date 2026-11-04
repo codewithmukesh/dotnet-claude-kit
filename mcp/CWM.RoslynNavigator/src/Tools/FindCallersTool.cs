@@ -16,7 +16,7 @@ public static class FindCallersTool
         [Description("Method name or SymbolId")] string methodName,
         string? className = null,
         int maxResults = 200,
-        int offset = 0,
+        int? offset = null,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
@@ -71,7 +71,7 @@ public static class FindCallersTool
             .OrderBy(c => c.Via == "direct" ? 0 : 1)
             .ThenBy(c => c.File, StringComparer.Ordinal)
             .ThenBy(c => c.Line);
-        return Serialize(Paging.Apply(ordered, maxResults, c => (c.File, c.Line, c.Method, c.Via, c.ViaSymbol), offset));
+        return Serialize(Paging.Apply(ordered, maxResults, c => (c.File, c.Line, c.Method, c.Via, c.ViaSymbol), offset ?? 0));
     }
 
     private static string Serialize(Paging.Page<CallerInfo> page) =>

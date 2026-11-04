@@ -15,7 +15,7 @@ public static class GetTypeHierarchyTool
         WorkspaceManager workspace,
         [Description("Type name or SymbolId")] string typeName,
         [Description("Max derived types")] int maxResults = 500,
-        int offset = 0,
+        int? offset = null,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
@@ -66,7 +66,7 @@ public static class GetTypeHierarchyTool
         // Each flavor of a multi-targeted project reports its own copy of a derived type:
         // same declaration ID, same declaring file.
         var distinct = Paging.Distinct(allDerived, d => (SymbolResolver.GetSymbolId(d), SymbolResolver.GetLocation(d)));
-        var page = Paging.Apply(DisplayNames(distinct), maxResults, offset);
+        var page = Paging.Apply(DisplayNames(distinct), maxResults, offset ?? 0);
         var location = SymbolResolver.GetLocation(typeSymbol);
         var file = location is { } loc ? workspace.ToRelativePath(loc.File) : null;
 

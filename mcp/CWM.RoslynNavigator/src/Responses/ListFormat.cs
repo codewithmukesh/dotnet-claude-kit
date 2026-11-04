@@ -23,8 +23,8 @@ internal static class ListFormat
     public const int TopProjects = 25;
 
     /// <summary>Null when <paramref name="format"/> is valid; otherwise a serialized InvalidArgument error.</summary>
-    public static string? Validate(string format) =>
-        ArgumentChecks.Choice("format", format, Auto, Full, Compact);
+    public static string? Validate(string? format) =>
+        format is null ? null : ArgumentChecks.Choice("format", format, Auto, Full, Compact);
 
     /// <summary>
     /// Serializes <paramref name="page"/> in the requested form, fitted to the response budget.
@@ -32,7 +32,7 @@ internal static class ListFormat
     /// </summary>
     public static string Render<T>(
         Paging.Page<T> page,
-        string format,
+        string? format,
         Func<Paging.Page<T>, string> full,
         Func<Paging.Page<T>, string> compact)
     {
