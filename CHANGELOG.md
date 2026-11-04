@@ -46,6 +46,7 @@ Measured on a 39-project, 3,750-document solution (warm workspace, second call):
   - `detect_antipatterns` scans every file in one parallel pass, skips EF checks in projects with no `DbSet`, and lists each rule's message and suggestion once (ABP 3.0s → 0.4s cold, ~12k → ~7k tokens)
   - File-scope `get_diagnostics` uses the file's own semantic model, falling back to the cached project compilation only for project-wide warnings (ABP 855 → 113ms cold)
   - Every tool shares one source-generated serializer that omits nulls and default flags (another 3–5% of tokens)
+- **Tool definitions cost half as many tokens.** Every request carries all 26 tool definitions, so their size is paid on every turn of every session. Descriptions now say what each tool returns and which neighbour to use instead. Conventions shared by every tool (symbol name forms, file matching, paging fields) are stated once in the MCP server instructions instead of 26 times, and optional parameters no longer carry `["string","null"]` schemas. About 8,000 → 4,100 estimated tokens, held in place by a budget test
 - A `Load profile` log line breaks Ready time into MSBuild, merge, and post-load steps, and the pre-Ready file-timestamp snapshot reads folders in parallel (ABP 0.6s → 0.1s)
 
 ### Fixed (navigator)
