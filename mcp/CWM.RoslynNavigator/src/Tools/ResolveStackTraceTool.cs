@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Text.Json;
 using CWM.RoslynNavigator.Responses;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using ModelContextProtocol.Server;
 
 namespace CWM.RoslynNavigator.Tools;
@@ -50,7 +51,7 @@ public static class ResolveStackTraceTool
                 symbolsByName[qualifiedName] = symbol;
             }
 
-            var frame = await ResolveFrameAsync(workspace, parsed[i], symbol, i, ct);
+            var frame = await ResolveFrameAsync(workspace, parsed[i], i > 0 ? parsed[i - 1] : null, symbol, i, ct);
 
             if (solutionOnly && !frame.InSolution) continue;
 
@@ -76,6 +77,7 @@ public static class ResolveStackTraceTool
     private static async Task<StackFrameInfo> ResolveFrameAsync(
         WorkspaceManager workspace,
         StackTraceParser.ParsedFrame frame,
+        StackTraceParser.ParsedFrame? callee,
         ISymbol? symbol,
         int index,
         CancellationToken ct)
@@ -97,9 +99,14 @@ public static class ResolveStackTraceTool
         var location = SymbolResolver.GetLocation(symbol);
         var file = location is { } loc ? workspace.ToRelativePath(loc.File) : frame.File;
 
-        // Prefer the line the trace reported — that is where it actually threw — and fall
-        // back to the declaration when the trace carried no PDB line info.
-        var line = frame.Line ?? location?.Line;
+        // Prefer the line the trace reported: that is where this frame was executing. Without
+        // PDB line info, the line a reader means is the call to the next frame down (the method
+        // this one called), not the method's signature; the declaration is the last resort.
+        var (callLine, callSites) = frame.Line is null && callee is not null
+            ? FindCallSite(symbol, callee.QualifiedName, ct)
+            : (null, 0);
+        var line = frame.Line ?? callLine ?? location?.Line;
+        var source = frame.Line is not null ? "trace" : callLine is not null ? "call" : "declaration";
         var snippet = await ReadSnippetAsync(workspace, symbol, line, ct);
 
         return new StackFrameInfo(
@@ -109,7 +116,9 @@ public static class ResolveStackTraceTool
             File: file,
             Line: line,
             DeclarationLine: location?.Line,
-            Snippet: snippet);
+            Snippet: snippet,
+            LineSource: source,
+            CallSites: callSites > 1 ? callSites : null);
     }
 
     private static async Task<string?> ReadSnippetAsync(
@@ -132,4 +141,45 @@ public static class ResolveStackTraceTool
 
         return text.Lines[zeroBased].ToString().Trim();
     }
+
+    /// <summary>
+    /// The first line in <paramref name="caller"/>'s body that calls <paramref name="calleeName"/>
+    /// (the next frame down), and how many such calls there are. Matched by name: a method call,
+    /// a property access for get_X/set_X, or a construction for .ctor. (null, 0) when none match,
+    /// e.g. when the next frame is a framework helper reached through a call the trace omits.
+    /// </summary>
+    internal static (int? Line, int Count) FindCallSite(ISymbol caller, string calleeName, CancellationToken ct)
+    {
+        var body = caller.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax(ct);
+        if (body is null) return (null, 0);
+
+        var segments = calleeName.Split('.');
+        var member = segments[^1];
+        Func<SyntaxNode, bool> matches = member switch
+        {
+            "ctor" or ".ctor" when segments.Length > 1 => node =>
+                node is ObjectCreationExpressionSyntax creation && RightmostName(creation.Type) == segments[^2],
+            _ when member.StartsWith("get_", StringComparison.Ordinal) || member.StartsWith("set_", StringComparison.Ordinal) =>
+                node => node is IdentifierNameSyntax identifier && identifier.Identifier.Text == member[4..],
+            _ => node => node is InvocationExpressionSyntax invocation && RightmostName(invocation.Expression) == member,
+        };
+
+        var lines = body.DescendantNodes()
+            .Where(matches)
+            .Select(node => node.GetLocation().GetLineSpan().StartLinePosition.Line + 1)
+            .Distinct()
+            .ToList();
+
+        return lines.Count == 0 ? (null, 0) : (lines[0], lines.Count);
+    }
+
+    /// <summary>"a.b.Foo&lt;T&gt;" → "Foo"; null for an expression that does not end in a name.</summary>
+    private static string? RightmostName(ExpressionSyntax expression) => expression switch
+    {
+        MemberAccessExpressionSyntax access => access.Name.Identifier.Text,
+        MemberBindingExpressionSyntax binding => binding.Name.Identifier.Text,
+        QualifiedNameSyntax qualified => qualified.Right.Identifier.Text,
+        SimpleNameSyntax simple => simple.Identifier.Text,
+        _ => null,
+    };
 }

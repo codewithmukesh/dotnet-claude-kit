@@ -141,6 +141,104 @@ public class GetEndpointMapTests(TestSolutionFixture fixture)
     }
 
     [Fact]
+    public void Analyze_BaseControllerInAnotherFile_InheritsControllerRouteAndAuth()
+    {
+        // Jellyfin's shape: [ApiController] and [Route("[controller]")] live on a base class in
+        // another file, and the derived controllers name neither ControllerBase nor ApiController.
+        var baseRoot = CSharpSyntaxTree.ParseText("""
+            [ApiController]
+            [Route("[controller]")]
+            [Authorize]
+            public class BaseApiController : ControllerBase { }
+            """, cancellationToken: TestContext.Current.CancellationToken).GetRoot(TestContext.Current.CancellationToken);
+        var root = CSharpSyntaxTree.ParseText("""
+            public class ItemsController : BaseApiController
+            {
+                [HttpGet("{id}")]
+                public IActionResult Get(int id) => Ok();
+            }
+            """, cancellationToken: TestContext.Current.CancellationToken).GetRoot(TestContext.Current.CancellationToken);
+        var index = new ControllerIndex();
+        index.Add(ControllerIndex.Collect(baseRoot));
+        index.Add(ControllerIndex.Collect(root));
+
+        var endpoint = Assert.Single(GetEndpointMapTool.AnalyzeRoot(root, "Items.cs", index));
+
+        Assert.Equal("Items/{id}", endpoint.Route);
+        Assert.Equal("authorized", endpoint.Auth);
+        Assert.Equal("controller", endpoint.Kind);
+    }
+
+    [Fact]
+    public void Analyze_DerivedRouteOverridesBaseRoute_UsesNearest()
+    {
+        var endpoints = Analyze("""
+            [ApiController]
+            [Route("[controller]")]
+            public class BaseApiController : ControllerBase { }
+
+            [Route("")]
+            public class ImageController : BaseApiController
+            {
+                [HttpPost("Users/{userId}/Images")]
+                public IActionResult Post() => Ok();
+            }
+            """);
+
+        Assert.Equal("Users/{userId}/Images", Assert.Single(endpoints).Route);
+    }
+
+    [Fact]
+    public void Analyze_ClassWithoutControllerAncestry_IsIgnored()
+    {
+        var endpoints = Analyze("""
+            public class Base { }
+            public class NotAController : Base
+            {
+                [HttpGet("x")]
+                public void Get() { }
+            }
+            """);
+
+        Assert.Empty(endpoints);
+    }
+
+    [Fact]
+    public void Analyze_StackedHttpAttributes_ReportsOneEndpointEach()
+    {
+        var endpoints = Analyze("""
+            [Route("videos")]
+            public class VideosController : ControllerBase
+            {
+                [HttpGet("{id}/stream")]
+                [HttpHead("{id}/stream")]
+                public IActionResult Stream(int id) => Ok();
+            }
+            """);
+
+        Assert.Equal(["GET", "HEAD"], endpoints.Select(e => e.Method));
+        Assert.All(endpoints, e => Assert.Equal("videos/{id}/stream", e.Route));
+    }
+
+    [Fact]
+    public void Analyze_ActionTokenAndAbsoluteTemplate_ResolveLikeAspNetCore()
+    {
+        var endpoints = Analyze("""
+            [Route("api/[controller]")]
+            public class OrdersController : ControllerBase
+            {
+                [HttpGet("[action]")]
+                public IActionResult Recent() => Ok();
+
+                [HttpGet("~/status")]
+                public IActionResult Status() => Ok();
+            }
+            """);
+
+        Assert.Equal(["api/Orders/Recent", "/status"], endpoints.Select(e => e.Route));
+    }
+
+    [Fact]
     public async Task GetEndpointMap_SampleSolutionHasNoEndpoints_ReturnsEmpty()
     {
         var json = await GetEndpointMapTool.ExecuteAsync(

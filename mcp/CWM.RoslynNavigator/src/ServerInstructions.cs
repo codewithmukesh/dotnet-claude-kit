@@ -16,7 +16,8 @@ internal static class ServerInstructions
         Conventions shared by all tools:
         - A symbol argument takes a bare name, Type.Member, a fully qualified name, or a SymbolId from find_symbol or get_symbol_at (exact, overload included). Qualify names reused across types; the optional file, line, className, or containingType arguments narrow an ambiguous name. An ambiguous name returns AmbiguousMatch with candidates.
         - File arguments match a path suffix (./ and backslashes accepted). A file that matches nothing returns FileNotFound.
-        - maxResults caps a list. Count, TotalFound, and Truncated report the full size; when truncated, narrow the filter or raise maxResults.
+        - maxResults caps a list. Count, TotalFound, Truncated report the full size; when Truncated, pass NextOffset as offset for the next page.
+        - format auto (default) turns a large list into compact per-file strings (Files); full or compact forces one.
         - IsGenerated: true marks generated code (omitted when false).
         - If an answer is empty or reports State Loading, call get_workspace_status.
         """;

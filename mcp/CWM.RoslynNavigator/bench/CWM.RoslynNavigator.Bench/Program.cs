@@ -119,24 +119,33 @@ static async Task<int> ProbeAsync(CommandLine command, CancellationToken ct)
 }
 
 // One tool call against a corpus, printing the raw response — for reproducing a bug report.
+// --calls-file runs a JSON array of {"tool": ..., "args": {...}} in one session instead, writing
+// each payload to --out-dir, so one solution load serves a whole before/after comparison.
 static async Task<int> CallAsync(CommandLine command, CancellationToken ct)
 {
     var corpus = ResultStore.ReadCorpus(command.Required("corpus"));
     var solution = SolutionPath(command.Required("corpus-root"), corpus);
-    var build = ServerBuild.Parse(command.Required("server"));
+    var build = ServerBuild.Parse(command.Required("server")) with
+    {
+        ExtraArguments = command.Optional("server-args")?.Split(' ', StringSplitOptions.RemoveEmptyEntries) ?? [],
+    };
+    var timeout = TimeSpan.FromSeconds(command.Number("timeout-s", 300));
+
+    if (command.Optional("calls-file") is { } callsFile)
+        return await CallManyAsync(command, build, solution, callsFile, timeout, ct);
+
     var tool = command.Required("tool");
-    var arguments = System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, System.Text.Json.JsonElement>>(command.Optional("args-file") is { } argsFile ? File.ReadAllText(argsFile) : command.Optional("args") ?? "{}")!
-        .ToDictionary(a => a.Key, a => (object?)a.Value);
+    var arguments = ParseArguments(command.Optional("args-file") is { } argsFile ? File.ReadAllText(argsFile) : command.Optional("args") ?? "{}");
 
     await using var session = await ServerSession.StartAsync(build, solution, ct);
     _ = await session.WaitForReadyAsync(TimeSpan.FromMinutes(20), ct);
     if (command.Flag("warm")) _ = await session.WaitForWarmAsync(TimeSpan.FromMinutes(20), ct);
-    var result = await session.CallAsync(tool, arguments, TimeSpan.FromSeconds(command.Number("timeout-s", 300)), ct);
+    var result = await session.CallAsync(tool, arguments, timeout, ct);
     Console.WriteLine($"{tool}: {result.Status} in {result.ElapsedMs:0} ms, {result.Bytes} bytes");
     // --repeat N: the same call N more times, for warm timings out of process.
     for (var i = 0; i < (int)command.Number("repeat", 0); i++)
     {
-        var again = await session.CallAsync(tool, arguments, TimeSpan.FromSeconds(command.Number("timeout-s", 300)), ct);
+        var again = await session.CallAsync(tool, arguments, timeout, ct);
         Console.WriteLine($"  repeat {i + 1}: {again.Status} in {again.ElapsedMs:0} ms");
     }
 
@@ -150,6 +159,35 @@ static async Task<int> CallAsync(CommandLine command, CancellationToken ct)
 
     return 0;
 }
+
+static async Task<int> CallManyAsync(
+    CommandLine command, ServerBuild build, string solution, string callsFile, TimeSpan timeout, CancellationToken ct)
+{
+    var calls = System.Text.Json.JsonDocument.Parse(File.ReadAllText(callsFile)).RootElement.EnumerateArray()
+        .Select(c => (Tool: c.GetProperty("tool").GetString()!,
+                      Args: c.TryGetProperty("args", out var a) ? ParseArguments(a.GetRawText()) : []))
+        .ToList();
+    var outDir = Directory.CreateDirectory(command.Optional("out-dir") ?? ".").FullName;
+
+    await using var session = await ServerSession.StartAsync(build, solution, ct);
+    _ = await session.WaitForReadyAsync(TimeSpan.FromMinutes(20), ct);
+    if (command.Flag("warm")) _ = await session.WaitForWarmAsync(TimeSpan.FromMinutes(20), ct);
+
+    for (var i = 0; i < calls.Count; i++)
+    {
+        var (tool, args) = calls[i];
+        var result = await session.CallAsync(tool, args, timeout, ct);
+        var payload = result.Payload ?? result.ErrorMessage ?? "";
+        File.WriteAllText(Path.Combine(outDir, $"{i:D2}-{tool}.json"), payload);
+        Console.WriteLine($"{i:D2} {tool,-28} {result.Status} {result.ElapsedMs,7:0} ms {payload.Length,8} chars  {System.Text.Json.JsonSerializer.Serialize(args)}");
+    }
+
+    return 0;
+}
+
+static Dictionary<string, object?> ParseArguments(string json) =>
+    System.Text.Json.JsonSerializer.Deserialize<Dictionary<string, System.Text.Json.JsonElement>>(json)!
+        .ToDictionary(a => a.Key, a => (object?)a.Value);
 
 static int Report(CommandLine command)
 {
@@ -185,6 +223,7 @@ static int Help()
           report --in <results/yyyy-MM-dd> [--after <label>]
           call   --corpus <def.json> --corpus-root <dir> --server <label=path> --tool <name>
                  [--args <json> | --args-file <file>] [--warm] [--repeat N] [--quiet] [--timeout-s 300]
+                 [--calls-file <json array of {tool,args}> --out-dir <dir>] [--server-args "<switches>"]
 
         A server path ending in .dll runs under the dotnet host; anything else runs directly.
         """);

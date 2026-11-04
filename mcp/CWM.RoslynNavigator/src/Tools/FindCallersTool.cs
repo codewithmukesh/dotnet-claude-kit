@@ -15,7 +15,8 @@ public static class FindCallersTool
         WorkspaceManager workspace,
         [Description("Method name or SymbolId")] string methodName,
         string? className = null,
-        int maxResults = 50,
+        int maxResults = 200,
+        int? offset = null,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
@@ -33,7 +34,9 @@ public static class FindCallersTool
 
         var symbol = resolved.Symbol;
 
-        var callers = await SymbolFinder.FindCallersAsync(symbol, solution, ct);
+        // From every target-framework flavor of the method (see SymbolFlavors).
+        var callers = await SymbolFlavors.SearchAllAsync(symbol, solution,
+            flavor => SymbolFinder.FindCallersAsync(flavor, solution, ct), ct);
 
         var generated = new GeneratedCodeIndex(workspace);
         var all = new List<CallerInfo>();
@@ -65,10 +68,15 @@ public static class FindCallersTool
 
         // Callers are already one per symbol and route; this also folds per-framework copies of
         // a caller declared in a multi-targeted project whose display strings differ.
-        return Serialize(Paging.Apply(all, maxResults, c => (c.File, c.Line, c.Method, c.Via, c.ViaSymbol)));
+        // Direct callers first, then a stable file/line order so an offset names the same entry every call.
+        var ordered = all
+            .OrderBy(c => c.Via == "direct" ? 0 : 1)
+            .ThenBy(c => c.File, StringComparer.Ordinal)
+            .ThenBy(c => c.Line);
+        return Serialize(Paging.Apply(ordered, maxResults, c => (c.File, c.Line, c.Method, c.Via, c.ViaSymbol), offset ?? 0));
     }
 
     private static string Serialize(Paging.Page<CallerInfo> page) =>
-        ToolJson.Serialize(new CallersResult(
-            page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit));
+        Paging.Fit(page, p => ToolJson.Serialize(new CallersResult(
+            p.Items, p.Count, p.TotalFound, p.Truncated, p.Limit, p.Offset, p.NextOffset)));
 }

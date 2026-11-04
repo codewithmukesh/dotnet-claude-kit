@@ -53,6 +53,9 @@
           "type": "integer",
           "default": 100
         },
+        "offset": {
+          "type": "integer"
+        },
         "scope": {
           "description": "production, or all to include test and migration code",
           "type": "string",
@@ -99,7 +102,10 @@
         },
         "maxResults": {
           "type": "integer",
-          "default": 50
+          "default": 200
+        },
+        "offset": {
+          "type": "integer"
         }
       },
       "required": [
@@ -130,6 +136,9 @@
         "maxResults": {
           "type": "integer",
           "default": 50
+        },
+        "offset": {
+          "type": "integer"
         }
       }
     }
@@ -146,7 +155,10 @@
         },
         "maxResults": {
           "type": "integer",
-          "default": 50
+          "default": 200
+        },
+        "offset": {
+          "type": "integer"
         }
       },
       "required": [
@@ -169,7 +181,10 @@
         },
         "maxResults": {
           "type": "integer",
-          "default": 50
+          "default": 200
+        },
+        "offset": {
+          "type": "integer"
         }
       },
       "required": [
@@ -195,7 +210,13 @@
         },
         "maxResults": {
           "type": "integer",
-          "default": 50
+          "default": 1000
+        },
+        "offset": {
+          "type": "integer"
+        },
+        "format": {
+          "type": "string"
         }
       },
       "required": [
@@ -221,6 +242,9 @@
         "maxResults": {
           "type": "integer",
           "default": 50
+        },
+        "offset": {
+          "type": "integer"
         },
         "match": {
           "description": "exact (case-sensitive), prefix, camelhump (GBIA finds GetByIdAsync), or substring. Fuzzy modes ignore case and rank tighter matches first.",
@@ -277,7 +301,13 @@
         },
         "maxResults": {
           "type": "integer",
-          "default": 100
+          "default": 500
+        },
+        "offset": {
+          "type": "integer"
+        },
+        "format": {
+          "type": "string"
         }
       }
     }
@@ -305,6 +335,9 @@
         "maxResults": {
           "type": "integer",
           "default": 100
+        },
+        "offset": {
+          "type": "integer"
         }
       }
     }
@@ -321,7 +354,13 @@
         },
         "maxResults": {
           "type": "integer",
-          "default": 100
+          "default": 500
+        },
+        "offset": {
+          "type": "integer"
+        },
+        "format": {
+          "type": "string"
         }
       }
     }
@@ -380,7 +419,13 @@
         },
         "maxResults": {
           "type": "integer",
-          "default": 100
+          "default": 500
+        },
+        "offset": {
+          "type": "integer"
+        },
+        "format": {
+          "type": "string"
         }
       }
     }
@@ -398,6 +443,9 @@
         "maxResults": {
           "type": "integer",
           "default": 50
+        },
+        "offset": {
+          "type": "integer"
         }
       },
       "required": [
@@ -537,7 +585,10 @@
         "maxResults": {
           "description": "Max derived types",
           "type": "integer",
-          "default": 50
+          "default": 500
+        },
+        "offset": {
+          "type": "integer"
         }
       },
       "required": [
@@ -595,6 +646,9 @@
           "description": "Max changed lines",
           "type": "integer",
           "default": 100
+        },
+        "offset": {
+          "type": "integer"
         }
       },
       "required": [

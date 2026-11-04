@@ -32,6 +32,7 @@ public static class DetectAntiPatternsTool
         string? projectFilter = null,
         [Description("Minimum: warning or error")] string severity = "warning",
         int maxResults = 100,
+        int? offset = null,
         [Description("production, or all to include test and migration code")] string scope = "production",
         [Description("Minimum: medium (all) or high")] string confidence = "medium",
         CancellationToken ct = default)
@@ -128,7 +129,10 @@ public static class DetectAntiPatternsTool
                     accumulator.Add(v, scans[i].Kind, finding.RelativePath, finding.Suppressed);
             }
         }
-        return ToolJson.Serialize(accumulator.Build(maxResults, minConfidence, suppressions));
+        var start = Math.Max(0, offset ?? 0);
+        return Paging.FitCount(
+            Math.Max(1, maxResults),
+            limit => ToolJson.Serialize(accumulator.Build(limit, start, minConfidence, suppressions)));
     }
 
     private readonly record struct Finding(AntiPatternViolation Violation, string RelativePath, bool Suppressed);
@@ -247,6 +251,7 @@ public static class DetectAntiPatternsTool
 
         public AntiPatternsResult Build(
             int maxResults,
+            int offset,
             AntiPatternConfidence minConfidence,
             SuppressionSet suppressions)
         {
@@ -261,6 +266,7 @@ public static class DetectAntiPatternsTool
                 .ThenByDescending(entry => entry.Violation.Severity)
                 .ThenBy(entry => entry.RelativePath, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(entry => entry.Violation.Line)
+                .Skip(offset)
                 .Take(limit)
                 .ToList();
 
@@ -319,9 +325,12 @@ public static class DetectAntiPatternsTool
                 MigrationFiles: _migration,
                 SuppressionConfig: suppressions.ConfigPath);
 
+            var start = Math.Min(offset, eligible.Count);
+            var end = start + violations.Count;
             return new AntiPatternsResult(
                 violations, violations.Count, eligible.Count,
-                eligible.Count > violations.Count, limit, summary, rules.Count > 0 ? rules : null);
+                end < eligible.Count, limit, summary, rules.Count > 0 ? rules : null,
+                start, end < eligible.Count ? end : null);
         }
 
         private static string SeverityName(AntiPatternSeverity severity) => severity.ToString().ToLowerInvariant();

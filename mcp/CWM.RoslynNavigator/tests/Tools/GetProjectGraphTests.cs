@@ -14,7 +14,7 @@ public class GetProjectGraphTests(TestSolutionFixture fixture)
         var json = await GetProjectGraphTool.ExecuteAsync(fixture.WorkspaceManager, ct: TestContext.Current.CancellationToken);
         var result = JsonSerializer.Deserialize<ProjectGraphResult>(json)!;
 
-        Assert.Equal(4, result.Projects.Count); // Domain, Infrastructure, Api, Tests
+        Assert.Equal(4, result.Projects!.Count); // Domain, Infrastructure, Api, Tests
         Assert.Contains(result.Projects, p => p.Name == "SampleDomain");
         Assert.Contains(result.Projects, p => p.Name == "SampleInfrastructure");
         Assert.Contains(result.Projects, p => p.Name == "SampleApi");
@@ -26,7 +26,7 @@ public class GetProjectGraphTests(TestSolutionFixture fixture)
         var json = await GetProjectGraphTool.ExecuteAsync(fixture.WorkspaceManager, ct: TestContext.Current.CancellationToken);
         var result = JsonSerializer.Deserialize<ProjectGraphResult>(json)!;
 
-        var infra = result.Projects.First(p => p.Name == "SampleInfrastructure");
+        var infra = result.Projects!.First(p => p.Name == "SampleInfrastructure");
         Assert.Contains("SampleDomain", infra.References!);
     }
 
@@ -36,7 +36,7 @@ public class GetProjectGraphTests(TestSolutionFixture fixture)
         var json = await GetProjectGraphTool.ExecuteAsync(fixture.WorkspaceManager, ct: TestContext.Current.CancellationToken);
         var result = JsonSerializer.Deserialize<ProjectGraphResult>(json)!;
 
-        var api = result.Projects.First(p => p.Name == "SampleApi");
+        var api = result.Projects!.First(p => p.Name == "SampleApi");
         Assert.Contains("SampleDomain", api.References!);
         Assert.Contains("SampleInfrastructure", api.References!);
     }
@@ -70,8 +70,8 @@ public class GetProjectGraphTests(TestSolutionFixture fixture)
 
         // Assert
         var result = JsonSerializer.Deserialize<ProjectGraphResult>(json)!;
-        Assert.Equal("SampleDomain/SampleDomain.csproj", result.Projects.Single(p => p.Name == "SampleDomain").Path);
-        Assert.All(result.Projects, p => Assert.Equal(["net10.0"], p.TargetFrameworks));
+        Assert.Equal("SampleDomain/SampleDomain.csproj", result.Projects!.Single(p => p.Name == "SampleDomain").Path);
+        Assert.All(result.Projects!, p => Assert.Equal(["net10.0"], p.TargetFrameworks));
     }
 
     [Fact]
@@ -82,7 +82,7 @@ public class GetProjectGraphTests(TestSolutionFixture fixture)
 
         // Assert
         var result = JsonSerializer.Deserialize<ProjectGraphResult>(json)!;
-        Assert.Null(result.Projects.Single(p => p.Name == "SampleDomain").References);
+        Assert.Null(result.Projects!.Single(p => p.Name == "SampleDomain").References);
     }
 
     [Fact]
@@ -93,7 +93,7 @@ public class GetProjectGraphTests(TestSolutionFixture fixture)
 
         // Assert
         var result = JsonSerializer.Deserialize<ProjectGraphResult>(json)!;
-        ToolGapTests.AssertTruncated(result.Projects.Count, result.Count, result.TotalFound, result.Truncated, result.Limit, total: 4);
+        ToolGapTests.AssertTruncated(result.Projects!.Count, result.Count, result.TotalFound, result.Truncated, result.Limit, total: 4);
     }
 
     [Fact]
@@ -104,7 +104,7 @@ public class GetProjectGraphTests(TestSolutionFixture fixture)
 
         // Assert
         var result = JsonSerializer.Deserialize<ProjectGraphResult>(json)!;
-        var domain = Assert.Single(result.Projects);
+        var domain = Assert.Single(result.Projects!);
         Assert.Equal(["SampleApi", "SampleInfrastructure", "SampleTests"], domain.ReferencedBy!.Order());
     }
 
@@ -170,7 +170,7 @@ public class GetProjectGraphTests(TestSolutionFixture fixture)
             var json = await GetProjectGraphTool.ExecuteAsync(workspace, ct: TestContext.Current.CancellationToken);
 
             // Assert
-            var app = JsonSerializer.Deserialize<ProjectGraphResult>(json)!.Projects.Single(p => p.Name == "App");
+            var app = JsonSerializer.Deserialize<ProjectGraphResult>(json)!.Projects!.Single(p => p.Name == "App");
             Assert.Equal(["Lib"], app.References);
         }
         finally

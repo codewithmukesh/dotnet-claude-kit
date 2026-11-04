@@ -125,6 +125,49 @@ public class ResolveStackTraceTests(TestSolutionFixture fixture)
     }
 
     [Fact]
+    public async Task ResolveStackTrace_NoLineInfo_ReportsCallToNextFrameNotDeclaration()
+    {
+        // A Release trace without PDB lines: "the line" of CancelOrderAsync is its call to
+        // Order.Cancel, the next frame down, not the method signature.
+        const string trace = """
+            System.InvalidOperationException: Order already shipped
+               at SampleDomain.Order.Cancel()
+               at SampleApi.OrderService.CancelOrderAsync(Guid id, CancellationToken ct)
+            """;
+
+        var json = await ResolveStackTraceTool.ExecuteAsync(
+            fixture.WorkspaceManager, trace, ct: TestContext.Current.CancellationToken);
+        var result = JsonSerializer.Deserialize<StackTraceResult>(json)!;
+
+        var top = result.Frames[0];
+        Assert.Equal("declaration", top.LineSource);
+        Assert.Equal(top.DeclarationLine, top.Line);
+
+        var caller = result.Frames[1];
+        Assert.Equal("call", caller.LineSource);
+        Assert.Equal(33, caller.Line);
+        Assert.Equal(29, caller.DeclarationLine);
+        Assert.Contains("order.Cancel()", caller.Snippet);
+    }
+
+    [Fact]
+    public async Task ResolveStackTrace_TraceWithLines_KeepsTraceLine()
+    {
+        const string trace = """
+            System.InvalidOperationException: Order already shipped
+               at SampleDomain.Order.Cancel()
+               at SampleApi.OrderService.CancelOrderAsync(Guid id, CancellationToken ct) in C:\src\SampleApi\OrderService.cs:line 31
+            """;
+
+        var json = await ResolveStackTraceTool.ExecuteAsync(
+            fixture.WorkspaceManager, trace, ct: TestContext.Current.CancellationToken);
+        var caller = JsonSerializer.Deserialize<StackTraceResult>(json)!.Frames[1];
+
+        Assert.Equal("trace", caller.LineSource);
+        Assert.Equal(31, caller.Line);
+    }
+
+    [Fact]
     public async Task ResolveStackTrace_EmptyInput_ReturnsInvalidArgument()
     {
         var json = await ResolveStackTraceTool.ExecuteAsync(

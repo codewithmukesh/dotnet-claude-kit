@@ -4,18 +4,40 @@ namespace CWM.RoslynNavigator.Responses;
 /// Applies a result cap and describes the resulting page. Centralised so every
 /// list-returning tool reports truncation identically — a caller that sees
 /// Truncated=false knows it has the complete set without comparing counts.
+/// <para>
+/// Paging is offset based: a page starts at <c>offset</c> and, when more entries follow,
+/// carries <c>NextOffset</c> — the exact value to pass back for the next page. Offsets index
+/// the tool's full, deterministically ordered result list, so they are stable across calls
+/// against the same workspace snapshot.
+/// </para>
 /// </summary>
 internal static class Paging
 {
-    internal readonly record struct Page<T>(List<T> Items, int Count, int TotalFound, bool Truncated, int Limit);
+    internal readonly record struct Page<T>(
+        List<T> Items, int Count, int TotalFound, bool Truncated, int Limit, int Offset = 0, int? NextOffset = null)
+    {
+        /// <summary>The first <paramref name="count"/> items of this page, with paging recomputed.</summary>
+        public Page<T> Take(int count)
+        {
+            if (count >= Count) return this;
+            var items = Items.Take(Math.Max(0, count)).ToList();
+            return this with { Items = items, Count = items.Count, Truncated = true, NextOffset = Offset + items.Count };
+        }
 
-    public static Page<T> Apply<T>(IReadOnlyList<T> all, int maxResults)
+        /// <summary>The same page over <paramref name="items"/> — this page's entries, converted one to one.</summary>
+        public Page<TOut> WithItems<TOut>(List<TOut> items) =>
+            new(items, Count, TotalFound, Truncated, Limit, Offset, NextOffset);
+    }
+
+    public static Page<T> Apply<T>(IReadOnlyList<T> all, int maxResults, int offset = 0)
     {
         var limit = Math.Max(1, maxResults);
-        var truncated = all.Count > limit;
-        var items = truncated ? [.. all.Take(limit)] : new List<T>(all);
+        var start = Math.Clamp(offset, 0, all.Count);
+        var items = all.Skip(start).Take(limit).ToList();
+        var end = start + items.Count;
+        var truncated = end < all.Count;
 
-        return new Page<T>(items, items.Count, all.Count, truncated, limit);
+        return new Page<T>(items, items.Count, all.Count, truncated, limit, start, truncated ? end : null);
     }
 
     /// <summary>
@@ -24,8 +46,8 @@ internal static class Paging
     /// Multi-targeted projects are the usual source: Roslyn loads one project per target
     /// framework, and every search returns the same source location once per framework.
     /// </summary>
-    public static Page<T> Apply<T, TKey>(IEnumerable<T> all, int maxResults, Func<T, TKey> key) =>
-        Apply(Distinct(all, key), maxResults);
+    public static Page<T> Apply<T, TKey>(IEnumerable<T> all, int maxResults, Func<T, TKey> key, int offset = 0) =>
+        Apply(Distinct(all, key), maxResults, offset);
 
     /// <summary>First entry per key, in input order.</summary>
     public static List<T> Distinct<T, TKey>(IEnumerable<T> all, Func<T, TKey> key)
@@ -47,4 +69,45 @@ internal static class Paging
     /// </summary>
     public static Page<T> Empty<T>(int maxResults) =>
         new([], 0, 0, false, Math.Max(1, maxResults));
+
+    /// <summary>
+    /// Serializes <paramref name="page"/>, dropping entries from its end until the response fits
+    /// <paramref name="budget"/> characters (<see cref="ResponseBudget.MaxChars"/> by default).
+    /// A shortened page is Truncated with NextOffset pointing at the first dropped entry, so the
+    /// caller pages on instead of losing the tail. At least one entry is always kept.
+    /// </summary>
+    public static string Fit<T>(Page<T> page, Func<Page<T>, string> serialize, int budget = ResponseBudget.MaxChars) =>
+        FitCount(Math.Max(1, page.Count), count => serialize(page.Take(count)), budget);
+
+    /// <summary>
+    /// <paramref name="render"/>(<paramref name="count"/>) when it fits <paramref name="budget"/>;
+    /// otherwise the largest count that does (never below one). For tools that build their own
+    /// page, such as detect_antipatterns, whose rules and summary depend on the page.
+    /// </summary>
+    public static string FitCount(int count, Func<int, string> render, int budget = ResponseBudget.MaxChars)
+    {
+        var json = render(count);
+        if (json.Length <= budget || count <= 1)
+            return json;
+
+        // Largest count that fits: response size grows monotonically with the entry count.
+        var best = render(1);
+        int low = 2, high = count - 1;
+        while (low <= high)
+        {
+            var mid = low + ((high - low) / 2);
+            var candidate = render(mid);
+            if (candidate.Length <= budget)
+            {
+                best = candidate;
+                low = mid + 1;
+            }
+            else
+            {
+                high = mid - 1;
+            }
+        }
+
+        return best;
+    }
 }

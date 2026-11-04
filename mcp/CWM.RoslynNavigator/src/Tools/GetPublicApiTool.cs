@@ -14,6 +14,7 @@ public static class GetPublicApiTool
         WorkspaceManager workspace,
         [Description("Type name or SymbolId")] string typeName,
         int maxResults = 50,
+        int? offset = null,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
@@ -39,14 +40,17 @@ public static class GetPublicApiTool
                 Accessibility: m.DeclaredAccessibility.ToString().ToLowerInvariant()))
             .ToList();
 
-        var page = Paging.Apply(allMembers, maxResults);
+        var page = Paging.Apply(allMembers, maxResults, offset ?? 0);
         var typeKind = SymbolResolver.GetKindString(typeSymbol);
         var location = SymbolResolver.GetLocation(typeSymbol);
+        var file = location is { } loc ? workspace.ToRelativePath(loc.File) : null;
 
-        return ToolJson.Serialize(new PublicApiResult(
-            typeKind, page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit,
-            File: location is { } loc ? workspace.ToRelativePath(loc.File) : null,
-            Line: location?.Line ?? 0));
+        return Paging.Fit(page, p => ToolJson.Serialize(new PublicApiResult(
+            typeKind, p.Items, p.Count, p.TotalFound, p.Truncated, p.Limit,
+            File: file,
+            Line: location?.Line ?? 0,
+            Offset: p.Offset,
+            NextOffset: p.NextOffset)));
     }
 
     private static string GetMemberKind(ISymbol symbol) => symbol switch

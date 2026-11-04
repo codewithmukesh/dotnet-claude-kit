@@ -28,64 +28,92 @@ public static class GetEndpointMapTool
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
         [Description("Path substring filter")] string? file = null,
-        int maxResults = 100,
+        int maxResults = 500,
+        int? offset = null,
+        string? format = null,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
         if (notReady is not null) return notReady;
+        if (ListFormat.Validate(format) is { } invalid) return invalid;
 
         var solution = workspace.GetSolution();
         if (solution is null)
-            return Serialize(Paging.Empty<EndpointEntry>(maxResults));
+            return ToolJson.Serialize(new EndpointMapResult([], 0, 0, false, Math.Max(1, maxResults)));
 
         var seenFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var documents = solution.Projects
             .SelectMany(p => p.Documents)
             .Where(d => d.FilePath is not null && seenFiles.Add(d.FilePath))
-            .Where(d => file is null || d.FilePath!.Contains(file, StringComparison.OrdinalIgnoreCase))
             .ToArray();
 
+        bool Selected(Document d) => file is null || d.FilePath!.Contains(file, StringComparison.OrdinalIgnoreCase);
+
         // A filter naming no file is a mistake to report, not "this file has no endpoints".
-        if (file is not null && documents.Length == 0)
+        if (file is not null && !documents.Any(Selected))
             return ArgumentChecks.FileFilterMatchesNothing(file);
 
-        // Files are analysed in parallel into per-document slots and flattened in document
-        // order, so the result and its truncation match a sequential pass.
-        var perDocument = new List<EndpointEntry>[documents.Length];
-
+        // Pass 1, every file: class declarations, so a controller whose base controller lives
+        // in another file (or outside the file filter) is still recognised.
+        var roots = new SyntaxNode?[documents.Length];
+        var declarations = new List<ControllerIndex.Declaration>[documents.Length];
         await Parallel.ForEachAsync(
             Enumerable.Range(0, documents.Length),
             new ParallelOptions { CancellationToken = ct },
             async (index, token) =>
             {
-                var document = documents[index];
-                var root = await document.GetSyntaxRootAsync(token);
-
-                perDocument[index] = root is null
-                    ? []
-                    : AnalyzeRoot(root, document.FilePath!)
-                        .Select(endpoint => endpoint with { File = workspace.ToRelativePath(endpoint.File) })
-                        .ToList();
+                roots[index] = await documents[index].GetSyntaxRootAsync(token);
+                declarations[index] = roots[index] is { } root ? ControllerIndex.Collect(root) : [];
             });
 
-        var all = perDocument.SelectMany(entries => entries).ToList();
+        var controllers = new ControllerIndex();
+        foreach (var fileDeclarations in declarations)
+            controllers.Add(fileDeclarations);
 
-        return Serialize(Paging.Apply(all, maxResults));
+        // Pass 2, selected files, in parallel into per-document slots flattened in document
+        // order, so the result and its paging match a sequential pass.
+        var perDocument = new List<(EndpointEntry Entry, string Project)>[documents.Length];
+        Parallel.For(0, documents.Length, new ParallelOptions { CancellationToken = ct }, index =>
+        {
+            var document = documents[index];
+            perDocument[index] = roots[index] is { } root && Selected(document)
+                ? [.. AnalyzeRoot(root, document.FilePath!, controllers)
+                    .Select(endpoint => (endpoint with { File = workspace.ToRelativePath(endpoint.File) }, ListFormat.ProjectName(document.Project)))]
+                : [];
+        });
+
+        var all = perDocument.SelectMany(entries => entries).ToList();
+        var page = Paging.Apply(all, maxResults, offset ?? 0);
+        var entries = page.WithItems(page.Items.Select(e => e.Entry).ToList());
+
+        var byProject = entries.Truncated || entries.Offset > 0 ? ListFormat.CountBy(all, e => e.Project) : null;
+
+        return ListFormat.Render(
+            entries,
+            format,
+            p => ToolJson.Serialize(new EndpointMapResult(
+                p.Items, p.Count, p.TotalFound, p.Truncated, p.Limit, p.Offset, p.NextOffset, ByProject: byProject)),
+            p => ToolJson.Serialize(new EndpointMapResult(
+                null, p.Count, p.TotalFound, p.Truncated, p.Limit, p.Offset, p.NextOffset,
+                Files: ListFormat.GroupByFile(p.Items, e => e.File, CompactEntry),
+                ByProject: byProject)));
     }
 
-    private static string Serialize(Paging.Page<EndpointEntry> page) =>
-        ToolJson.Serialize(new EndpointMapResult(
-            page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit));
+    /// <summary>"35 GET Tmdb/ClientConfiguration authorized"; an empty route shows as "(none)".</summary>
+    private static string CompactEntry(EndpointEntry endpoint) =>
+        $"{endpoint.Line} {endpoint.Method} {(endpoint.Route.Length > 0 ? endpoint.Route : "(none)")} {endpoint.Auth}";
 
     /// <summary>
-    /// Syntax-only endpoint extraction for one file. Internal for direct unit testing.
+    /// Syntax-only endpoint extraction for one file. <paramref name="controllers"/> resolves
+    /// controller base classes declared elsewhere; without it only this file's classes are known.
+    /// Internal for direct unit testing.
     /// </summary>
-    internal static List<EndpointEntry> AnalyzeRoot(SyntaxNode root, string filePath)
+    internal static List<EndpointEntry> AnalyzeRoot(SyntaxNode root, string filePath, ControllerIndex? controllers = null)
     {
         var results = new List<EndpointEntry>();
 
         AnalyzeMinimalApis(root, filePath, results);
-        AnalyzeControllers(root, filePath, results);
+        AnalyzeControllers(root, filePath, controllers ?? ControllerIndex.For(root), results);
 
         return results;
     }
@@ -178,47 +206,52 @@ public static class GetEndpointMapTool
         }
     }
 
-    private static void AnalyzeControllers(SyntaxNode root, string filePath, List<EndpointEntry> results)
+    private static void AnalyzeControllers(
+        SyntaxNode root, string filePath, ControllerIndex controllers, List<EndpointEntry> results)
     {
         foreach (var cls in root.DescendantNodes().OfType<ClassDeclarationSyntax>())
         {
-            var isController = HasAttribute(cls.AttributeLists, "ApiController")
-                || (cls.BaseList?.Types.Any(t =>
-                        t.Type.ToString() is "ControllerBase" or "Controller") ?? false);
+            var className = cls.Identifier.Text;
 
-            if (!isController) continue;
+            if (!controllers.IsController(className))
+                continue;
 
-            var controllerName = cls.Identifier.Text.EndsWith("Controller", StringComparison.Ordinal)
-                ? cls.Identifier.Text[..^"Controller".Length]
-                : cls.Identifier.Text;
+            var controllerName = className.EndsWith("Controller", StringComparison.Ordinal)
+                ? className[..^"Controller".Length]
+                : className;
 
-            var classRoute = (GetAttributeStringArgument(cls.AttributeLists, "Route") ?? "")
-                .Replace("[controller]", controllerName, StringComparison.OrdinalIgnoreCase);
-
-            var classAuth = HasAttribute(cls.AttributeLists, "AllowAnonymous") ? "anonymous"
-                : HasAttribute(cls.AttributeLists, "Authorize") ? "authorized"
-                : null;
+            // [Route] and [Authorize] are inherited: the nearest one on the class or a base applies.
+            var classRoute = ReplaceTokens(controllers.Route(className) ?? "", controllerName, action: null);
+            var classAuth = controllers.Auth(className);
 
             foreach (var method in cls.Members.OfType<MethodDeclarationSyntax>())
             {
-                var http = FindHttpAttribute(method.AttributeLists);
-                if (http is null) continue;
-
-                var (verb, template) = http.Value;
-                var methodRoute = (GetAttributeStringArgument(method.AttributeLists, "Route") ?? template ?? "")
-                    .Replace("[controller]", controllerName, StringComparison.OrdinalIgnoreCase);
-
                 var auth = HasAttribute(method.AttributeLists, "AllowAnonymous") ? "anonymous"
                     : HasAttribute(method.AttributeLists, "Authorize") ? "authorized"
                     : classAuth ?? "unmarked";
+                var line = method.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
 
-                results.Add(new EndpointEntry(
-                    Method: verb,
-                    Route: CombineRoutes(classRoute, methodRoute),
-                    Auth: auth,
-                    Kind: "controller",
-                    File: filePath,
-                    Line: method.GetLocation().GetLineSpan().StartLinePosition.Line + 1));
+                // Each Http* attribute is its own endpoint: [HttpGet("a")] [HttpHead("a")] is two.
+                foreach (var (verb, template) in FindHttpAttributes(method.AttributeLists))
+                {
+                    var methodRoute = ReplaceTokens(
+                        GetAttributeStringArgument(method.AttributeLists, "Route") ?? template ?? "",
+                        controllerName,
+                        method.Identifier.Text);
+
+                    // A template starting with "/" or "~/" is absolute and ignores the controller's route.
+                    var route = methodRoute.StartsWith('/') || methodRoute.StartsWith("~/", StringComparison.Ordinal)
+                        ? methodRoute.TrimStart('~')
+                        : CombineRoutes(classRoute, methodRoute);
+
+                    results.Add(new EndpointEntry(
+                        Method: verb,
+                        Route: route,
+                        Auth: auth,
+                        Kind: "controller",
+                        File: filePath,
+                        Line: line));
+                }
             }
         }
     }
@@ -284,6 +317,13 @@ public static class GetEndpointMapTool
         return null;
     }
 
+    /// <summary>Fills the [controller] and [action] route tokens.</summary>
+    private static string ReplaceTokens(string template, string controller, string? action)
+    {
+        var route = template.Replace("[controller]", controller, StringComparison.OrdinalIgnoreCase);
+        return action is null ? route : route.Replace("[action]", action, StringComparison.OrdinalIgnoreCase);
+    }
+
     internal static string CombineRoutes(string prefix, string route)
     {
         if (string.IsNullOrEmpty(prefix)) return route;
@@ -297,11 +337,11 @@ public static class GetEndpointMapTool
         return arg is LiteralExpressionSyntax { Token.Value: string value } ? value : null;
     }
 
-    private static bool HasAttribute(SyntaxList<AttributeListSyntax> lists, string name) =>
+    internal static bool HasAttribute(SyntaxList<AttributeListSyntax> lists, string name) =>
         lists.SelectMany(l => l.Attributes)
             .Any(a => MatchesAttributeName(a, name));
 
-    private static string? GetAttributeStringArgument(SyntaxList<AttributeListSyntax> lists, string name)
+    internal static string? GetAttributeStringArgument(SyntaxList<AttributeListSyntax> lists, string name)
     {
         var attribute = lists.SelectMany(l => l.Attributes)
             .FirstOrDefault(a => MatchesAttributeName(a, name));
@@ -310,7 +350,7 @@ public static class GetEndpointMapTool
         return arg is LiteralExpressionSyntax { Token.Value: string value } ? value : null;
     }
 
-    private static (string Verb, string? Template)? FindHttpAttribute(SyntaxList<AttributeListSyntax> lists)
+    private static IEnumerable<(string Verb, string? Template)> FindHttpAttributes(SyntaxList<AttributeListSyntax> lists)
     {
         foreach (var attribute in lists.SelectMany(l => l.Attributes))
         {
@@ -319,11 +359,9 @@ public static class GetEndpointMapTool
             {
                 var arg = attribute.ArgumentList?.Arguments.FirstOrDefault()?.Expression;
                 var template = arg is LiteralExpressionSyntax { Token.Value: string value } ? value : null;
-                return (verb, template);
+                yield return (verb, template);
             }
         }
-
-        return null;
     }
 
     private static bool MatchesAttributeName(AttributeSyntax attribute, string name) =>

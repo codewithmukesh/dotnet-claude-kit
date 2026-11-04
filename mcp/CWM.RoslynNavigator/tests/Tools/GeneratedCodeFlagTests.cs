@@ -46,8 +46,8 @@ public class GeneratedCodeFlagTests(TestSolutionFixture fixture)
             ct: TestContext.Current.CancellationToken);
         var result = JsonSerializer.Deserialize<ReferencesResult>(json)!;
 
-        Assert.Contains(result.References, r => r.IsGenerated && r.File.EndsWith(".g.cs"));
-        Assert.Contains(result.References, r => !r.IsGenerated);
+        Assert.Contains(result.References!, r => r.IsGenerated && r.File.EndsWith(".g.cs"));
+        Assert.Contains(result.References!, r => !r.IsGenerated);
     }
 
     [Fact]

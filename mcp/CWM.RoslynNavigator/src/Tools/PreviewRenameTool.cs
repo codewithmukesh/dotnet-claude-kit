@@ -26,6 +26,7 @@ public static class PreviewRenameTool
         bool renameInStrings = false,
         bool renameInComments = false,
         [Description("Max changed lines")] int maxResults = 100,
+        int? offset = null,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
@@ -83,23 +84,27 @@ public static class PreviewRenameTool
             : StringComparer.OrdinalIgnoreCase.Compare(a.File, b.File));
 
         var conflicts = await FindIntroducedErrorsAsync(workspace, solution, renamed, changedDocuments, ct);
-        var page = Paging.Apply(edits, maxResults);
+        var page = Paging.Apply(edits, maxResults, offset ?? 0);
 
-        return ToolJson.Serialize(new RenamePreviewResult(
+        var files = edits.Select(e => e.File).Distinct(StringComparer.OrdinalIgnoreCase).Count();
+
+        return Paging.Fit(page, p => ToolJson.Serialize(new RenamePreviewResult(
             Symbol: SymbolResolver.BuildQualifiedName(symbol),
             Kind: SymbolResolver.GetKindString(symbol),
             SymbolId: SymbolResolver.GetSymbolId(symbol),
             OldName: symbol.Name,
             NewName: newName,
-            Changes: page.Items,
-            Count: page.Count,
-            TotalFound: page.TotalFound,
-            Files: edits.Select(e => e.File).Distinct(StringComparer.OrdinalIgnoreCase).Count(),
-            Truncated: page.Truncated,
-            Limit: page.Limit,
+            Changes: p.Items,
+            Count: p.Count,
+            TotalFound: p.TotalFound,
+            Files: files,
+            Truncated: p.Truncated,
+            Limit: p.Limit,
             Conflicts: [.. conflicts.Take(MaxConflicts)],
             ConflictCount: conflicts.Count,
-            Note: "Preview only — nothing was written to disk or to the workspace."));
+            Note: "Preview only — nothing was written to disk or to the workspace.",
+            Offset: p.Offset,
+            NextOffset: p.NextOffset)));
     }
 
     /// <summary>

@@ -38,7 +38,7 @@ The 26 tool definitions add about 21k input tokens to every request, mostly chea
 | `get_type_hierarchy` | Inheritance chain, interfaces, and derived types |
 | `get_public_api` | Public members of a type without reading the full file |
 | `get_symbol_detail` | Full signature, parameters, return type, and XML docs |
-| `get_project_graph` | Solution project dependency graph: one entry per csproj (solution-relative path, target frameworks, direct project references), paged at 100. `summary: true` returns counts, frameworks, folders, dependency layers, and the most-referenced projects; `project: "Name"` returns the matches with `ReferencedBy`. With several solutions loaded, also which solution(s) each project belongs to |
+| `get_project_graph` | Solution project dependency graph: one entry per csproj (solution-relative path, target frameworks, direct project references); when that is too large for one response, one `Project -> Ref1, Ref2` line per project (see [Result caps](#result-caps-paging-and-the-response-budget)). `summary: true` returns counts, frameworks, folders, dependency layers, and the most-referenced projects; `project: "Name"` returns the matches with `ReferencedBy`. With several solutions loaded, also which solution(s) each project belongs to |
 | `get_dependency_graph` | Call dependency graph for a method |
 | `get_diagnostics` | Compiler and analyzer warnings/errors |
 | `get_test_coverage_map` | Heuristic test coverage by naming convention |
@@ -47,9 +47,9 @@ The 26 tool definitions add about 21k input tokens to every request, mostly chea
 | `get_symbol_source` | Exact source of one symbol — members in full, types as a signatures-only skeleton (`includeBodies` opt-in), capped by `maxChars` |
 | `get_file_outline` | Skeleton of one file: namespace, types, member signatures with line numbers — no bodies |
 | `get_nuget_packages` | PackageReference inventory per project with versions (CPM-aware, no network calls) |
-| `get_endpoint_map` | ASP.NET Core route inventory: Minimal APIs (MapGroup-composed) + controllers, with auth posture per endpoint |
+| `get_endpoint_map` | ASP.NET Core route inventory: Minimal APIs (MapGroup-composed) + controllers, with auth posture per endpoint. A controller is recognised through its base classes in any file (`class ItemsController : BaseApiController`), inheriting `[Route]` and `[Authorize]` from the nearest base that sets them; each stacked `Http*` attribute is its own endpoint |
 | `get_di_registrations` | DI registration map with duplicate detection and captive-dependency (singleton→scoped) risk flags |
-| `resolve_stack_trace` | Map an exception stack trace onto the solution — undoes async/lambda/local-function rewrites, marks which frames are yours |
+| `resolve_stack_trace` | Map an exception stack trace onto the solution — undoes async/lambda/local-function rewrites, marks which frames are yours. Each frame's `Line` is the line executing in it: the trace's own line when present, else the call to the next frame down (`LineSource`: `trace` / `call` / `declaration`; `CallSites` when the method makes that call more than once) |
 | `analyze_change_impact` | Blast radius of changing one symbol: references by project and file (for a member: calls to it and through the interface/base member it implements, not calls to sibling implementations), implementations and overrides that must move with it, transitive callers (interface/base dispatch included, counted in `IndirectCallers`; the walk is bounded and sets `Truncated` if it stops early), risk rating |
 | `get_token_savings` | Tokens this server has saved in this repository, with a per-tool leaderboard. Opt-in — see [Token savings](#token-savings) |
 | `get_symbol_at` | The symbol at a file position — pass the identifier `text` (or a `column`) on a `line`. Kind, signature, containing type, definition, `SymbolId`, and declared/expression types with nullability |
@@ -125,27 +125,60 @@ and has no references".
 | `NoSource` | A metadata symbol, or one with no member declaration. |
 | `InvalidArgument` | Malformed input — an empty stack trace, for instance. |
 
-### Result caps
+### Result caps, paging, and the response budget
 
-Every list-returning tool accepts `maxResults` and reports four fields:
+Every list-returning tool accepts `maxResults` and reports these fields:
 
 | Field | Meaning |
 |-------|---------|
 | `Count` | Entries in this response |
 | `TotalFound` | Entries that matched in total |
-| `Truncated` | Whether the cap dropped entries — **the field to branch on** |
-| `Limit` | The cap that was applied; re-query above it to see the rest |
+| `Truncated` | Whether more entries follow — **the field to branch on** |
+| `Limit` | The cap that was applied |
+| `Offset` | Where this page starts (omitted when 0) |
+| `NextOffset` | Pass it back as `offset` for the next page (omitted on the last page) |
 
 `Truncated` is stated rather than inferred from `Count` vs `TotalFound`, which gets the
 boundary case wrong when the result set happens to be exactly the size of the limit.
 
-Defaults: 50 for symbol/list tools (`find_symbol`, `find_references`,
-`find_implementations`, `find_callers`, `find_overrides`, `find_dead_code`,
-`get_public_api`, `get_type_hierarchy`, `get_test_coverage_map`,
-`resolve_stack_trace`, `analyze_change_impact`), 100 for `detect_antipatterns`,
-`get_diagnostics`, `get_endpoint_map`, `get_di_registrations`, `get_nuget_packages`,
-`get_project_graph` projects, and `get_dependency_graph` nodes, 200 for `get_file_outline` members. `get_symbol_source`
-caps by characters instead (`maxChars`, default 8000, with a `Truncated` flag).
+**Paging.** `find_symbol`, `find_references`, `find_implementations`, `find_callers`,
+`find_overrides`, `find_dead_code`, `get_type_hierarchy`, `get_public_api`,
+`get_project_graph`, `get_diagnostics`, `detect_antipatterns`, `get_endpoint_map`,
+`get_di_registrations`, and `preview_rename` take `offset`. Results are in a stable order
+(by file and line where it has no other meaning), so following `NextOffset` from 0 visits
+every entry exactly once.
+
+**Response budget.** Claude Code saves an MCP result longer than 50,000 characters to a
+file and shows the agent only its path ([docs](https://code.claude.com/docs/en/mcp#mcp-output-limits-and-warnings));
+in the A/B run that is how a 525-reference answer turned into an agent that listed almost
+nothing. Every list tool therefore fits its page to 30,000 characters
+(`ResponseBudget.MaxChars`): when entries do not fit, the page ends early with `Truncated`
+and `NextOffset`, whatever `maxResults` asked for. `get_workspace_status` fits its two lists the same way.
+
+**Compact form.** `find_references`, `get_endpoint_map`, `get_di_registrations`, and
+`get_project_graph` take `format`: `auto` (default), `full`, or `compact`. `auto` returns
+the full entries when the page fits the budget and otherwise switches to a compact form that
+lists far more per call — entries grouped by file as short strings, each path written once:
+
+| Tool | Compact field | Entry |
+|------|---------------|-------|
+| `find_references` | `Files` | `"37 parameter"` (line, kind) |
+| `get_endpoint_map` | `Files` | `"55 GET System/ActivityLog/Entries authorized"` |
+| `get_di_registrations` | `Files` | `"510 singleton IBackupService -> BackupService"` (arrow omitted when the service is its own implementation; `keyed`/`try` appended) |
+| `get_project_graph` | `Edges` | `"~.AdminMenu -> ~.Admin.Abstractions, ~.Navigation.Core"` — direct references; `~` stands for `Prefix` (e.g. `OrchardCore`) when most names share it |
+
+When a page is partial, `ByProject` counts the complete result set per project (top 25, the
+rest folded into one `(N more)` line), so the first call already says where everything is.
+`get_di_registrations` always adds `ByLifetime`, and lists the 25 most-registered
+`Duplicates` with `DuplicateCount` when there are more.
+
+Defaults are sized so the first call usually answers: 1000 for `find_references`; 500 for
+`get_type_hierarchy`, `get_endpoint_map`, `get_di_registrations`, and `get_project_graph`;
+200 for `find_implementations`, `find_callers`, `find_overrides`, and `get_file_outline` members;
+100 for `detect_antipatterns`, `get_diagnostics`, `get_nuget_packages`, and
+`get_dependency_graph` nodes; 50 for the rest (`find_symbol`, `find_dead_code`,
+`get_public_api`, `get_test_coverage_map`, `resolve_stack_trace`, `analyze_change_impact`).
+`get_symbol_source` caps by characters instead (`maxChars`, default 8000, with a `Truncated` flag).
 `get_diagnostics` orders errors first and always includes per-severity totals, so a
 capped response never hides the important picture.
 
@@ -165,6 +198,12 @@ when it exists in some, not all, of its project's frameworks (code under `#if NE
 `get_project_graph` lists a multi-targeted csproj once with all its `TargetFrameworks`,
 `analyze_change_impact` counts it once in `AffectedProjects`, and
 `detect_antipatterns`, `get_diagnostics`, and `get_test_coverage_map` count each file once.
+
+Each flavor also has its own symbol for every type, and a consumer derives from the flavor it
+compiles against. `get_type_hierarchy`, `find_implementations`, `find_overrides`, and
+`find_callers` therefore search from the symbol's counterpart in every flavor and merge the
+results. Searching from one flavor only listed 3 of ABP's `AbpModule` subclasses, because
+`Volo.Abp.Core` loads as net9.0 and net10.0 and most modules compile against the other one.
 
 ### Generated code
 
