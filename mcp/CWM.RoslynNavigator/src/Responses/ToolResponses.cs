@@ -511,6 +511,12 @@ internal sealed record ChangeImpactResult(
     int IndirectCallers = 0);
 
 // Stack trace resolution
+/// <summary>
+/// <see cref="Line"/> is the line executing in this frame. <see cref="LineSource"/> says where it
+/// came from: "trace" (the trace's own file:line), "call" (no line in the trace, so the call in
+/// this method to the next frame's method — <see cref="CallSites"/> counts them when there are
+/// several and Line is the first), or "declaration" (neither was available).
+/// </summary>
 internal sealed record StackFrameInfo(
     int Index,
     string Method,
@@ -518,7 +524,9 @@ internal sealed record StackFrameInfo(
     string? File,
     int? Line,
     int? DeclarationLine,
-    string? Snippet);
+    string? Snippet,
+    string? LineSource = null,
+    int? CallSites = null);
 
 internal sealed record StackTraceResult(
     string? ExceptionType,

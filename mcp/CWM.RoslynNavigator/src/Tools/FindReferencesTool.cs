@@ -19,7 +19,7 @@ public static class FindReferencesTool
         [Description("Symbol name or SymbolId")] string symbolName,
         string? file = null,
         int? line = null,
-        int maxResults = 500,
+        int maxResults = 1000,
         int? offset = null,
         string? format = null,
         CancellationToken ct = default)

@@ -226,31 +226,32 @@ public static class GetEndpointMapTool
 
             foreach (var method in cls.Members.OfType<MethodDeclarationSyntax>())
             {
-                var http = FindHttpAttribute(method.AttributeLists);
-                if (http is null) continue;
-
-                var (verb, template) = http.Value;
-                var methodRoute = ReplaceTokens(
-                    GetAttributeStringArgument(method.AttributeLists, "Route") ?? template ?? "",
-                    controllerName,
-                    method.Identifier.Text);
-
-                // A template starting with "/" or "~/" is absolute and ignores the controller's route.
-                var route = methodRoute.StartsWith('/') || methodRoute.StartsWith("~/", StringComparison.Ordinal)
-                    ? methodRoute.TrimStart('~')
-                    : CombineRoutes(classRoute, methodRoute);
-
                 var auth = HasAttribute(method.AttributeLists, "AllowAnonymous") ? "anonymous"
                     : HasAttribute(method.AttributeLists, "Authorize") ? "authorized"
                     : classAuth ?? "unmarked";
+                var line = method.GetLocation().GetLineSpan().StartLinePosition.Line + 1;
 
-                results.Add(new EndpointEntry(
-                    Method: verb,
-                    Route: route,
-                    Auth: auth,
-                    Kind: "controller",
-                    File: filePath,
-                    Line: method.GetLocation().GetLineSpan().StartLinePosition.Line + 1));
+                // Each Http* attribute is its own endpoint: [HttpGet("a")] [HttpHead("a")] is two.
+                foreach (var (verb, template) in FindHttpAttributes(method.AttributeLists))
+                {
+                    var methodRoute = ReplaceTokens(
+                        GetAttributeStringArgument(method.AttributeLists, "Route") ?? template ?? "",
+                        controllerName,
+                        method.Identifier.Text);
+
+                    // A template starting with "/" or "~/" is absolute and ignores the controller's route.
+                    var route = methodRoute.StartsWith('/') || methodRoute.StartsWith("~/", StringComparison.Ordinal)
+                        ? methodRoute.TrimStart('~')
+                        : CombineRoutes(classRoute, methodRoute);
+
+                    results.Add(new EndpointEntry(
+                        Method: verb,
+                        Route: route,
+                        Auth: auth,
+                        Kind: "controller",
+                        File: filePath,
+                        Line: line));
+                }
             }
         }
     }
@@ -349,7 +350,7 @@ public static class GetEndpointMapTool
         return arg is LiteralExpressionSyntax { Token.Value: string value } ? value : null;
     }
 
-    private static (string Verb, string? Template)? FindHttpAttribute(SyntaxList<AttributeListSyntax> lists)
+    private static IEnumerable<(string Verb, string? Template)> FindHttpAttributes(SyntaxList<AttributeListSyntax> lists)
     {
         foreach (var attribute in lists.SelectMany(l => l.Attributes))
         {
@@ -358,11 +359,9 @@ public static class GetEndpointMapTool
             {
                 var arg = attribute.ArgumentList?.Arguments.FirstOrDefault()?.Expression;
                 var template = arg is LiteralExpressionSyntax { Token.Value: string value } ? value : null;
-                return (verb, template);
+                yield return (verb, template);
             }
         }
-
-        return null;
     }
 
     private static bool MatchesAttributeName(AttributeSyntax attribute, string name) =>
