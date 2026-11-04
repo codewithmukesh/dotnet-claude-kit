@@ -78,7 +78,8 @@ public static class GetWorkspaceStatusTool
                 Limit: problemPage.Limit,
                 Reloading: workspace.IsReloading,
                 ReloadReason: workspace.ReloadReason,
-                LastReloadError: lastReloadError));
+                LastReloadError: lastReloadError,
+                LoadCache: workspace.CacheStatus));
         });
     }
 }

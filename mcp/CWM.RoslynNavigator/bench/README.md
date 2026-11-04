@@ -97,6 +97,12 @@ Other verbs:
 
 - `probe --corpus <def> --corpus-root <dir> --server <label=path>` checks that a corpus loads.
   It prints the server version, the time to ready, the project graph, and any load problems.
+  `--load-parallelism N` and `--no-load-cache` are passed to the server. `--wait-verify` also
+  waits for warm-up and for the background check of a snapshot restored from the load cache,
+  then prints the cache status, the server's load cache log lines, and peak memory. The probe
+  uses the server's normal load cache (set `CWM_ROSLYN_CACHE_DIR` to isolate it), so a second
+  probe of the same corpus measures a warm start. `run` always starts with an empty cache, so
+  its Ready column stays the cold MSBuild load.
 - `call --corpus <def> --corpus-root <dir> --server <label=path> --tool <name> --args <json>`
   makes one call and prints the response. `--warm` waits for warm-up first, `--repeat N`
   repeats the call N times for warm timings out of process, and `--quiet` skips the payload.

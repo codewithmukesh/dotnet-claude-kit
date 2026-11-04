@@ -109,12 +109,46 @@ static async Task<int> ProbeAsync(CommandLine command, CancellationToken ct)
     var solution = SolutionPath(command.Required("corpus-root"), corpus);
     var build = ServerBuild.Parse(command.Required("server"));
 
-    await using var session = await ServerSession.StartAsync(build, solution, ct);
+    // Server switches worth probing: --load-parallelism N and --no-load-cache.
+    List<string> serverArguments = [];
+    if (command.Optional("load-parallelism") is { } parallelism) serverArguments.AddRange(["--load-parallelism", parallelism]);
+    if (command.Flag("no-load-cache")) serverArguments.Add("--no-load-cache");
+
+    await using var memory = new MemorySampler();
+    await using var session = await ServerSession.StartAsync(build, solution, ct, serverArguments);
     var ready = await session.WaitForReadyAsync(TimeSpan.FromMinutes(20), ct);
     var graph = await session.CallAsync("get_project_graph", [], TimeSpan.FromMinutes(2), ct);
     Console.WriteLine($"server {session.ServerVersion}, ready after {ready?.ToString() ?? "n/a"} ms, tools: {session.ToolNames.Count}");
     Console.WriteLine(graph.Payload is { Length: > 1500 } p ? p[..1500] + "…" : graph.Payload);
     foreach (var problem in session.LoadProblems) Console.WriteLine($"load problem: {problem}");
+
+    // --wait-verify: wait for the background MSBuild verification of a cache-restored snapshot
+    // (and for warm-up), so the memory peak covers the whole start.
+    if (command.Flag("wait-verify"))
+    {
+        var warm = await session.WaitForWarmAsync(TimeSpan.FromMinutes(20), ct);
+        string? cache = null;
+        for (var deadline = DateTime.UtcNow.AddMinutes(20); DateTime.UtcNow < deadline; await Task.Delay(500, ct))
+        {
+            var status = await session.CallAsync("get_workspace_status", [], TimeSpan.FromMinutes(2), ct);
+            using var json = System.Text.Json.JsonDocument.Parse(status.Payload ?? "{}");
+            if (!json.RootElement.TryGetProperty("LoadCache", out var loadCache))
+            {
+                cache = "(not reported)";
+                break;
+            }
+
+            cache = loadCache.GetRawText();
+            if (!loadCache.TryGetProperty("Verification", out var verification) || verification.GetString() != "running") break;
+        }
+
+        Console.WriteLine($"warm after {warm?.ToString() ?? "n/a"} ms; verified after {session.ElapsedSinceStartMs} ms; load cache: {cache}");
+        foreach (var note in session.LoadNotes) Console.WriteLine($"note: {note}");
+    }
+
+    var peaks = memory.Snapshot();
+    if (peaks.Supported)
+        Console.WriteLine($"memory: server peak {peaks.ServerPeakBytes / 1048576} MB, build hosts {peaks.BuildHostPeakBytes / 1048576} MB ({peaks.BuildHostProcesses}), combined peak {peaks.CombinedPeakBytes / 1048576} MB");
     return 0;
 }
 
@@ -221,6 +255,8 @@ static int Help()
                  [--warm-skip-s 60] [--warm-timeout-min 20] [--grep-head-limit 250] [--prefill-tps 10000]
                  [--after <label>] [--skip-existing]
           report --in <results/yyyy-MM-dd> [--after <label>]
+          probe  --corpus <def.json> --corpus-root <dir> --server <label=path>
+                 [--load-parallelism N] [--no-load-cache] [--wait-verify]
           call   --corpus <def.json> --corpus-root <dir> --server <label=path> --tool <name>
                  [--args <json> | --args-file <file>] [--warm] [--repeat N] [--quiet] [--timeout-s 300]
                  [--calls-file <json array of {tool,args}> --out-dir <dir>] [--server-args "<switches>"]

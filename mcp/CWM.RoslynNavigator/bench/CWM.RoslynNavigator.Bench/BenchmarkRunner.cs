@@ -30,8 +30,11 @@ internal sealed class BenchmarkRunner(BenchSettings settings, TextWriter log)
         var stats = CorpusStats.Measure(solutionPath);
         log.WriteLine($"[{corpus.Name} × {build.Label}] {stats.ProjectsDeclared} projects, {stats.CsFiles} .cs files");
 
+        // An empty load cache per run: "Ready" stays the cold MSBuild load, comparable across
+        // builds and with runs made before the cache existed, whatever the user's cache holds.
+        var loadCache = Directory.CreateTempSubdirectory("cwm-bench-load-cache-");
         await using var memory = new MemorySampler();
-        var session = await ServerSession.StartAsync(build, solutionPath, ct);
+        var session = await ServerSession.StartAsync(build, solutionPath, ct, loadCacheDirectory: loadCache.FullName);
         var restarts = 0;
         var loadProblems = new List<string>();
 
@@ -60,7 +63,7 @@ internal sealed class BenchmarkRunner(BenchSettings settings, TextWriter log)
                 {
                     loadProblems.AddRange(session.LoadProblems);
                     await session.DisposeAsync();
-                    session = await ServerSession.StartAsync(build, solutionPath, ct);
+                    session = await ServerSession.StartAsync(build, solutionPath, ct, loadCacheDirectory: loadCache.FullName);
                     restarts++;
                     await session.WaitForReadyAsync(settings.ReadyTimeout, ct);
                     await session.WaitForWarmAsync(settings.WarmTimeout, ct);
@@ -114,6 +117,14 @@ internal sealed class BenchmarkRunner(BenchSettings settings, TextWriter log)
         finally
         {
             await session.DisposeAsync();
+            try
+            {
+                loadCache.Delete(recursive: true);
+            }
+            catch (IOException)
+            {
+                // A temp folder left behind costs disk space only.
+            }
         }
     }
 

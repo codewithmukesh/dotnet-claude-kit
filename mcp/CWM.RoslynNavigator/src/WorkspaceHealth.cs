@@ -52,9 +52,12 @@ internal sealed class WorkspaceHealth(TimeProvider clock)
     /// Records a load diagnostic once. A parallel load (<see cref="ParallelSolutionLoader"/>)
     /// can evaluate a shared project in several build hosts, each reporting the same message.
     /// </summary>
-    public void RecordDiagnostic(WorkspaceDiagnosticKind kind, string message)
+    public void RecordDiagnostic(WorkspaceDiagnosticKind kind, string message) =>
+        RecordDiagnostic(kind == WorkspaceDiagnosticKind.Failure ? "failure" : "warning", message);
+
+    /// <summary>Records a diagnostic by kind name ("failure" or "warning"), as replayed from the load cache.</summary>
+    public void RecordDiagnostic(string kindName, string message)
     {
-        var kindName = kind == WorkspaceDiagnosticKind.Failure ? "failure" : "warning";
         if (!_seenDiagnostics.TryAdd((kindName, message), 0))
             return;
 
@@ -71,6 +74,12 @@ internal sealed class WorkspaceHealth(TimeProvider clock)
         _removedAnalyzers[projectId] = paths;
         Interlocked.Increment(ref _revision);
     }
+
+    /// <summary>Every recorded load diagnostic in order, without project attribution. Written to the load cache.</summary>
+    public IReadOnlyList<LoadDiagnostic> RecordedDiagnostics => [.. _diagnostics];
+
+    /// <summary>The analyzer paths removed per project. Written to the load cache.</summary>
+    public IReadOnlyDictionary<ProjectId, IReadOnlyList<string>> RemovedAnalyzers => _removedAnalyzers;
 
     public void WarmUpStarted(int total)
     {

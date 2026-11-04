@@ -51,6 +51,8 @@ public sealed class McpServerFixture : IAsyncLifetime
                 ["CWM_ROSLYN_TELEMETRY"] = TelemetryEnabled ? "on" : "off",
                 ["LOCALAPPDATA"] = _telemetryRoot,
                 ["XDG_DATA_HOME"] = _telemetryRoot,
+                // The load cache stays inside the throwaway copy, never in the user's cache folder.
+                ["CWM_ROSLYN_CACHE_DIR"] = Path.Combine(_copy.Root, "load-cache"),
             },
             ShutdownTimeout = TimeSpan.FromSeconds(10),
         };
