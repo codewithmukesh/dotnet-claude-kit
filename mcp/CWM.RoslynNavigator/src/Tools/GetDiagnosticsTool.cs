@@ -19,6 +19,7 @@ public static class GetDiagnosticsTool
         [Description("File or project path (required for 'file' and 'project' scopes)")] string? path = null,
         [Description("Severity filter: 'error', 'warning', or 'all' (info and above; hidden diagnostics are always excluded)")] string severityFilter = "all",
         [Description("Maximum diagnostics to return. TotalFound and the per-severity counts in the response report the full picture; re-query with a higher value if it exceeds Count.")] int maxResults = 100,
+        [Description("Skip this many diagnostics; pass NextOffset from the previous response for the next page.")] int offset = 0,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
@@ -97,10 +98,10 @@ public static class GetDiagnosticsTool
             .Select(m => m.Info)
             .ToList();
 
-        var page = Paging.Apply(ordered, maxResults);
+        var page = Paging.Apply(ordered, maxResults, offset);
 
-        return ToolJson.Serialize(new DiagnosticsResult(
-            page.Items, page.Count, page.TotalFound, errors, warnings, info, page.Truncated, page.Limit));
+        return Paging.Fit(page, p => ToolJson.Serialize(new DiagnosticsResult(
+            p.Items, p.Count, p.TotalFound, errors, warnings, info, p.Truncated, p.Limit, p.Offset, p.NextOffset)));
     }
 
     private static readonly ConditionalWeakTable<Compilation, IReadOnlyList<Diagnostic>> CompilationDiagnostics = new();

@@ -15,7 +15,8 @@ public static class FindOverridesTool
         WorkspaceManager workspace,
         [Description("The virtual or abstract method name to find overrides for. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).")] string methodName,
         [Description("Optional: containing class name to disambiguate")] string? className = null,
-        [Description("Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 50,
+        [Description("Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 200,
+        [Description("Skip this many results; pass NextOffset from the previous response for the next page.")] int offset = 0,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
@@ -52,10 +53,11 @@ public static class FindOverridesTool
         }
 
         // A multi-targeted project declares each override once per target framework.
-        return Serialize(Paging.Apply(all, maxResults, o => (o.ContainingType, o.Method, o.File, o.Line)));
+        return Serialize(Paging.Apply(
+            all.OrderBy(o => o.File, StringComparer.Ordinal).ThenBy(o => o.Line), maxResults, o => (o.ContainingType, o.Method, o.File, o.Line), offset));
     }
 
     private static string Serialize(Paging.Page<OverrideInfo> page) =>
-        ToolJson.Serialize(new OverridesResult(
-            page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit));
+        Paging.Fit(page, p => ToolJson.Serialize(new OverridesResult(
+            p.Items, p.Count, p.TotalFound, p.Truncated, p.Limit, p.Offset, p.NextOffset)));
 }

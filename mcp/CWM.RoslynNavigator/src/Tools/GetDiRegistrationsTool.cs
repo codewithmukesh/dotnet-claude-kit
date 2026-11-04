@@ -22,11 +22,14 @@ public static class GetDiRegistrationsTool
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
         [Description("Optional: filter to registrations in files whose path contains this value. A value matching no file returns a FileNotFound error.")] string? file = null,
-        [Description("Maximum registrations to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count. Duplicates and captive risks are always computed from the full set.")] int maxResults = 100,
+        [Description("Maximum registrations to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count. Duplicates and captive risks are always computed from the full set.")] int maxResults = 500,
+        [Description("Skip this many registrations; pass NextOffset from the previous response for the next page.")] int offset = 0,
+        [Description("'auto' (full entries when they fit, else compact 'line lifetime Service -> Impl' strings grouped by file), 'full', or 'compact'.")] string format = ListFormat.Auto,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
         if (notReady is not null) return notReady;
+        if (ListFormat.Validate(format) is { } invalid) return invalid;
 
         var solution = workspace.GetSolution();
         if (solution is null)
@@ -55,29 +58,55 @@ public static class GetDiRegistrationsTool
             async (index, token) => scans[index] = await ScanDocumentAsync(documents[index], file, workspace, token));
 
         var registrations = new List<DiRegistration>();
+        var projects = new List<string>();
         var typeDeclarations = new Dictionary<string, TypeDeclarationSyntax>(StringComparer.Ordinal);
         var unrecognized = new Dictionary<string, int>(StringComparer.Ordinal);
 
-        foreach (var scan in scans)
+        for (var index = 0; index < scans.Length; index++)
         {
+            var scan = scans[index];
             foreach (var typeDecl in scan.TypeDeclarations)
                 typeDeclarations.TryAdd(typeDecl.Identifier.Text, typeDecl);
 
             registrations.AddRange(scan.Registrations);
+            projects.AddRange(Enumerable.Repeat(ListFormat.ProjectName(documents[index].Project), scan.Registrations.Count));
 
             foreach (var (label, count) in scan.Unrecognized)
                 unrecognized[label] = unrecognized.GetValueOrDefault(label) + count;
         }
 
-        var duplicates = FindDuplicates(registrations);
+        var allDuplicates = FindDuplicates(registrations);
+        var duplicates = allDuplicates
+            .OrderByDescending(d => d.Count)
+            .ThenBy(d => d.Service, StringComparer.Ordinal)
+            .Take(MaxDuplicates)
+            .ToList();
+        int? duplicateCount = allDuplicates.Count > duplicates.Count ? allDuplicates.Count : null;
         var captiveRisks = FindCaptiveRisks(registrations, typeDeclarations);
+        var note = DiContainerSupport.BuildNote(registrations.Count, unrecognized);
 
-        var page = Paging.Apply(registrations, maxResults);
+        var page = Paging.Apply(registrations, maxResults, offset);
+        var byLifetime = ListFormat.CountBy(registrations, r => r.Lifetime);
+        var byProject = page.Truncated || page.Offset > 0 ? ListFormat.CountBy(projects, p => p) : null;
 
-        return ToolJson.Serialize(new DiRegistrationsResult(
-            page.Items, duplicates, captiveRisks, page.Count, page.TotalFound, page.Truncated, page.Limit,
-            DiContainerSupport.BuildNote(registrations.Count, unrecognized)));
+        return ListFormat.Render(
+            page,
+            format,
+            p => ToolJson.Serialize(new DiRegistrationsResult(
+                p.Items, duplicates, captiveRisks, p.Count, p.TotalFound, p.Truncated, p.Limit, note, p.Offset, p.NextOffset,
+                ByLifetime: byLifetime, ByProject: byProject, DuplicateCount: duplicateCount)),
+            p => ToolJson.Serialize(new DiRegistrationsResult(
+                null, duplicates, captiveRisks, p.Count, p.TotalFound, p.Truncated, p.Limit, note, p.Offset, p.NextOffset,
+                Files: ListFormat.GroupByFile(p.Items, r => r.File, CompactEntry),
+                ByLifetime: byLifetime, ByProject: byProject, DuplicateCount: duplicateCount)));
     }
+
+    /// <summary>Most duplicated services listed; a large modular app registers hundreds of multi-registrations.</summary>
+    private const int MaxDuplicates = 25;
+
+    /// <summary>"505 singleton IFoo -> Foo keyed try"; the arrow is omitted when the service is its own implementation.</summary>
+    private static string CompactEntry(DiRegistration r) =>
+        $"{r.Line} {r.Lifetime} {r.Service}{(r.Implementation == r.Service ? "" : $" -> {r.Implementation}")}{(r.Keyed ? " keyed" : "")}{(r.TryAdd ? " try" : "")}";
 
     private sealed record DocumentScan(
         List<TypeDeclarationSyntax> TypeDeclarations,
@@ -171,10 +200,15 @@ public static class GetDiRegistrationsTool
             if (service is null)
                 continue; // instance/factory-only overload without a resolvable type
 
-            var hasFactory = invocation.ArgumentList.Arguments
+            var arguments = invocation.ArgumentList.Arguments;
+            var hasFactory = arguments
                 .Any(a => a.Expression is SimpleLambdaExpressionSyntax or ParenthesizedLambdaExpressionSyntax);
 
-            implementation ??= hasFactory ? "(factory)" : service;
+            // AddSingleton<IFoo>(existing) registers an instance; reporting IFoo as its own
+            // implementation read as "IFoo is a concrete type".
+            var hasInstance = !hasFactory && access.Name is GenericNameSyntax && arguments.Count > 0;
+
+            implementation ??= hasFactory ? "(factory)" : hasInstance ? "(instance)" : service;
 
             results.Add(new DiRegistration(
                 Service: service,

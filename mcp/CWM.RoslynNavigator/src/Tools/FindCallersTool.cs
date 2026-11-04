@@ -15,7 +15,8 @@ public static class FindCallersTool
         WorkspaceManager workspace,
         [Description("Method to find callers for. Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified. Qualify when the name is reused across types. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).")] string methodName,
         [Description("Optional: containing class name to disambiguate")] string? className = null,
-        [Description("Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 50,
+        [Description("Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 200,
+        [Description("Skip this many results; pass NextOffset from the previous response for the next page.")] int offset = 0,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
@@ -65,10 +66,15 @@ public static class FindCallersTool
 
         // Callers are already one per symbol and route; this also folds per-framework copies of
         // a caller declared in a multi-targeted project whose display strings differ.
-        return Serialize(Paging.Apply(all, maxResults, c => (c.File, c.Line, c.Method, c.Via, c.ViaSymbol)));
+        // Direct callers first, then a stable file/line order so an offset names the same entry every call.
+        var ordered = all
+            .OrderBy(c => c.Via == "direct" ? 0 : 1)
+            .ThenBy(c => c.File, StringComparer.Ordinal)
+            .ThenBy(c => c.Line);
+        return Serialize(Paging.Apply(ordered, maxResults, c => (c.File, c.Line, c.Method, c.Via, c.ViaSymbol), offset));
     }
 
     private static string Serialize(Paging.Page<CallerInfo> page) =>
-        ToolJson.Serialize(new CallersResult(
-            page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit));
+        Paging.Fit(page, p => ToolJson.Serialize(new CallersResult(
+            p.Items, p.Count, p.TotalFound, p.Truncated, p.Limit, p.Offset, p.NextOffset)));
 }

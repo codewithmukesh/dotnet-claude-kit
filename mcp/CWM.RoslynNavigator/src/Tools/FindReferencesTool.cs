@@ -19,11 +19,14 @@ public static class FindReferencesTool
         [Description("Symbol to find references for. Bare, type-qualified ('OrderService.CreateAsync'), or fully qualified. Qualify when the name is reused across types. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).")] string symbolName,
         [Description("Optional: file path to disambiguate (e.g., 'IOrderRepository.cs')")] string? file = null,
         [Description("Optional: line number to disambiguate")] int? line = null,
-        [Description("Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 50,
+        [Description("Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 500,
+        [Description("Skip this many results; pass NextOffset from the previous response for the next page.")] int offset = 0,
+        [Description("'auto' (full entries when they fit, else compact 'line kind' strings grouped by file), 'full', or 'compact'.")] string format = ListFormat.Auto,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
         if (notReady is not null) return notReady;
+        if (ListFormat.Validate(format) is { } invalid) return invalid;
 
         var limit = Math.Max(1, maxResults);
 
@@ -50,11 +53,41 @@ public static class FindReferencesTool
             f => (f.Path, f.Position),
             (f, tfms) => f with { TargetFrameworks = tfms });
 
+        // A stable order (file, then position) so an offset names the same entry on every
+        // call; Roslyn's own order follows its parallel search.
+        unique = [.. unique.OrderBy(f => f.Path, StringComparer.Ordinal).ThenBy(f => f.Position)];
+
+        var page = Paging.Apply(unique, limit, offset);
+        var results = await BuildEntriesAsync(workspace, solution, page.Items, ct);
+        var entries = page.WithItems(results);
+
+        // On a partial page, where the rest lives: counts over the complete result set.
+        var byProject = entries.Truncated || entries.Offset > 0
+            ? ListFormat.CountBy(unique, f => ListFormat.ProjectName(f.Location.Document.Project))
+            : null;
+
+        return ListFormat.Render(
+            entries,
+            format,
+            p => ToolJson.Serialize(new ReferencesResult(
+                p.Items, p.Count, p.TotalFound, p.Truncated, p.Limit, p.Offset, p.NextOffset, ByProject: byProject)),
+            p => ToolJson.Serialize(new ReferencesResult(
+                null, p.Count, p.TotalFound, p.Truncated, p.Limit, p.Offset, p.NextOffset,
+                Files: ListFormat.GroupByFile(p.Items, r => r.File, r => $"{r.Line} {r.Kind}{(r.IsGenerated ? " generated" : "")}"),
+                ByProject: byProject)));
+    }
+
+    /// <summary>Longest snippet kept in a full entry; a minified or generated line can run to kilobytes.</summary>
+    private const int MaxSnippet = 160;
+
+    private static async Task<List<RefLocation>> BuildEntriesAsync(
+        WorkspaceManager workspace, Solution solution, List<FoundLocation> page, CancellationToken ct)
+    {
         var generated = new GeneratedCodeIndex(workspace);
         var textCache = new Dictionary<DocumentId, Microsoft.CodeAnalysis.Text.SourceText>();
-        var results = new List<RefLocation>();
+        var results = new List<RefLocation>(page.Count);
 
-        foreach (var found in unique.Take(limit))
+        foreach (var found in page)
         {
             var location = found.Location;
             var lineSpan = location.Location.GetLineSpan();
@@ -69,6 +102,8 @@ public static class FindReferencesTool
                 }
                 var refLine = text.Lines[lineSpan.StartLinePosition.Line];
                 snippet = refLine.ToString().Trim();
+                if (snippet.Length > MaxSnippet)
+                    snippet = snippet[..MaxSnippet] + "…";
             }
 
             results.Add(new RefLocation(
@@ -80,8 +115,7 @@ public static class FindReferencesTool
                 TargetFrameworks: found.TargetFrameworks));
         }
 
-        return ToolJson.Serialize(new ReferencesResult(
-            results, results.Count, unique.Count, unique.Count > results.Count, limit));
+        return results;
     }
 
     private sealed record FoundLocation(

@@ -14,7 +14,8 @@ public static class FindImplementationsTool
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
         [Description("The interface or base class name to find implementations for. Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).")] string interfaceName,
-        [Description("Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 50,
+        [Description("Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 200,
+        [Description("Skip this many results; pass NextOffset from the previous response for the next page.")] int offset = 0,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
@@ -55,10 +56,11 @@ public static class FindImplementationsTool
         }
 
         // A multi-targeted project can declare each implementation once per target framework.
-        return Serialize(Paging.Apply(all, maxResults, i => (i.Type, i.File, i.Line)));
+        return Serialize(Paging.Apply(
+            all.OrderBy(i => i.File, StringComparer.Ordinal).ThenBy(i => i.Line), maxResults, i => (i.Type, i.File, i.Line), offset));
     }
 
     private static string Serialize(Paging.Page<ImplementationInfo> page) =>
-        ToolJson.Serialize(new ImplementationsResult(
-            page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit));
+        Paging.Fit(page, p => ToolJson.Serialize(new ImplementationsResult(
+            p.Items, p.Count, p.TotalFound, p.Truncated, p.Limit, p.Offset, p.NextOffset)));
 }

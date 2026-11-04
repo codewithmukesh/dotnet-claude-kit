@@ -73,7 +73,14 @@ internal sealed record SymbolLocation(
     // Set only when the symbol exists in some, not all, of a multi-targeted project's frameworks.
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<string>? TargetFrameworks = null);
 
-internal sealed record SymbolSearchResult(List<SymbolLocation> Symbols, int Count, int TotalFound, bool Truncated, int Limit);
+internal sealed record SymbolSearchResult(
+    List<SymbolLocation> Symbols,
+    int Count,
+    int TotalFound,
+    bool Truncated,
+    int Limit,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] int Offset = 0,
+    int? NextOffset = null);
 
 internal sealed record ReferenceLocation(
     string File,
@@ -83,7 +90,27 @@ internal sealed record ReferenceLocation(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool IsGenerated,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<string>? TargetFrameworks = null);
 
-internal sealed record ReferencesResult(List<ReferenceLocation> References, int Count, int TotalFound, bool Truncated, int Limit);
+/// <summary>
+/// <see cref="References"/> holds full entries; when they would not fit the response budget
+/// the page is compact instead: <see cref="Files"/> lists "line kind" per file and References is
+/// omitted. <see cref="ByProject"/> counts the complete result set whenever the page is partial.
+/// </summary>
+internal sealed record ReferencesResult(
+    List<ReferenceLocation>? References,
+    int Count,
+    int TotalFound,
+    bool Truncated,
+    int Limit,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] int Offset = 0,
+    int? NextOffset = null,
+    List<FileEntries>? Files = null,
+    List<NamedCount>? ByProject = null);
+
+/// <summary>
+/// The compact form of a list: one entry per file, each item a short "line ..." string.
+/// Paths are written once per file rather than once per entry.
+/// </summary>
+internal sealed record FileEntries(string File, List<string> Entries);
 
 internal sealed record ImplementationInfo(
     string Type,
@@ -92,7 +119,14 @@ internal sealed record ImplementationInfo(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool IsGenerated);
 
 
-internal sealed record ImplementationsResult(List<ImplementationInfo> Implementations, int Count, int TotalFound, bool Truncated, int Limit);
+internal sealed record ImplementationsResult(
+    List<ImplementationInfo> Implementations,
+    int Count,
+    int TotalFound,
+    bool Truncated,
+    int Limit,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] int Offset = 0,
+    int? NextOffset = null);
 
 internal sealed record TypeHierarchyResult(
     List<string> BaseTypes,
@@ -102,7 +136,9 @@ internal sealed record TypeHierarchyResult(
     bool Truncated,
     int Limit,
     string? File = null,
-    int Line = 0);
+    int Line = 0,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] int Offset = 0,
+    int? NextOffset = null);
 
 /// <summary>
 /// One csproj. A multi-targeted csproj is one entry listing every framework, although Roslyn
@@ -128,16 +164,23 @@ internal sealed record SolutionSummary(
 /// <summary>
 /// <see cref="Solution"/> is the primary solution's file name (unchanged for one solution).
 /// <see cref="Solutions"/> appears only when several solutions are loaded. Count/TotalFound
-/// describe <see cref="Projects"/>, one entry per csproj.
+/// describe <see cref="Projects"/>, one entry per csproj. When full entries would not fit the
+/// response budget the page is compact: <see cref="Edges"/> holds one "Project -> Ref1, Ref2"
+/// line per project (its direct project references; a bare name references none),
+/// <see cref="TargetFrameworks"/> counts frameworks across the solution, and Projects is omitted.
 /// </summary>
 internal sealed record ProjectGraphResult(
     string Solution,
-    List<ProjectInfo> Projects,
+    List<ProjectInfo>? Projects,
     int Count,
     int TotalFound,
     bool Truncated,
     int Limit,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<SolutionSummary>? Solutions = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<SolutionSummary>? Solutions = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] int Offset = 0,
+    int? NextOffset = null,
+    List<string>? Edges = null,
+    List<NamedCount>? TargetFrameworks = null);
 
 /// <summary>Projects whose longest chain of project references below them is <see cref="Depth"/> long.</summary>
 internal sealed record ProjectLayer(int Depth, int Count, List<string> Examples);
@@ -170,7 +213,9 @@ internal sealed record PublicApiResult(
     bool Truncated,
     int Limit,
     string? File = null,
-    int Line = 0);
+    int Line = 0,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] int Offset = 0,
+    int? NextOffset = null);
 
 internal sealed record DiagnosticInfo(string Id, string Severity, string Message, string File, int Line);
 
@@ -182,7 +227,9 @@ internal sealed record DiagnosticsResult(
     int Warnings,
     int Info,
     bool Truncated,
-    int Limit);
+    int Limit,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] int Offset = 0,
+    int? NextOffset = null);
 
 internal sealed record StatusResponse(string State, string Message);
 
@@ -237,7 +284,14 @@ internal sealed record CallerInfo(
     string Via = "direct",
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ViaSymbol = null);
 
-internal sealed record CallersResult(List<CallerInfo> Callers, int Count, int TotalFound, bool Truncated, int Limit);
+internal sealed record CallersResult(
+    List<CallerInfo> Callers,
+    int Count,
+    int TotalFound,
+    bool Truncated,
+    int Limit,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] int Offset = 0,
+    int? NextOffset = null);
 
 internal sealed record OverrideInfo(
     string Method,
@@ -246,7 +300,14 @@ internal sealed record OverrideInfo(
     int Line,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool IsGenerated);
 
-internal sealed record OverridesResult(List<OverrideInfo> Overrides, int Count, int TotalFound, bool Truncated, int Limit);
+internal sealed record OverridesResult(
+    List<OverrideInfo> Overrides,
+    int Count,
+    int TotalFound,
+    bool Truncated,
+    int Limit,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] int Offset = 0,
+    int? NextOffset = null);
 
 internal sealed record ParameterDetail(string Name, string Type, string? DefaultValue);
 
@@ -313,7 +374,9 @@ internal sealed record AntiPatternsResult(
     bool Truncated,
     int Limit,
     AntiPatternSummary? Summary = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<AntiPatternRule>? Rules = null)
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] List<AntiPatternRule>? Rules = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] int Offset = 0,
+    int? NextOffset = null)
 {
     /// <summary>Each finding with its rule's values filled back in for the omitted fields.</summary>
     public List<AntiPatternInfo> Expand()
@@ -349,7 +412,9 @@ internal sealed record DeadCodeResult(
     bool Truncated,
     int Limit,
     int ConventionFiltered = 0,
-    bool AssemblyScanningDetected = false);
+    bool AssemblyScanningDetected = false,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] int Offset = 0,
+    int? NextOffset = null);
 
 // Circular dependency detection
 internal sealed record CircularDependencyChain(List<string> Chain, string Level);
@@ -518,7 +583,9 @@ internal sealed record RenamePreviewResult(
     int Limit,
     List<DiagnosticInfo> Conflicts,
     int ConflictCount,
-    string Note);
+    string Note,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] int Offset = 0,
+    int? NextOffset = null);
 
 // Symbol source
 internal sealed record SymbolSourceResult(
@@ -555,20 +622,41 @@ internal sealed record PackageRef(string Id, string? Version);
 
 internal sealed record ProjectPackages(string Name, string TargetFramework, bool Cpm, List<PackageRef> Packages);
 
-internal sealed record NugetPackagesResult(List<ProjectPackages> Projects, int Count, int TotalFound, bool Truncated, int Limit);
+internal sealed record NugetPackagesResult(
+    List<ProjectPackages> Projects,
+    int Count,
+    int TotalFound,
+    bool Truncated,
+    int Limit,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] int Offset = 0,
+    int? NextOffset = null);
 
 // Endpoint map
 internal sealed record EndpointEntry(string Method, string Route, string Auth, string Kind, string File, int Line);
 
-internal sealed record EndpointMapResult(List<EndpointEntry> Endpoints, int Count, int TotalFound, bool Truncated, int Limit);
+/// <summary>
+/// When full entries would not fit the response budget the page is compact: <see cref="Files"/>
+/// lists "line METHOD route auth" per file and Endpoints is omitted. <see cref="ByProject"/>
+/// counts the complete result set whenever the page is partial.
+/// </summary>
+internal sealed record EndpointMapResult(
+    List<EndpointEntry>? Endpoints,
+    int Count,
+    int TotalFound,
+    bool Truncated,
+    int Limit,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] int Offset = 0,
+    int? NextOffset = null,
+    List<FileEntries>? Files = null,
+    List<NamedCount>? ByProject = null);
 
 // DI registrations
 internal sealed record DiRegistration(
     string Service,
     string Implementation,
     string Lifetime,
-    bool Keyed,
-    bool TryAdd,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool Keyed,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] bool TryAdd,
     string File,
     int Line);
 
@@ -576,12 +664,26 @@ internal sealed record DiDuplicate(string Service, int Count);
 
 internal sealed record DiCaptiveRisk(string Service, string Implementation, string DependsOn, string File, int Line);
 
+/// <summary>
+/// When full entries would not fit the response budget the page is compact: <see cref="Files"/>
+/// lists "line lifetime Service -> Implementation" per file (" -> Implementation" omitted when it
+/// is the service itself; "keyed"/"try" flags appended) and Registrations is omitted.
+/// <see cref="ByLifetime"/> counts the complete set; <see cref="ByProject"/> appears whenever the
+/// page is partial. Duplicates lists the most-registered services first, capped;
+/// <see cref="DuplicateCount"/> is the full number when the cap applied.
+/// </summary>
 internal sealed record DiRegistrationsResult(
-    List<DiRegistration> Registrations,
+    List<DiRegistration>? Registrations,
     List<DiDuplicate> Duplicates,
     List<DiCaptiveRisk> CaptiveRisks,
     int Count,
     int TotalFound,
     bool Truncated,
     int Limit,
-    string? Note = null);
+    string? Note = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] int Offset = 0,
+    int? NextOffset = null,
+    List<FileEntries>? Files = null,
+    List<NamedCount>? ByLifetime = null,
+    List<NamedCount>? ByProject = null,
+    int? DuplicateCount = null);

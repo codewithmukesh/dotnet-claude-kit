@@ -21,11 +21,14 @@ public static class GetProjectGraphTool
         WorkspaceManager workspace,
         [Description("Optional: only projects whose name or path contains this value (case-insensitive). Each match also lists ReferencedBy.")] string? project = null,
         [Description("True: return the solution's shape (counts, frameworks, folders, dependency layers, most-referenced projects) instead of the project list.")] bool summary = false,
-        [Description("Maximum projects to return. TotalFound in the response reports the full count; re-query with a higher value, a project filter, or summary=true if it exceeds Count.")] int maxResults = 100,
+        [Description("Maximum projects to return. TotalFound in the response reports the full count; re-query with a higher value, a project filter, or summary=true if it exceeds Count.")] int maxResults = 500,
+        [Description("Skip this many projects; pass NextOffset from the previous response for the next page.")] int offset = 0,
+        [Description("'auto' (full entries when they fit, else one 'Project -> Ref1, Ref2' line per project), 'full', or 'compact'.")] string format = ListFormat.Auto,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
         if (notReady is not null) return notReady;
+        if (ListFormat.Validate(format) is { } invalid) return invalid;
 
         var solution = workspace.GetSolution();
         if (solution is null)
@@ -73,10 +76,33 @@ public static class GetProjectGraphTool
             })];
         }
 
-        var page = Paging.Apply(selected.Select(n => n.Info).ToList(), maxResults);
+        var page = Paging.Apply(selected.Select(n => n.Info).ToList(), maxResults, offset);
+        var frameworks = CountBy(selected.SelectMany(n => n.Info.TargetFrameworks));
 
-        return ToolJson.Serialize(new ProjectGraphResult(
-            solutionName, page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit, solutions));
+        return ListFormat.Render(
+            page,
+            format,
+            p => ToolJson.Serialize(new ProjectGraphResult(
+                solutionName, p.Items, p.Count, p.TotalFound, p.Truncated, p.Limit, solutions, p.Offset, p.NextOffset)),
+            p => ToolJson.Serialize(new ProjectGraphResult(
+                solutionName, null, p.Count, p.TotalFound, p.Truncated, p.Limit, solutions, p.Offset, p.NextOffset,
+                Edges: [.. p.Items.Select(EdgeLine)],
+                TargetFrameworks: frameworks)));
+    }
+
+    /// <summary>
+    /// "App -> Domain, Infrastructure" (direct references), a bare "Domain" when it references none,
+    /// and " &lt;- Api, Tests" appended for a project-filtered query's dependents.
+    /// </summary>
+    private static string EdgeLine(ProjectInfo project)
+    {
+        var line = project.References is { Count: > 0 } references
+            ? $"{project.Name} -> {string.Join(", ", references)}"
+            : project.Name;
+
+        return project.ReferencedBy is { Count: > 0 } dependents
+            ? $"{line} <- {string.Join(", ", dependents)}"
+            : line;
     }
 
     private sealed record ProjectNode(ProjectInfo Info, bool IsTest);

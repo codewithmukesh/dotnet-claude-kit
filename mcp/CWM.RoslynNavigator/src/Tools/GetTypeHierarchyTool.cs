@@ -14,7 +14,8 @@ public static class GetTypeHierarchyTool
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
         [Description("Type name. Bare ('OrderService') or namespace-qualified ('MyApp.Orders.OrderService'). Also accepts a SymbolId from find_symbol/get_symbol_at, which names exactly one symbol (overload included).")] string typeName,
-        [Description("Maximum derived types to return. TotalDerived in the response reports the full count; re-query with a higher value if it exceeds the list length.")] int maxResults = 50,
+        [Description("Maximum derived types to return. TotalDerived in the response reports the full count; re-query with a higher value if it exceeds the list length.")] int maxResults = 500,
+        [Description("Skip this many derived types; pass NextOffset from the previous response for the next page.")] int offset = 0,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
@@ -64,16 +65,37 @@ public static class GetTypeHierarchyTool
 
         // Each flavor of a multi-targeted project reports its own copy of a derived type:
         // same declaration ID, same declaring file.
-        var page = Paging.Apply(
-            Paging.Distinct(allDerived, d => (SymbolResolver.GetSymbolId(d), SymbolResolver.GetLocation(d)))
-                .Select(d => d.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat))
-                .ToList(),
-            maxResults);
+        var distinct = Paging.Distinct(allDerived, d => (SymbolResolver.GetSymbolId(d), SymbolResolver.GetLocation(d)));
+        var page = Paging.Apply(DisplayNames(distinct), maxResults, offset);
         var location = SymbolResolver.GetLocation(typeSymbol);
+        var file = location is { } loc ? workspace.ToRelativePath(loc.File) : null;
 
-        return ToolJson.Serialize(new TypeHierarchyResult(
-            baseTypes, interfaces, page.Items, page.TotalFound, page.Truncated, page.Limit,
-            File: location is { } loc ? workspace.ToRelativePath(loc.File) : null,
-            Line: location?.Line ?? 0));
+        return Paging.Fit(page, p => ToolJson.Serialize(new TypeHierarchyResult(
+            baseTypes, interfaces, p.Items, p.TotalFound, p.Truncated, p.Limit,
+            File: file,
+            Line: location?.Line ?? 0,
+            Offset: p.Offset,
+            NextOffset: p.NextOffset)));
+    }
+
+    /// <summary>
+    /// Display names in a stable order. A name shared by several derived types (OrchardCore has
+    /// one "Startup" per module, ~190 of them) is namespace-qualified, or the list cannot tell
+    /// them apart; unique names stay short.
+    /// </summary>
+    private static List<string> DisplayNames(List<INamedTypeSymbol> types)
+    {
+        var shortNames = types.Select(t => t.ToDisplayString(SymbolDisplayFormat.MinimallyQualifiedFormat)).ToList();
+        var repeated = shortNames
+            .GroupBy(n => n, StringComparer.Ordinal)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToHashSet(StringComparer.Ordinal);
+
+        return [.. types
+            .Select((t, i) => repeated.Contains(shortNames[i])
+                ? t.ToDisplayString(SymbolDisplayFormat.CSharpErrorMessageFormat)
+                : shortNames[i])
+            .Order(StringComparer.Ordinal)];
     }
 }

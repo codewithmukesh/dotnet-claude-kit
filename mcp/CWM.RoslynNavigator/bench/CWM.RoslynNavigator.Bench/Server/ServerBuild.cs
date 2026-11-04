@@ -7,6 +7,9 @@ namespace CWM.RoslynNavigator.Bench.Server;
 /// </summary>
 internal sealed record ServerBuild(string Label, string Path)
 {
+    /// <summary>Extra server switches (e.g. <c>--load-parallelism 1</c>) appended after the solution.</summary>
+    public IReadOnlyList<string> ExtraArguments { get; init; } = [];
+
     public static ServerBuild Parse(string spec)
     {
         var separator = spec.IndexOf('=');
@@ -26,5 +29,7 @@ internal sealed record ServerBuild(string Label, string Path)
     public string Command => RunsUnderHost ? DotnetHost.Resolve() : Path;
 
     public IList<string> Arguments(string solutionPath) =>
-        RunsUnderHost ? [Path, "--solution", solutionPath] : ["--solution", solutionPath];
+        RunsUnderHost
+            ? [Path, "--solution", solutionPath, .. ExtraArguments]
+            : ["--solution", solutionPath, .. ExtraArguments];
 }

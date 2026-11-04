@@ -15,6 +15,7 @@ public static class FindSymbolTool
         [Description("Symbol name. Bare ('CreateAsync'), type-qualified ('OrderService.CreateAsync'), or fully qualified ('MyApp.Orders.OrderService.CreateAsync'), or a SymbolId (exact mode). Qualifying narrows results when a name is reused across types; with a fuzzy match the qualifier still matches exactly and only the last segment is fuzzy.")] string name,
         [Description("Filter by kind: 'type', 'class', 'interface', 'struct', 'enum', 'record', 'method', 'property', 'field', or 'any'")] string kind = "any",
         [Description("Maximum results to return. TotalFound in the response reports the full count; re-query with a higher value if it exceeds Count.")] int maxResults = 50,
+        [Description("Skip this many results; pass NextOffset from the previous response for the next page.")] int offset = 0,
         [Description("Name matching: 'exact' (default, case-sensitive), 'prefix', 'camelhump', or 'substring' (case-insensitive). Each looser mode includes the tighter ones.")] string match = "exact",
         CancellationToken ct = default)
     {
@@ -48,10 +49,10 @@ public static class FindSymbolTool
             s => (s.File, s.Line, s.Kind, s.Name, s.ContainingType),
             (s, tfms) => s with { TargetFrameworks = tfms });
 
-        var page = Paging.Apply(all, maxResults);
+        var page = Paging.Apply(all, maxResults, offset);
 
-        return ToolJson.Serialize(new SymbolSearchResult(
-            page.Items, page.Count, page.TotalFound, page.Truncated, page.Limit));
+        return Paging.Fit(page, p => ToolJson.Serialize(new SymbolSearchResult(
+            p.Items, p.Count, p.TotalFound, p.Truncated, p.Limit, p.Offset, p.NextOffset)));
     }
 
     private static SymbolLocation ToLocation(
