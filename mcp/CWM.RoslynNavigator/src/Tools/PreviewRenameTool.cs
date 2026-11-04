@@ -15,17 +15,17 @@ public static class PreviewRenameTool
     private const int MaxLineLength = 200;
     private const int MaxConflicts = 20;
 
-    [McpServerTool(Name = "preview_rename"), Description("Preview a semantic rename WITHOUT applying it: never writes to disk and never changes the loaded workspace. Runs Roslyn's renamer on an immutable copy of the solution and returns every line it would change (file, line, old text, new text) — including interface implementations, overrides, and call sites through them — plus Conflicts: compiler errors the rename would introduce (duplicate members, clashes) in the changed documents and their projects' declarations. Use it to check a rename's reach and safety before editing; apply the edits yourself.")]
+    [McpServerTool(Name = "preview_rename"), Description("Preview a semantic rename without applying it (writes nothing): every changed line with old and new text, including implementations, overrides, and call sites, plus compiler conflicts the rename would cause. Apply the edits yourself.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Symbol to rename. Bare, type-qualified ('OrderService.CreateAsync'), fully qualified, or a SymbolId from find_symbol/get_symbol_at.")] string symbolName,
-        [Description("The new name — a valid C# identifier ('@' prefix allowed for keywords)")] string newName,
-        [Description("Optional: file path to disambiguate")] string? file = null,
-        [Description("Optional: line number to disambiguate")] int? line = null,
-        [Description("Also rename overloads of a method")] bool renameOverloads = false,
-        [Description("Also rename the name inside string literals")] bool renameInStrings = false,
-        [Description("Also rename the name inside comments")] bool renameInComments = false,
-        [Description("Maximum changed lines to return. TotalFound reports the full count.")] int maxResults = 100,
+        [Description("Symbol name or SymbolId")] string symbolName,
+        [Description("Valid C# identifier (@ prefix allowed)")] string newName,
+        string? file = null,
+        int? line = null,
+        bool renameOverloads = false,
+        bool renameInStrings = false,
+        bool renameInComments = false,
+        [Description("Max changed lines")] int maxResults = 100,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);

@@ -25,15 +25,15 @@ public static class DetectAntiPatternsTool
         new EfCoreNoTrackingDetector()
     ];
 
-    [McpServerTool(Name = "detect_antipatterns"), Description("Detect .NET anti-patterns in source code using Roslyn analysis. Finds async void, sync-over-async, new HttpClient(), DateTime.Now, broad catch, logging interpolation, missing pragma restore, missing CancellationToken, and EF Core queries without AsNoTracking. Generated code is never reported; test and migration code is excluded by default. Each finding carries a confidence level — grade on 'high' only, treat 'medium' as review items. The 'summary' field gives complete per-detector counts even when the violation list is truncated, so there is no need to sample. Suppression rules can be declared in .cwm-navigator.json or inline with '// cwm:ignore APXXX — reason'. Rules gives each reported id's severity, message, and suggestion once; a violation repeats one of those only where it differs, omits Confidence when high and SourceKind when production.")]
+    [McpServerTool(Name = "detect_antipatterns"), Description("Find .NET anti-patterns: async void, sync-over-async, new HttpClient(), DateTime.Now, broad catch, interpolated logging, missing pragma restore, missing CancellationToken, EF queries without AsNoTracking. Summary counts every finding even when truncated. Confidence is omitted when high; treat medium as review items. Suppress with // cwm:ignore APxxx or .cwm-navigator.json.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Filter to file (partial match on file path)")] string? file = null,
-        [Description("Filter to project name")] string? projectFilter = null,
-        [Description("Minimum severity: 'warning' (default) or 'error'")] string severity = "warning",
-        [Description("Maximum results to return")] int maxResults = 100,
-        [Description("Source scope: 'production' (default), or 'all' to include test and migration code")] string scope = "production",
-        [Description("Minimum confidence: 'medium' (default, returns all) or 'high' for graded findings only")] string confidence = "medium",
+        [Description("Path substring filter")] string? file = null,
+        string? projectFilter = null,
+        [Description("Minimum: warning or error")] string severity = "warning",
+        int maxResults = 100,
+        [Description("production, or all to include test and migration code")] string scope = "production",
+        [Description("Minimum: medium (all) or high")] string confidence = "medium",
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);

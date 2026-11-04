@@ -56,6 +56,8 @@ The 26 tool definitions add about 21k input tokens to every request, mostly chea
 | `preview_rename` | What a semantic rename **would** change — per-line old/new text across implementations, overrides and call sites, plus compiler errors it would introduce. Never writes to disk or the workspace — see [Rename preview](#rename-preview) |
 | `get_workspace_status` | What is loaded and how completely: solutions, project/document counts, warm-up progress, snapshot version, and every project that loaded or compiled incompletely — see [Workspace health](#workspace-health) |
 
+Tool definitions are re-sent to the model on every request, so they are kept short: conventions shared by every tool (symbol name forms, file matching, paging fields) are sent once as MCP server instructions, and `ToolDefinitionBudgetTests` fails the build if the definitions grow past about 15 KB (~4k tokens).
+
 ### Symbol names
 
 Every tool that takes a symbol accepts three forms, from loosest to tightest:

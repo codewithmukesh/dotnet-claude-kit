@@ -36,10 +36,20 @@ builder.Services.AddHostedService<TelemetryWriter>();
 // Measurement hangs off a single call-tool filter rather than a line in each
 // tool method. One registration covers every tool including ones added later, and there
 // is no per-tool line to forget — a forgotten line would be a silent measurement gap.
-builder.Services.AddMcpServer()
+//
+// Tool definitions are re-sent to the model on every request, so conventions shared by all
+// tools go once in the server instructions and the generated schemas are compacted.
+builder.Services.AddMcpServer(options => options.ServerInstructions = ServerInstructions.Text)
     .WithStdioServerTransport()
     .WithToolsFromAssembly()
     .WithRequestFilters(filters => filters
+    .AddListToolsFilter(next => async (context, ct) =>
+    {
+        var result = await next(context, ct);
+        foreach (var tool in result.Tools)
+            tool.InputSchema = ToolSchemaCompactor.Compact(tool.InputSchema);
+        return result;
+    })
     // An empty answer from a partially loaded workspace says so (see IncompleteWorkspaceNote).
     // Done here, once, so no tool's response shape changes and new tools are covered.
     // The same filter leases the current workspace for the call, so a background reload that

@@ -9,11 +9,11 @@ namespace CWM.RoslynNavigator.Tools;
 [McpServerToolType]
 public static class DetectCircularDependenciesTool
 {
-    [McpServerTool(Name = "detect_circular_dependencies"), Description("Detect circular dependencies at the project or type level. Finds cycles in project references or type dependencies within a project.")]
+    [McpServerTool(Name = "detect_circular_dependencies"), Description("Find dependency cycles between projects (project references) or between types inside one project.")]
     public static async Task<string> ExecuteAsync(
         WorkspaceManager workspace,
-        [Description("Scope: 'projects' for project-level cycles, 'types' for type-level cycles")] string scope = "projects",
-        [Description("Optional: project name filter (required for 'types' scope)")] string? projectFilter = null,
+        [Description("projects or types")] string scope = "projects",
+        [Description("Project name; required for types")] string? projectFilter = null,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
