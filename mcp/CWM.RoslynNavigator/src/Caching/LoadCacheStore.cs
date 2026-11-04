@@ -84,14 +84,10 @@ internal sealed class LoadCacheStore(string rootDirectory)
     /// </summary>
     public (LoadCacheFile? File, string Reason) TryRead(LoadCacheHeader header, CancellationToken ct = default)
     {
-        var path = GetFilePath(header);
         LoadCacheFile? file;
         try
         {
-            // Shared for delete: a concurrent writer can still rename its new file over this one.
-            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
-            using var gzip = new GZipStream(stream, CompressionMode.Decompress);
-            file = JsonSerializer.Deserialize<LoadCacheFile>(gzip, JsonOptions);
+            file = ReadEntry(header);
         }
         catch (Exception ex) when (ex is FileNotFoundException or DirectoryNotFoundException)
         {
@@ -121,6 +117,18 @@ internal sealed class LoadCacheStore(string rootDirectory)
             return (null, difference);
 
         return (file, "hit");
+    }
+
+    /// <summary>
+    /// The entry for <paramref name="header"/> exactly as stored, without any validation.
+    /// Throws when it is missing or unreadable.
+    /// </summary>
+    internal LoadCacheFile? ReadEntry(LoadCacheHeader header)
+    {
+        // Shared for delete: a concurrent writer can still rename its new file over this one.
+        using var stream = new FileStream(GetFilePath(header), FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+        using var gzip = new GZipStream(stream, CompressionMode.Decompress);
+        return JsonSerializer.Deserialize<LoadCacheFile>(gzip, JsonOptions);
     }
 
     /// <summary>
