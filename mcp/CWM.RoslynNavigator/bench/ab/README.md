@@ -4,7 +4,9 @@ The main bench measures the server over MCP. This folder measures what a user fe
 Claude Code sessions answering the same questions with and without the navigator, timed
 end to end, with every model round trip included.
 
-The committed run is in [`../results/2026-11-04-ab/`](../results/2026-11-04-ab/report.md).
+The latest run is in [`../results/2026-11-04-ab-v2/`](../results/2026-11-04-ab-v2/report.md).
+The earlier run, before the tool-definition trim and the load cache, is in
+[`../results/2026-11-04-ab/`](../results/2026-11-04-ab/report.md).
 
 ## Method
 
@@ -68,8 +70,10 @@ The committed run took about two hours of sessions, one at a time, on a subscrip
   to which arm wrote which answer and told not to penalise correct extras, and its stated
   reasons are concrete (wrong line numbers, callers that do not exist, vague lists where the
   question asked for files), but it is not a human review.
-- **More input tokens with the navigator.** Its 26 tool definitions add roughly 21k tokens
-  to every request. Most of those are prompt-cache reads, which is why cost still drops.
+- **More input tokens with the navigator.** Its tool definitions ride along on every
+  request: +13% input tokens in total in the latest run, mostly prompt-cache reads.
+  Complete answers on very large solutions are big, so OrchardCore and ABP cost slightly
+  more with the navigator even though the overall bill drops.
 - **The default route is narrower than real life.** Without Bash the agent cannot run `rg`,
   `find`, or `dotnet build`. With Bash it could do more, and it would also take longer.
 - **Startup is not in these times.** On a large solution the first question of a session
