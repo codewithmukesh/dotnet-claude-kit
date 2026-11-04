@@ -82,16 +82,30 @@ public sealed class LoadCacheRobustnessTests : IDisposable
                 lock (readReasons) readReasons.Add(reason);
             }
         }, ct);
+        var written = 0;
         var writers = Enumerable.Range(0, 2).Select(writer => Task.Run(() =>
         {
             for (var i = 0; i < 25; i++)
-                _bed.Store.Write(entry with { LoadStartedUtc = entry.LoadStartedUtc.AddTicks(writer * 1000 + i) });
+            {
+                try
+                {
+                    _bed.Store.Write(entry with { LoadStartedUtc = entry.LoadStartedUtc.AddTicks(writer * 1000 + i) });
+                    Interlocked.Increment(ref written);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // Windows denies replacing a file another handle has open; under a reader
+                    // that never pauses a write may give up, leaving the previous entry. The
+                    // server logs that and carries on (LoadCacheFolderNotWritable covers it).
+                }
+            }
         }, ct)).ToArray();
         await Task.WhenAll(writers);
         await stop.CancelAsync();
         await reader;
 
-        // Assert
+        // Assert: readers only ever see a complete entry, old or new.
+        Assert.True(written > 0);
         Assert.NotEmpty(readReasons);
         Assert.All(readReasons, reason => Assert.Equal("hit", reason));
         Assert.Equal("hit", _bed.Store.TryRead(_bed.Header, ct).Reason);

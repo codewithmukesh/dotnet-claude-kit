@@ -1,8 +1,8 @@
+using System.Text.Json;
 using CWM.RoslynNavigator.Caching;
 using CWM.RoslynNavigator.Responses;
 using CWM.RoslynNavigator.Tests.Fixtures;
 using CWM.RoslynNavigator.Tools;
-using System.Text.Json;
 
 namespace CWM.RoslynNavigator.Tests.Caching;
 

@@ -159,8 +159,10 @@ internal sealed class LoadCacheStore(string rootDirectory)
     }
 
     /// <summary>
-    /// The rename can collide with another instance renaming over the same file, or with a
-    /// reader on a platform that does not allow replacing an open file; both are momentary.
+    /// The rename can collide with another instance renaming over the same file, or — on
+    /// Windows, which denies replacing a file another process has open — with a reader. Both
+    /// are momentary, so it is retried for about half a second; after that the write gives up
+    /// and the previous entry stays, which is always a complete one.
     /// </summary>
     private static void MoveWithRetry(string source, string destination)
     {
@@ -171,9 +173,9 @@ internal sealed class LoadCacheStore(string rootDirectory)
                 File.Move(source, destination, overwrite: true);
                 return;
             }
-            catch (Exception ex) when (attempt < 5 && ex is IOException or UnauthorizedAccessException)
+            catch (Exception ex) when (attempt < 10 && ex is IOException or UnauthorizedAccessException)
             {
-                Thread.Sleep(20 * attempt);
+                Thread.Sleep(10 * attempt);
             }
         }
     }
