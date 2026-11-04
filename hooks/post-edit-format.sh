@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Post-edit hook: auto-format changed .cs files
-# Runs dotnet format on specific files after Claude edits them.
+# Runs dotnet format on specific files after Claude edits them, or CSharpier
+# when the repository uses it.
 #
 # Usage:
 #   Called automatically by Claude Code PostToolUse hook after Edit/Write on .cs files.
@@ -8,8 +9,15 @@
 #     1. First argument ($1)
 #     2. CLAUDE_EDITED_FILE env var
 #     3. PostToolUse stdin JSON ({"tool_input":{"file_path":"..."}})
+#
+#   CWM_POST_EDIT_FORMAT=off disables the hook. Claude Code cannot turn off a
+#   single plugin hook, so without this the only way out is disabling the plugin.
 
 set -euo pipefail
+
+if [[ "${CWM_POST_EDIT_FORMAT:-}" == "off" ]]; then
+    exit 0
+fi
 
 FILE="${1:-${CLAUDE_EDITED_FILE:-}}"
 
@@ -42,6 +50,47 @@ fi
 
 # Skip if file doesn't exist (deleted)
 if [[ ! -f "$FILE" ]]; then
+    exit 0
+fi
+
+# A repository that uses CSharpier gets CSharpier, never dotnet format: the two
+# disagree on indentation in places, so running both makes each undo the other
+# and `dotnet csharpier check` fails on files only this hook touched. CSharpier
+# is detected the way it resolves its own config and local tool, walking up
+# from the edited file.
+uses_csharpier() {
+    local dir
+    dir=$(dirname "$FILE")
+    while true; do
+        if [[ -f "$dir/.csharpierrc" || -f "$dir/.csharpierrc.json" \
+            || -f "$dir/.csharpierrc.yaml" || -f "$dir/.csharpierrc.yml" ]]; then
+            return 0
+        fi
+        # .NET 10 writes new tool manifests to the root, older SDKs to .config/
+        local manifest
+        for manifest in "$dir/dotnet-tools.json" "$dir/.config/dotnet-tools.json"; do
+            if [[ -f "$manifest" ]] && grep -qi '"csharpier"' "$manifest" 2>/dev/null; then
+                return 0
+            fi
+        done
+        # Same drive-root fixed-point guard as the project walk below
+        local parent
+        parent=$(dirname "$dir")
+        if [[ "$parent" == "$dir" || "$dir" == "." ]]; then
+            return 1
+        fi
+        dir="$parent"
+    done
+}
+
+if uses_csharpier; then
+    # Run from the file's directory so `dotnet csharpier` resolves the
+    # repository's local tool manifest even when the hook's cwd is elsewhere.
+    # Exit 0 on failure for the same reason as dotnet format below.
+    if ! FORMAT_OUTPUT=$(cd "$(dirname "$FILE")" && dotnet csharpier format "$FILE" 2>&1); then
+        echo "post-edit-format: dotnet csharpier format failed for $FILE (file left unformatted)"
+        echo "$FORMAT_OUTPUT"
+    fi
     exit 0
 fi
 

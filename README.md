@@ -462,7 +462,7 @@ Three Claude Code hooks run automatically (declared in `hooks/hooks.json`); the 
 | Script | Kind | What It Does |
 |------|-------|-------------|
 | `pre-bash-guard.sh` | Claude Code hook — PreToolUse (Bash) | Parses each command and blocks destructive ones (force push, `reset --hard`, `clean -f`, `rm -rf` outside build output) plus machine-wide ones (`pkill`, `dotnet build-server shutdown`, deleting NuGet caches). A command that only *mentions* one, like a grep pattern or a commit message, passes ([ADR-007](knowledge/decisions/007-command-word-guard.md)) |
-| `post-edit-format.sh` | Claude Code hook — PostToolUse (*.cs) | Auto-formats C# files after edits, and prints the error if `dotnet format` fails |
+| `post-edit-format.sh` | Claude Code hook — PostToolUse (*.cs) | Auto-formats C# files after edits with `dotnet format`, or CSharpier when the repo uses it, and prints the error if formatting fails (`CWM_POST_EDIT_FORMAT=off` disables it) |
 | `post-scaffold-restore.sh` | Claude Code hook — PostToolUse (*.csproj) | `dotnet restore` after project file changes |
 | `pre-commit-format.sh` | Git pre-commit (manual install) | `dotnet format --verify-no-changes` ensures consistent formatting |
 | `pre-commit-antipattern.sh` | Git pre-commit (manual install) | Detects `async void`, sync-over-async, `new HttpClient()`, and `DateTime.Now` in the lines a commit adds ([why text, not an analyzer](knowledge/decisions/006-three-tier-antipattern-detection.md)) |

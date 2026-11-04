@@ -11,8 +11,37 @@ Claude works:
 | Script | Event | Purpose |
 |---|---|---|
 | `pre-bash-guard.sh` | PreToolUse (Bash) | Blocks destructive commands (force push, `git reset --hard`, unsafe `rm -rf`, unscoped process kills, shared-cache deletes) — see [below](#why-does-the-bash-guard-parse-commands-instead-of-grepping-them) |
-| `post-edit-format.sh` | PostToolUse (Edit\|Write) | Runs `dotnet format` on edited `.cs` files |
+| `post-edit-format.sh` | PostToolUse (Edit\|Write) | Formats edited `.cs` files with `dotnet format`, or with CSharpier when the repository uses it — see [below](#which-formatter-does-the-post-edit-hook-run) |
 | `post-scaffold-restore.sh` | PostToolUse (Edit\|Write) | Runs `dotnet restore` after `.csproj` changes |
+
+### Which formatter does the post-edit hook run?
+
+The one the repository already uses. Walking up from the edited file, the hook
+looks for any of:
+
+- `.csharpierrc`, `.csharpierrc.json`, `.csharpierrc.yaml` or `.csharpierrc.yml`
+- a `csharpier` entry in `dotnet-tools.json` or `.config/dotnet-tools.json`
+
+If it finds one, it runs `dotnet csharpier format <file>` (CSharpier 1.0+) and
+never `dotnet format`. Otherwise it runs `dotnet format <project> --include <file>`
+against the nearest `.csproj` or `.sln`.
+
+Running both is not an option: `dotnet format` and CSharpier disagree on
+indentation in places (unbraced nested `foreach` over a wrapped expression,
+multi-line property patterns), so each would undo the other and
+`dotnet csharpier check` would fail on files only the hook touched.
+
+Either way a failed format is printed and the hook still exits 0 — a file that
+does not compile mid-edit must not interrupt the edit.
+
+**Options**
+
+| | |
+|---|---|
+| `CWM_POST_EDIT_FORMAT=off` | Disable the hook entirely. Claude Code cannot turn off a single plugin hook, so this is the way to keep the plugin and drop the formatting |
+
+Set it in the environment Claude Code starts from, or in the `env` block of a
+project's `.claude/settings.json`.
 
 ### Why does the Bash guard parse commands instead of grepping them?
 
