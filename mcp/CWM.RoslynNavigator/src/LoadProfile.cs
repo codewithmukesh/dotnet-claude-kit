@@ -51,7 +51,9 @@ internal sealed class LoadProfile : IProgress<ProjectLoadProgress>
             var operations = string.Join(", ", _operations
                 .OrderBy(o => o.Key)
                 .Select(o => $"{o.Key.ToString().ToLowerInvariant()} {o.Value.Count}x {(long)o.Value.Total.TotalMilliseconds} ms"));
-            return $"{TotalMs} ms total; steps: {steps}; MSBuild (summed per project): {operations}";
+            return operations.Length == 0
+                ? $"{TotalMs} ms total; steps: {steps}"
+                : $"{TotalMs} ms total; steps: {steps}; MSBuild (summed per project): {operations}";
         }
     }
 }

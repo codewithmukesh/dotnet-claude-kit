@@ -33,6 +33,7 @@ internal sealed class ServerSession : IAsyncDisposable
     private readonly ConcurrentQueue<string> _stderrTail;
     private readonly TaskCompletionSource<long> _warm;
     private readonly Dictionary<string, HashSet<string>> _toolParameters;
+    private ConcurrentQueue<string> _loadNotes = new(); // set once, by StartAsync
 
     private ServerSession(
         Stopwatch sinceStart,
@@ -59,13 +60,21 @@ internal sealed class ServerSession : IAsyncDisposable
     /// <summary>Distinct load problems the server logged (project load failures, missing projects).</summary>
     public IReadOnlyList<string> LoadProblems => [.. _loadProblems.Distinct().Take(100)];
 
+    /// <summary>The server's load cache and load profile log lines, kept whatever else it logs.</summary>
+    public IReadOnlyList<string> LoadNotes => [.. _loadNotes];
+
     /// <summary>The last stderr lines the server wrote — where a tool's exception detail lands.</summary>
     public IReadOnlyList<string> StderrTail => [.. _stderrTail];
 
     public static async Task<ServerSession> StartAsync(
-        ServerBuild build, string solutionPath, CancellationToken ct, IReadOnlyList<string>? extraArguments = null)
+        ServerBuild build,
+        string solutionPath,
+        CancellationToken ct,
+        IReadOnlyList<string>? extraArguments = null,
+        string? loadCacheDirectory = null)
     {
         var loadProblems = new ConcurrentQueue<string>();
+        var loadNotes = new ConcurrentQueue<string>();
         var stderrTail = new ConcurrentQueue<string>();
         var warm = new TaskCompletionSource<long>(TaskCreationOptions.RunContinuationsAsynchronously);
         var sinceStart = Stopwatch.StartNew();
@@ -77,7 +86,10 @@ internal sealed class ServerSession : IAsyncDisposable
             Arguments = build.Arguments(solutionPath, extraArguments),
             WorkingDirectory = Path.GetDirectoryName(solutionPath),
             // Telemetry off: its background writer is not part of what is being measured.
-            EnvironmentVariables = new Dictionary<string, string?> { ["CWM_ROSLYN_TELEMETRY"] = "off" },
+            // A load cache folder, when given, replaces the user's (servers before the cache ignore it).
+            EnvironmentVariables = loadCacheDirectory is null
+                ? new Dictionary<string, string?> { ["CWM_ROSLYN_TELEMETRY"] = "off" }
+                : new Dictionary<string, string?> { ["CWM_ROSLYN_TELEMETRY"] = "off", ["CWM_ROSLYN_CACHE_DIR"] = loadCacheDirectory },
             ShutdownTimeout = TimeSpan.FromSeconds(10),
             StandardErrorLines = line =>
             {
@@ -89,6 +101,8 @@ internal sealed class ServerSession : IAsyncDisposable
                     warm.TrySetResult(-1);
                 else if (Array.Exists(LoadProblemMarkers, m => line.Contains(m, StringComparison.Ordinal)))
                     loadProblems.Enqueue(line.Trim());
+                else if (line.Contains("Load cache", StringComparison.Ordinal) || line.Contains("Load profile", StringComparison.Ordinal))
+                    loadNotes.Enqueue($"+{sinceStart.ElapsedMilliseconds} ms {line.Trim()}");
             },
         });
 
@@ -100,7 +114,7 @@ internal sealed class ServerSession : IAsyncDisposable
             t => SchemaProperties(t.ProtocolTool.InputSchema),
             StringComparer.Ordinal);
 
-        return new ServerSession(sinceStart, client, loadProblems, stderrTail, warm, parameters);
+        return new ServerSession(sinceStart, client, loadProblems, stderrTail, warm, parameters) { _loadNotes = loadNotes };
     }
 
     public bool HasTool(string name) => _toolParameters.ContainsKey(name);

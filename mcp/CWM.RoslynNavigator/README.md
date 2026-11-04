@@ -446,9 +446,9 @@ Working across several solutions (e.g. microservices)? Repeat `--solution`, or a
 `--all-solutions` — see [Multiple Solutions](#multiple-solutions).
 
 Load tuning, rarely needed: `--load-parallelism N` sets how many MSBuild build hosts load
-the solution side by side (default: automatic; `1` = one host), and `--all-target-frameworks`
-keeps every target framework of a multi-targeted project loaded instead of one — see
-[Scaling](#scaling).
+the solution side by side (default: automatic; `1` = one host), `--all-target-frameworks`
+keeps every target framework of a multi-targeted project loaded instead of one, and
+`--no-load-cache` turns off the [load cache](#load-cache) — see [Scaling](#scaling).
 
 ### As a Local Tool (per-repo)
 
@@ -619,6 +619,9 @@ One strategy for every solution size:
 - **Ready at open.** Tools answer as soon as the solution(s) are open; until then they
   return a `Loading` status. On a 39-project solution that is ~13 s after start instead of
   ~23 s.
+- **Ready in seconds on the next start.** The [load cache](#load-cache) restores the last
+  load's projects instead of running MSBuild again, then checks them with MSBuild in the
+  background. OrchardCore: Ready 58.5 s → 2.8 s; ABP: 99.8 s → 2.4 s.
 - **Several build hosts when the graph allows it.** MSBuildWorkspace evaluates and
   design-time-builds projects one at a time in a single build host, which is nearly all of
   the load time on a large solution. When a solution declares 12 or more projects, the
@@ -678,6 +681,57 @@ One strategy for every solution size:
   picked up by the next one. A reload that fails (e.g. an unparseable solution file) keeps the
   previous snapshot, is reported as `LastReloadError` (and `Healthy: false`), and is retried
   after 30 s. The replaced workspace is disposed as soon as the last call still using it ends.
+
+### Load cache
+
+Nearly all of a large solution's start is MSBuild evaluating and design-time-building every
+project. What that produces (each project's files, references, and compiler options) rarely
+changes between sessions, so after every MSBuild load the server writes it to a small cache
+entry, and the next start whose build inputs are unchanged rebuilds the solution from it.
+
+| Corpus (projects) | Ready, no cache entry | Ready, cache hit |
+|---|---|---|
+| CleanArchitecture | 4.8 s | 1.3-1.4 s |
+| eShop | 7.5 s | 1.4 s |
+| jellyfin | 10.1 s | 1.7-2.2 s |
+| OrchardCore (257 projects) | 58.5 s | 2.8-3.6 s |
+| ABP framework (271 projects, one build host) | 99.8 s | 2.4-2.5 s |
+
+Process start until tools stop answering `Loading`, measured with the bench `probe` verb on a busy 32 GB machine;
+details in [`bench/results/2026-11-05-load-cache`](bench/results/2026-11-05-load-cache/report.md).
+
+- **Where.** `%LOCALAPPDATA%\cwm-roslyn-navigator\cache` on Windows,
+  `$XDG_CACHE_HOME/cwm-roslyn-navigator` (default `~/.cache/...`) on Linux,
+  `~/Library/Caches/cwm-roslyn-navigator` on macOS. `CWM_ROSLYN_CACHE_DIR` overrides it. One
+  gzipped JSON file per solution set and options, 30-700 KB. Deleting the folder is always safe.
+- **When it is used.** Only when every input still matches: the solution files, every
+  project file, `Directory.Build.props/.targets`, `Directory.Packages.props`, `global.json`
+  and `NuGet.config` in every folder from a project up to the root, any `.props`/`.targets`
+  they import by a literal or `$(MSBuildThisFileDirectory)` path, each project's
+  `project.assets.json` (a restore that changes a package version changes it), the installed
+  .NET SDKs, the navigator build, and `--all-target-frameworks`. Build files are compared by
+  content, so a branch switch that rewrites them unchanged still hits.
+- **Always verified.** A restored snapshot is checked by the real MSBuild load in the
+  background, which takes as long as a cold start. If MSBuild produces the same projects,
+  documents, references, and options, the restored snapshot stays, with every compilation
+  warmed meanwhile. If anything differs (an import through another property, an environment
+  variable, a workload), MSBuild's snapshot is swapped in like any reload. Either way the
+  entry is rewritten. Answers are never flagged as stale during the check, since the inputs matched.
+- **Files changed between sessions.** A document deleted since the entry was written is left
+  out at once. A new file is picked up by the first tool call, exactly like a file created
+  while the server runs.
+- **Never a failure.** A missing, corrupt, or truncated entry is a miss and the server loads
+  with MSBuild. A cache folder that cannot be written is logged and skipped. Entries are
+  written to a temporary file and renamed into place, so two servers on the same solution
+  never read a partial entry.
+- **Cost.** While the check runs, the server holds the restored snapshot and MSBuild's result
+  at once: peak memory is higher than a cold start's (OrchardCore 1.4 GB → 2.1 GB for server
+  plus build host). `--no-load-cache` turns the cache off.
+
+`get_workspace_status` reports it as `LoadCache`: `Source` (`cache` or `msbuild`),
+`Verification` (`running`, `unchanged`, `changed`, `failed`, `superseded`), and `Detail` (why
+the cache was not used, or what changed). The server logs `Load cache hit`, `miss`,
+`verified`, and `written` lines.
 
 ## Troubleshooting
 

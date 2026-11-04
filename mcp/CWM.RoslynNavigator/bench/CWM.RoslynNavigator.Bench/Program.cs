@@ -143,6 +143,7 @@ static async Task<int> ProbeAsync(CommandLine command, CancellationToken ct)
         }
 
         Console.WriteLine($"warm after {warm?.ToString() ?? "n/a"} ms; verified after {session.ElapsedSinceStartMs} ms; load cache: {cache}");
+        foreach (var note in session.LoadNotes) Console.WriteLine($"note: {note}");
     }
 
     var peaks = memory.Snapshot();
