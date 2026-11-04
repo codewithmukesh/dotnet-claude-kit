@@ -25,6 +25,6 @@ internal sealed record ServerBuild(string Label, string Path)
     /// <summary>The executable to start. An absolute path, so no shell wrapper is involved.</summary>
     public string Command => RunsUnderHost ? DotnetHost.Resolve() : Path;
 
-    public IList<string> Arguments(string solutionPath) =>
-        RunsUnderHost ? [Path, "--solution", solutionPath] : ["--solution", solutionPath];
+    public IList<string> Arguments(string solutionPath, IReadOnlyList<string>? extra = null) =>
+        RunsUnderHost ? [Path, "--solution", solutionPath, .. extra ?? []] : ["--solution", solutionPath, .. extra ?? []];
 }

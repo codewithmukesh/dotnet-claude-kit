@@ -221,7 +221,22 @@ internal sealed record WorkspaceStatusResult(
     int Limit,
     bool Reloading = false,
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? ReloadReason = null,
-    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? LastReloadError = null);
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? LastReloadError = null,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] LoadCacheStatus? LoadCache = null);
+
+/// <summary>
+/// The persistent load cache's part in the current snapshot. <see cref="Source"/> is "cache"
+/// when the snapshot was restored from it and "msbuild" when MSBuild loaded it.
+/// <see cref="Verification"/> is the background MSBuild check of a restored snapshot:
+/// "running", "unchanged" (the cached snapshot was exact and stays), "changed" (MSBuild's
+/// snapshot was swapped in), "failed", "superseded" (a reload replaced it first), or null when
+/// the start did not use the cache. <see cref="Detail"/> says why the cache was not used or
+/// what changed.
+/// </summary>
+internal sealed record LoadCacheStatus(
+    string Source,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Verification,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Detail);
 
 /// <summary>
 /// <see cref="Via"/> is "direct" when the call binds to the requested method itself, or

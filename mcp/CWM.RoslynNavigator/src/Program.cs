@@ -114,6 +114,11 @@ WorkspaceOptions.Apply(args, workspaceManager);
 workspaceManager.HasConfiguredSolutions = solutionPaths.Count > 0;
 
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
+if (workspaceManager.LoadCache is { } loadCache)
+    logger.LogInformation("Load cache: {Directory} (disable with {Flag})", loadCache.RootDirectory, WorkspaceOptions.NoLoadCacheFlag);
+else
+    logger.LogInformation("Load cache disabled.");
+
 if (solutionPaths.Count > 0)
 {
     foreach (var solutionPath in solutionPaths)

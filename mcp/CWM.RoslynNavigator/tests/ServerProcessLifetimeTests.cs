@@ -24,6 +24,7 @@ public sealed class ServerProcessLifetimeTests
         startInfo.ArgumentList.Add(serverDll);
         startInfo.ArgumentList.Add("--solution");
         startInfo.ArgumentList.Add(Path.Combine(Path.GetTempPath(), "does-not-exist.sln"));
+        startInfo.ArgumentList.Add("--no-load-cache");
 
         using var server = Process.Start(startInfo)!;
         _ = server.StandardOutput.ReadToEndAsync(TestContext.Current.CancellationToken);

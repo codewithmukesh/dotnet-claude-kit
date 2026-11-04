@@ -62,7 +62,8 @@ internal sealed class ServerSession : IAsyncDisposable
     /// <summary>The last stderr lines the server wrote — where a tool's exception detail lands.</summary>
     public IReadOnlyList<string> StderrTail => [.. _stderrTail];
 
-    public static async Task<ServerSession> StartAsync(ServerBuild build, string solutionPath, CancellationToken ct)
+    public static async Task<ServerSession> StartAsync(
+        ServerBuild build, string solutionPath, CancellationToken ct, IReadOnlyList<string>? extraArguments = null)
     {
         var loadProblems = new ConcurrentQueue<string>();
         var stderrTail = new ConcurrentQueue<string>();
@@ -73,7 +74,7 @@ internal sealed class ServerSession : IAsyncDisposable
         {
             Name = build.Label,
             Command = build.Command,
-            Arguments = build.Arguments(solutionPath),
+            Arguments = build.Arguments(solutionPath, extraArguments),
             WorkingDirectory = Path.GetDirectoryName(solutionPath),
             // Telemetry off: its background writer is not part of what is being measured.
             EnvironmentVariables = new Dictionary<string, string?> { ["CWM_ROSLYN_TELEMETRY"] = "off" },

@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.IO.Enumeration;
 using System.Security.Cryptography;
 using System.Text.Json;
+using CWM.RoslynNavigator.Caching;
 using CWM.RoslynNavigator.Responses;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.MSBuild;
@@ -18,7 +19,7 @@ namespace CWM.RoslynNavigator;
 /// one inotify watch per subdirectory, quickly exhausting the kernel limit for large solutions.
 /// Instead, documents are refreshed on demand when tools are invoked.
 /// </summary>
-public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvider clock) : IDisposable
+public sealed partial class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvider clock) : IDisposable
 {
     // _writeLock guards snapshot mutations (document refreshes, the swap after a load) and is
     // only ever held briefly. _loadLock serializes loads, which take as long as MSBuild needs;
@@ -74,6 +75,15 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     private Task _reload = Task.CompletedTask;
     private int _liveWorkspaces;
     private volatile bool _disposed;
+
+    // Load cache: whether the current snapshot was restored from it, how its background
+    // verification against MSBuild went, and the in-flight verification and cache write.
+    private volatile bool _snapshotFromCache;
+    private volatile string? _cacheVerification;
+    private volatile string? _cacheDetail;
+    private Task _cacheVerificationTask = Task.CompletedTask;
+    private Task _cacheWrite = Task.CompletedTask;
+    private readonly SemaphoreSlim _cacheWriteLock = new(1, 1);
 
     public WorkspaceState State { get; private set; } = WorkspaceState.NotStarted;
     public string? ErrorMessage => _errorMessage;
@@ -154,6 +164,27 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
     /// 1 is a plain <c>OpenSolutionAsync</c>. Set by Program.cs.
     /// </summary>
     internal int LoadParallelism { get; set; }
+
+    /// <summary>
+    /// The persistent load cache, or null when disabled (<c>--no-load-cache</c>, or a
+    /// WorkspaceManager constructed directly, as tests do). With it, a start whose inputs are
+    /// unchanged restores the last load's snapshot instead of running MSBuild, then verifies it
+    /// with a real MSBuild load in the background. Set by Program.cs.
+    /// </summary>
+    internal LoadCacheStore? LoadCache { get; set; }
+
+    /// <summary>
+    /// Where the current snapshot came from and how the cache fared, or null when the cache is
+    /// disabled. Reported by get_workspace_status.
+    /// </summary>
+    internal LoadCacheStatus? CacheStatus => LoadCache is null
+        ? null
+        : new LoadCacheStatus(_snapshotFromCache ? "cache" : "msbuild", _cacheVerification, _cacheDetail);
+
+    /// <summary>True while a snapshot restored from the cache is being checked against a real MSBuild load.</summary>
+    internal bool IsVerifyingCachedSnapshot => _cacheVerification == CacheVerificationRunning;
+
+    private const string CacheVerificationRunning = "running";
 
     /// <summary>
     /// When set (<c>--all-target-frameworks</c>), every target framework of a multi-targeted
@@ -290,7 +321,9 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         WorkspaceHealth Health,
         DateTimeOffset StartedUtc,
         IReadOnlyDictionary<string, DateTime> BuildFileStampsAtStart,
-        LoadProfile Profile);
+        LoadProfile Profile,
+        DateTimeOffset DiskTimeAtStart,
+        bool FromCache = false);
 
     /// <summary>Must hold <see cref="_loadLock"/>.</summary>
     private async Task LoadAndSwapAsync(string[] solutionPaths, CancellationToken ct)
@@ -318,12 +351,17 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         PendingLoad? pending = null;
         try
         {
+            if (!reloading && LoadCache is { } cache && await TryRestoreFromCacheAsync(cache, solutionPaths, ct))
+                return;
+
             pending = await OpenSolutionsAsync(solutionPaths, ct);
             if (BeforeSwap is { } beforeSwap)
                 await beforeSwap(ct);
 
-            await SwapAsync(pending);
+            var loaded = pending;
+            await SwapAsync(loaded);
             pending = null;
+            ScheduleCacheWrite(loaded);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
@@ -373,6 +411,8 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         // Anything on disk before MSBuild evaluates and still not a document afterwards was
         // excluded by the project; files created from here on are genuinely new.
         var startedUtc = clock.GetUtcNow();
+        // Compared with file timestamps, so it is the machine's clock whatever clock is injected.
+        var diskTimeAtStart = TimeProvider.System.GetUtcNow();
         var profile = new LoadProfile();
         // A build file whose stamp moves between here and the swap changed after MSBuild may
         // have read it; the swap marks it changed so the next refresh reloads again.
@@ -447,7 +487,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             }
 
             return new PendingLoad(
-                solutionPaths, workspace, solution, loaded, health, startedUtc, stampsAtStart, profile);
+                solutionPaths, workspace, solution, loaded, health, startedUtc, stampsAtStart, profile, diskTimeAtStart);
         }
         catch
         {
@@ -484,12 +524,15 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             _solution = load.Solution;
             _loadedSolutions = load.Loaded;
             _health = load.Health;
+            _snapshotFromCache = load.FromCache;
             Interlocked.Increment(ref _loadCount);
             Interlocked.Increment(ref _snapshotVersion);
             _errorMessage = null;
             _lastReloadError = null;
 
-            if (load.SolutionPaths.Length == 1)
+            if (load.FromCache)
+                logger.LogInformation("Solution restored from the load cache: {ProjectCount} projects", load.Solution.ProjectIds.Count);
+            else if (load.SolutionPaths.Length == 1)
                 logger.LogInformation("Solution loaded: {ProjectCount} projects", load.Solution.ProjectIds.Count);
             else
                 logger.LogInformation("{SolutionCount} solutions loaded: {ProjectCount} distinct projects",
@@ -869,6 +912,8 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             $"Workspace is ready and reloading in the background ({reason}). Answers come from the previous snapshot until the reload completes.",
         WorkspaceState.Ready when _lastReloadError is { } error =>
             $"Workspace is ready, but the last reload failed ({error}); answers come from the snapshot before it. The reload is retried on a later call.",
+        WorkspaceState.Ready when _snapshotFromCache && IsVerifyingCachedSnapshot =>
+            "Workspace is ready (restored from the load cache; MSBuild is verifying it in the background).",
         WorkspaceState.Ready => "Workspace is ready.",
         _ => "Unknown workspace state."
     };
@@ -1370,12 +1415,14 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
         try
         {
             var additions = ClassifyNewFiles(scan.NewFiles, out var needReload);
+            // While a cached snapshot is being verified, that MSBuild load evaluates these
+            // files too; a reload of its own would run the same evaluation a second time.
             if (needReload.Count > 0
-                && !StartBackgroundReload(
-                    $"new source files in projects with custom compile items: {string.Join(", ", needReload.Select(Path.GetFileName))}"))
+                && (IsVerifyingCachedSnapshot || !StartBackgroundReload(
+                    $"new source files in projects with custom compile items: {string.Join(", ", needReload.Select(Path.GetFileName))}")))
             {
-                // A reload already in flight may have evaluated the projects before these
-                // files existed; ask again once it has swapped in.
+                // A reload or verification already in flight may have evaluated the projects
+                // before these files existed; ask again once it has finished.
                 foreach (var path in needReload)
                     _pendingNewFiles[path] = 0;
             }
@@ -1834,7 +1881,7 @@ public sealed class WorkspaceManager(ILogger<WorkspaceManager> logger, TimeProvi
             // Bounded so shutdown cannot block on a large directory walk, a compilation, or a
             // reload that is slow to observe cancellation. A reload still running afterwards
             // finds the manager disposed at its swap and disposes its own workspace.
-            Task.WaitAll([_structuralScan, _warmUp, _reload], TimeSpan.FromSeconds(2));
+            Task.WaitAll([_structuralScan, _warmUp, _reload, _cacheVerificationTask, _cacheWrite], TimeSpan.FromSeconds(2));
         }
         catch (Exception)
         {
