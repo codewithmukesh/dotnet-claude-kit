@@ -49,6 +49,16 @@ public class GetDiRegistrationsTests(TestSolutionFixture fixture)
     }
 
     [Fact]
+    public void Analyze_ExistingInstanceArgument_ReportsInstanceImplementation()
+    {
+        var registrations = Analyze("services.AddSingleton<IServerConfigurationManager>(ConfigurationManager);");
+
+        var registration = Assert.Single(registrations);
+        Assert.Equal("IServerConfigurationManager", registration.Service);
+        Assert.Equal("(instance)", registration.Implementation);
+    }
+
+    [Fact]
     public void Analyze_FactoryLambda_ReportsFactoryImplementation()
     {
         var registrations = Analyze("services.AddScoped<IQux>(sp => new Qux());");

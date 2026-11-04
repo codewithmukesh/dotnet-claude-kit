@@ -86,7 +86,7 @@ public static class GetDiRegistrationsTool
         var note = DiContainerSupport.BuildNote(registrations.Count, unrecognized);
 
         var page = Paging.Apply(registrations, maxResults, offset ?? 0);
-        var byLifetime = ListFormat.CountBy(registrations, r => r.Lifetime);
+        var byLifetime = registrations.Count > 0 ? ListFormat.CountBy(registrations, r => r.Lifetime) : null;
         var byProject = page.Truncated || page.Offset > 0 ? ListFormat.CountBy(projects, p => p) : null;
 
         return ListFormat.Render(

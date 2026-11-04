@@ -71,6 +71,7 @@ public static class FindDeadCodeTool
         [Description("File path or project name for that scope")] string? path = null,
         [Description("type, method, property, or all")] string kind = "all",
         int maxResults = 50,
+        int? offset = null,
         CancellationToken ct = default)
     {
         var notReady = await workspace.EnsureReadyOrStatusAsync(ct);
@@ -265,6 +266,8 @@ public static class FindDeadCodeTool
 
         var deadCode = new List<DeadCodeInfo>();
         var totalFound = 0;
+        var start = Math.Max(0, offset ?? 0);
+        var limit = Math.Max(1, maxResults);
 
         foreach (var (symbol, symbolFile, symbolLine) in survivors)
         {
@@ -276,7 +279,7 @@ public static class FindDeadCodeTool
             if (isReferenced) continue;
 
             totalFound++;
-            if (deadCode.Count < maxResults)
+            if (totalFound > start && deadCode.Count < limit)
             {
                 var (confidence, note) = Grade(symbol, reflection);
 
@@ -291,10 +294,13 @@ public static class FindDeadCodeTool
             }
         }
 
-        return ToolJson.Serialize(new DeadCodeResult(
-            deadCode, deadCode.Count, totalFound,
-            totalFound > deadCode.Count, Math.Max(1, maxResults), conventionFiltered,
-            reflection.AssemblyScanningDetected));
+        var end = Math.Min(start, totalFound) + deadCode.Count;
+        var page = new Paging.Page<DeadCodeInfo>(
+            deadCode, deadCode.Count, totalFound, end < totalFound, limit, Math.Min(start, totalFound), end < totalFound ? end : null);
+
+        return Paging.Fit(page, p => ToolJson.Serialize(new DeadCodeResult(
+            p.Items, p.Count, p.TotalFound, p.Truncated, p.Limit, conventionFiltered,
+            reflection.AssemblyScanningDetected, p.Offset, p.NextOffset)));
     }
 
     /// <summary>

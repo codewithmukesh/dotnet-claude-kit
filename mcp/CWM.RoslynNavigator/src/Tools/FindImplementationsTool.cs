@@ -35,9 +35,12 @@ public static class FindImplementationsTool
                 ErrorCodes.WrongSymbolKind,
                 $"'{interfaceName}' resolved to a {SymbolResolver.GetKindString(symbol)}, not an interface or class."));
 
-        var implementations = typeSymbol.TypeKind == TypeKind.Interface
-            ? await SymbolFinder.FindImplementationsAsync(typeSymbol, solution, cancellationToken: ct)
-            : await SymbolFinder.FindDerivedClassesAsync(typeSymbol, solution, cancellationToken: ct);
+        // From every target-framework flavor of the type: a consumer of another flavor
+        // implements a different symbol (see SymbolFlavors).
+        var implementations = await SymbolFlavors.SearchAllAsync(typeSymbol, solution, async flavor =>
+            typeSymbol.TypeKind == TypeKind.Interface
+                ? await SymbolFinder.FindImplementationsAsync(flavor, solution, cancellationToken: ct)
+                : await SymbolFinder.FindDerivedClassesAsync(flavor, solution, cancellationToken: ct), ct);
 
         var generated = new GeneratedCodeIndex(workspace);
         var all = new List<ImplementationInfo>();

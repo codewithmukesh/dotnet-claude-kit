@@ -1,3 +1,5 @@
+using CWM.RoslynNavigator.Responses;
+
 namespace CWM.RoslynNavigator.Tests.Scale;
 
 /// <summary>
@@ -41,8 +43,11 @@ public sealed class ScaleTests(ScaleBaselineFixture fixture)
     /// </summary>
     private static readonly TimeSpan BaselineFloor = TimeSpan.FromMilliseconds(250);
 
-    /// <summary>Every heavy tool's response stays under this however large the solution.</summary>
-    private const int ResponseBytesCeiling = 128 * 1024;
+    /// <summary>
+    /// Every default response stays under the response budget however large the solution, so
+    /// Claude Code shows it inline instead of saving it to a file (see ResponseBudget).
+    /// </summary>
+    private const int ResponseCharsCeiling = ResponseBudget.MaxChars;
 
     /// <summary>
     /// Known super-linear tools and the growth exponent they are held to instead of 1. Empty:
@@ -74,9 +79,11 @@ public sealed class ScaleTests(ScaleBaselineFixture fixture)
             var budget = reference * growth * TimeGrowthAllowance;
             if (tool.Elapsed > budget)
                 failures.Add($"{tool.Tool}: {tool.Elapsed.TotalMilliseconds:F0} ms > budget {budget.TotalMilliseconds:F0} ms ({scale}× projects from {baseline[tool.Tool].Elapsed.TotalMilliseconds:F0} ms)");
-            if (tool.ResponseBytes > ResponseBytesCeiling)
-                failures.Add($"{tool.Tool}: {tool.ResponseBytes} bytes > {ResponseBytesCeiling}");
+            if (tool.ResponseChars > ResponseCharsCeiling)
+                failures.Add($"{tool.Tool}: {tool.ResponseChars} chars > {ResponseCharsCeiling}");
         }
+
+        failures.AddRange(measured.ContractFailures);
 
         var loadBudget = Max(baseline.Load + baseline.WarmUp, BaselineFloor) * scale * TimeGrowthAllowance;
         if (measured.Load + measured.WarmUp > loadBudget)

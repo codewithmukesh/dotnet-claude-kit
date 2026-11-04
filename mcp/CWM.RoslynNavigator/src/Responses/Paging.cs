@@ -76,19 +76,27 @@ internal static class Paging
     /// A shortened page is Truncated with NextOffset pointing at the first dropped entry, so the
     /// caller pages on instead of losing the tail. At least one entry is always kept.
     /// </summary>
-    public static string Fit<T>(Page<T> page, Func<Page<T>, string> serialize, int budget = ResponseBudget.MaxChars)
+    public static string Fit<T>(Page<T> page, Func<Page<T>, string> serialize, int budget = ResponseBudget.MaxChars) =>
+        FitCount(Math.Max(1, page.Count), count => serialize(page.Take(count)), budget);
+
+    /// <summary>
+    /// <paramref name="render"/>(<paramref name="count"/>) when it fits <paramref name="budget"/>;
+    /// otherwise the largest count that does (never below one). For tools that build their own
+    /// page, such as detect_antipatterns, whose rules and summary depend on the page.
+    /// </summary>
+    public static string FitCount(int count, Func<int, string> render, int budget = ResponseBudget.MaxChars)
     {
-        var json = serialize(page);
-        if (json.Length <= budget || page.Count <= 1)
+        var json = render(count);
+        if (json.Length <= budget || count <= 1)
             return json;
 
-        // Largest prefix that fits: response size grows monotonically with the item count.
-        var best = serialize(page.Take(1));
-        int low = 2, high = page.Count - 1;
+        // Largest count that fits: response size grows monotonically with the entry count.
+        var best = render(1);
+        int low = 2, high = count - 1;
         while (low <= high)
         {
             var mid = low + ((high - low) / 2);
-            var candidate = serialize(page.Take(mid));
+            var candidate = render(mid);
             if (candidate.Length <= budget)
             {
                 best = candidate;

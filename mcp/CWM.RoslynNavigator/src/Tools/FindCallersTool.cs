@@ -34,7 +34,9 @@ public static class FindCallersTool
 
         var symbol = resolved.Symbol;
 
-        var callers = await SymbolFinder.FindCallersAsync(symbol, solution, ct);
+        // From every target-framework flavor of the method (see SymbolFlavors).
+        var callers = await SymbolFlavors.SearchAllAsync(symbol, solution,
+            flavor => SymbolFinder.FindCallersAsync(flavor, solution, ct), ct);
 
         var generated = new GeneratedCodeIndex(workspace);
         var all = new List<CallerInfo>();

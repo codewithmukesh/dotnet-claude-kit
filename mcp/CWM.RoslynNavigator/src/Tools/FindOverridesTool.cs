@@ -33,7 +33,9 @@ public static class FindOverridesTool
 
         var symbol = resolved.Symbol;
 
-        var overrides = await SymbolFinder.FindOverridesAsync(symbol, solution, cancellationToken: ct);
+        // From every target-framework flavor of the member (see SymbolFlavors).
+        var overrides = await SymbolFlavors.SearchAllAsync(symbol, solution,
+            flavor => SymbolFinder.FindOverridesAsync(flavor, solution, cancellationToken: ct), ct);
 
         var generated = new GeneratedCodeIndex(workspace);
         var all = new List<OverrideInfo>();

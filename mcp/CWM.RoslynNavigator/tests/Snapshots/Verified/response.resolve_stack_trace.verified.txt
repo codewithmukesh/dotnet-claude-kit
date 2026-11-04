@@ -9,7 +9,8 @@
       "File": "SampleApi/OrderService.cs",
       "Line": 29,
       "DeclarationLine": 29,
-      "Snippet": "public async Task CancelOrderAsync(Guid id, CancellationToken ct = default)"
+      "Snippet": "public async Task CancelOrderAsync(Guid id, CancellationToken ct = default)",
+      "LineSource": "declaration"
     }
   ],
   "Count": 1,

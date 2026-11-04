@@ -54,13 +54,18 @@ public static class GetTypeHierarchyTool
         var allDerived = new List<INamedTypeSymbol>();
         if (typeSymbol.TypeKind == TypeKind.Interface)
         {
-            var derivedInterfaces = await SymbolFinder.FindDerivedInterfacesAsync(typeSymbol, solution, cancellationToken: ct);
-            var implementations = await SymbolFinder.FindImplementationsAsync(typeSymbol, solution, cancellationToken: ct);
+            var derivedInterfaces = await SymbolFlavors.SearchAllAsync(typeSymbol, solution,
+                flavor => SymbolFinder.FindDerivedInterfacesAsync(flavor, solution, cancellationToken: ct), ct);
+            var implementations = await SymbolFlavors.SearchAllAsync(typeSymbol, solution,
+                flavor => SymbolFinder.FindImplementationsAsync(flavor, solution, cancellationToken: ct), ct);
             allDerived.AddRange(derivedInterfaces.Concat(implementations));
         }
         else
         {
-            allDerived.AddRange(await SymbolFinder.FindDerivedClassesAsync(typeSymbol, solution, cancellationToken: ct));
+            // From every target-framework flavor of the type: a consumer of another flavor
+            // derives from a different symbol (see SymbolFlavors).
+            allDerived.AddRange(await SymbolFlavors.SearchAllAsync(typeSymbol, solution,
+                flavor => SymbolFinder.FindDerivedClassesAsync(flavor, solution, cancellationToken: ct), ct));
         }
 
         // Each flavor of a multi-targeted project reports its own copy of a derived type:

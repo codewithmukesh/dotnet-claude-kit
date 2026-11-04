@@ -11,7 +11,8 @@ namespace CWM.RoslynNavigator.Tests.Scale;
 /// <item>Every project references Shared, and projects form reference chains ten deep
 /// (P002 → P001, P003 → P002 … P010 → P009, P012 → P011 …), so references cross projects
 /// without the O(N²) metadata fan-out of one 500-deep chain.</item>
-/// <item>Each project has <see cref="FilesPerProject"/> files: the handler, and services
+/// <item>Each project has a controller deriving from Shared's <c>WidgetControllerBase</c> (two
+/// endpoints) that also registers two services, plus <see cref="FilesPerProject"/> files: the handler, and services
 /// that call each other, call into the previous project in the chain, leave one method
 /// unused (dead code), and use DateTime.Now in one file (an anti-pattern finding).</item>
 /// <item>Guard Directory.* files so the generated tree never inherits a parent's build
@@ -43,6 +44,40 @@ public static class LargeSolutionGenerator
                     public static int Register(IWidgetHandler handler) => handler.Handle(1);
                 }
                 """,
+            // Stand-ins for the ASP.NET Core and DI types get_endpoint_map and get_di_registrations
+            // recognise by name, so the generated solution needs no package restore.
+            ["Web.cs"] = """
+                namespace Shared;
+
+                public interface IServiceCollection;
+
+                public static class ServiceCollectionExtensions
+                {
+                    public static IServiceCollection AddSingleton<TService, TImplementation>(this IServiceCollection services) => services;
+
+                    public static IServiceCollection AddScoped<TService, TImplementation>(this IServiceCollection services) => services;
+                }
+
+                public sealed class ApiControllerAttribute : System.Attribute;
+
+                public sealed class RouteAttribute(string template) : System.Attribute
+                {
+                    public string Template => template;
+                }
+
+                public sealed class HttpGetAttribute(string template) : System.Attribute
+                {
+                    public string Template => template;
+                }
+
+                public sealed class HttpPostAttribute : System.Attribute;
+
+                public abstract class ControllerBase;
+
+                [ApiController]
+                [Route("[controller]")]
+                public abstract class WidgetControllerBase : ControllerBase;
+                """,
         });
 
         var solution = new StringBuilder("<Solution>\n  <Project Path=\"Shared/Shared.csproj\" />\n");
@@ -66,6 +101,26 @@ public static class LargeSolutionGenerator
                     }
                     """,
             };
+
+            // A controller reached only through WidgetControllerBase, and two DI registrations.
+            files[$"Widget{p:D3}Controller.cs"] = $$"""
+                using Shared;
+
+                namespace {{name}};
+
+                public sealed class Widget{{p:D3}}Controller : WidgetControllerBase
+                {
+                    [HttpGet("{id}")]
+                    public int Get(int id) => id;
+
+                    [HttpPost]
+                    public int Create() => 0;
+
+                    public static IServiceCollection AddWidgets(IServiceCollection services) => services
+                        .AddSingleton<IWidgetHandler, Handler{{p:D3}}>()
+                        .AddScoped<Service{{p:D3}}_01, Service{{p:D3}}_01>();
+                }
+                """;
 
             for (var f = 1; f < FilesPerProject; f++)
                 files[$"Service{p:D3}_{f:D2}.cs"] = ServiceSource(name, p, f, previous);

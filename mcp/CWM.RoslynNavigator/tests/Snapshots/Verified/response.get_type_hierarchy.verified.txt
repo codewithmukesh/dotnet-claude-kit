@@ -6,7 +6,7 @@
   ],
   "TotalDerived": 1,
   "Truncated": false,
-  "Limit": 50,
+  "Limit": 500,
   "File": "SampleDomain/BaseEntity.cs",
   "Line": 6
 }

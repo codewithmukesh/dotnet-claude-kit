@@ -78,6 +78,7 @@ public static class GetProjectGraphTool
 
         var page = Paging.Apply(selected.Select(n => n.Info).ToList(), maxResults, offset ?? 0);
         var frameworks = CountBy(selected.SelectMany(n => n.Info.TargetFrameworks));
+        var prefix = SharedPrefix([.. nodes.Select(n => n.Info.Name)]);
 
         return ListFormat.Render(
             page,
@@ -86,23 +87,51 @@ public static class GetProjectGraphTool
                 solutionName, p.Items, p.Count, p.TotalFound, p.Truncated, p.Limit, solutions, p.Offset, p.NextOffset)),
             p => ToolJson.Serialize(new ProjectGraphResult(
                 solutionName, null, p.Count, p.TotalFound, p.Truncated, p.Limit, solutions, p.Offset, p.NextOffset,
-                Edges: [.. p.Items.Select(EdgeLine)],
-                TargetFrameworks: frameworks)));
+                Edges: [.. p.Items.Select(i => EdgeLine(i, prefix))],
+                TargetFrameworks: frameworks,
+                Prefix: prefix)));
     }
 
     /// <summary>
     /// "App -> Domain, Infrastructure" (direct references), a bare "Domain" when it references none,
-    /// and " &lt;- Api, Tests" appended for a project-filtered query's dependents.
+    /// and " <- Api, Tests" appended for a project-filtered query's dependents. Names starting with
+    /// <paramref name="prefix"/> are written with "~" in its place.
     /// </summary>
-    private static string EdgeLine(ProjectInfo project)
+    private static string EdgeLine(ProjectInfo project, string? prefix)
     {
+        string Short(string name) =>
+            prefix is not null && name.StartsWith(prefix + ".", StringComparison.Ordinal) ? "~" + name[prefix.Length..] : name;
+
         var line = project.References is { Count: > 0 } references
-            ? $"{project.Name} -> {string.Join(", ", references)}"
-            : project.Name;
+            ? $"{Short(project.Name)} -> {string.Join(", ", references.Select(Short))}"
+            : Short(project.Name);
 
         return project.ReferencedBy is { Count: > 0 } dependents
-            ? $"{line} <- {string.Join(", ", dependents)}"
+            ? $"{line} <- {string.Join(", ", dependents.Select(Short))}"
             : line;
+    }
+
+    /// <summary>
+    /// The dotted name prefix ("OrchardCore", "Volo.Abp") that saves the most characters across
+    /// <paramref name="names"/>, when at least half of them share it; null otherwise. A
+    /// 250-project solution repeats it in nearly every edge, which on its own decides whether the
+    /// graph fits one response.
+    /// </summary>
+    internal static string? SharedPrefix(IReadOnlyList<string> names)
+    {
+        var counts = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var name in names)
+        {
+            for (var dot = name.IndexOf('.'); dot > 0; dot = name.IndexOf('.', dot + 1))
+                counts[name[..dot]] = counts.GetValueOrDefault(name[..dot]) + 1;
+        }
+
+        return counts
+            .Where(c => c.Value * 2 >= names.Count && c.Value > 1)
+            .OrderByDescending(c => c.Key.Length * c.Value)
+            .ThenBy(c => c.Key, StringComparer.Ordinal)
+            .Select(c => c.Key)
+            .FirstOrDefault();
     }
 
     private sealed record ProjectNode(ProjectInfo Info, bool IsTest);

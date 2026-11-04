@@ -168,6 +168,7 @@ internal sealed record SolutionSummary(
 /// response budget the page is compact: <see cref="Edges"/> holds one "Project -> Ref1, Ref2"
 /// line per project (its direct project references; a bare name references none),
 /// <see cref="TargetFrameworks"/> counts frameworks across the solution, and Projects is omitted.
+/// When most project names share a dotted <see cref="Prefix"/> ("OrchardCore"), Edges write it as "~".
 /// </summary>
 internal sealed record ProjectGraphResult(
     string Solution,
@@ -180,7 +181,8 @@ internal sealed record ProjectGraphResult(
     [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)] int Offset = 0,
     int? NextOffset = null,
     List<string>? Edges = null,
-    List<NamedCount>? TargetFrameworks = null);
+    List<NamedCount>? TargetFrameworks = null,
+    string? Prefix = null);
 
 /// <summary>Projects whose longest chain of project references below them is <see cref="Depth"/> long.</summary>
 internal sealed record ProjectLayer(int Depth, int Count, List<string> Examples);
