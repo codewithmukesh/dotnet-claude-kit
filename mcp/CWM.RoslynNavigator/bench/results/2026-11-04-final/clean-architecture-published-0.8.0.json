@@ -1,0 +1,627 @@
+{
+  "Schema": 1,
+  "RunDate": "2026-11-04-final",
+  "GeneratedAtUtc": "2026-11-03T23:08:20.2029536+00:00",
+  "Corpus": {
+    "Name": "clean-architecture",
+    "Tier": "small",
+    "Repository": "https://github.com/ardalis/CleanArchitecture",
+    "Commit": "e7c79be54ba0b001a5b332c1efe935f520b9db4b",
+    "Solution": "Clean.Architecture.slnx",
+    "ProjectsDeclared": 9,
+    "ProjectsLoaded": 9,
+    "CsFiles": 95,
+    "CsBytes": 108138,
+    "Notes": [
+      "Restore needs -p:NuGetAudit=false: the repo treats NuGet vulnerability warnings (NU1902/NU1903 on SSH.NET and System.Security.Cryptography.Pkcs at this commit) as errors. Nothing in the source is changed."
+    ]
+  },
+  "Build": {
+    "Label": "published-0.8.0",
+    "ServerVersion": "0.8.0.0",
+    "Executable": "cwm-roslyn-navigator.exe"
+  },
+  "Environment": {
+    "Os": "Microsoft Windows 10.0.26300",
+    "ProcessorCount": 24,
+    "Runtime": ".NET 10.0.14",
+    "Machine": "X64"
+  },
+  "Settings": {
+    "WarmIterations": 5,
+    "CallTimeoutSeconds": 300,
+    "WarmSkipMs": 60000,
+    "GrepHeadLimit": 250,
+    "BytesPerToken": 3.5,
+    "DivisorCalibrated": false,
+    "PrefillTokensPerSecond": 10000
+  },
+  "Startup": {
+    "ReadyMs": 7553,
+    "FirstAnswerMs": 7571,
+    "FirstAnswerStatus": "ok",
+    "WarmMs": 4727,
+    "Memory": {
+      "Supported": true,
+      "ServerPeakBytes": 408080384,
+      "BuildHostPeakBytes": 336277504,
+      "CombinedPeakBytes": 548462592,
+      "BuildHostProcesses": 4
+    },
+    "Restarts": 0,
+    "LoadProblems": []
+  },
+  "Tools": [
+    {
+      "Tool": "find_symbol",
+      "Arguments": {
+        "name": "AppDbContext",
+        "kind": "class",
+        "maxResults": "50"
+      },
+      "Status": "ok",
+      "ColdMs": 0.8,
+      "WarmMedianMs": 0.4,
+      "WarmP95Ms": 0.5,
+      "WarmSamples": 5,
+      "Bytes": 207,
+      "Tokens": 59
+    },
+    {
+      "Tool": "find_references",
+      "Arguments": {
+        "symbolName": "IEmailSender",
+        "maxResults": "100"
+      },
+      "Status": "ok",
+      "ColdMs": 154.6,
+      "WarmMedianMs": 1.2,
+      "WarmP95Ms": 2.5,
+      "WarmSamples": 5,
+      "Bytes": 1274,
+      "Tokens": 364
+    },
+    {
+      "Tool": "find_implementations",
+      "Arguments": {
+        "interfaceName": "IEmailSender",
+        "maxResults": "100"
+      },
+      "Status": "ok",
+      "ColdMs": 147,
+      "WarmMedianMs": 0.7,
+      "WarmP95Ms": 1.5,
+      "WarmSamples": 5,
+      "Bytes": 268,
+      "Tokens": 77
+    },
+    {
+      "Tool": "find_callers",
+      "Arguments": {
+        "methodName": "BuildRoute",
+        "className": "GetContributorByIdRequest",
+        "maxResults": "100"
+      },
+      "Status": "ok",
+      "ColdMs": 107.7,
+      "WarmMedianMs": 1.4,
+      "WarmP95Ms": 2.2,
+      "WarmSamples": 5,
+      "Bytes": 388,
+      "Tokens": 111
+    },
+    {
+      "Tool": "get_type_hierarchy",
+      "Arguments": {
+        "typeName": "AppDbContext",
+        "maxResults": "100"
+      },
+      "Status": "ok",
+      "ColdMs": 2.7,
+      "WarmMedianMs": 0.4,
+      "WarmP95Ms": 0.7,
+      "WarmSamples": 5,
+      "Bytes": 237,
+      "Tokens": 68
+    },
+    {
+      "Tool": "get_public_api",
+      "Arguments": {
+        "typeName": "AppDbContext",
+        "maxResults": "100"
+      },
+      "Status": "ok",
+      "ColdMs": 9.2,
+      "WarmMedianMs": 0.4,
+      "WarmP95Ms": 0.8,
+      "WarmSamples": 5,
+      "Bytes": 393,
+      "Tokens": 112
+    },
+    {
+      "Tool": "get_symbol_detail",
+      "Arguments": {
+        "symbolName": "BuildRoute",
+        "containingType": "GetContributorByIdRequest"
+      },
+      "Status": "ok",
+      "ColdMs": 5.1,
+      "WarmMedianMs": 0.4,
+      "WarmP95Ms": 0.6,
+      "WarmSamples": 5,
+      "Bytes": 408,
+      "Tokens": 117
+    },
+    {
+      "Tool": "get_symbol_source",
+      "Arguments": {
+        "symbolName": "BuildRoute",
+        "containingType": "GetContributorByIdRequest",
+        "file": "src/Clean.Architecture.Web/Contributors/GetById.GetContributorByIdRequest.cs",
+        "line": "6"
+      },
+      "Status": "ok",
+      "ColdMs": 3.2,
+      "WarmMedianMs": 0.4,
+      "WarmP95Ms": 0.6,
+      "WarmSamples": 5,
+      "Bytes": 313,
+      "Tokens": 89,
+      "Truncated": false
+    },
+    {
+      "Tool": "get_file_outline",
+      "Arguments": {
+        "filePath": "src/Clean.Architecture.ServiceDefaults/Extensions.cs",
+        "maxResults": "500"
+      },
+      "Status": "not-ready",
+      "ColdMs": 1.4,
+      "WarmMedianMs": 0.2,
+      "WarmP95Ms": 0.5,
+      "WarmSamples": 5,
+      "Bytes": 129,
+      "Tokens": 37,
+      "ErrorMessage": "{\"State\":\"NotFound\",\"Message\":\"File \\u0027src/Clean.Architecture.ServiceDefaults/Extensions.cs\\u0027 not found in the solution.\"}"
+    },
+    {
+      "Tool": "get_project_graph",
+      "Arguments": {},
+      "Status": "ok",
+      "ColdMs": 1.9,
+      "WarmMedianMs": 1.4,
+      "WarmP95Ms": 1.6,
+      "WarmSamples": 5,
+      "Bytes": 3411,
+      "Tokens": 975
+    },
+    {
+      "Tool": "get_dependency_graph",
+      "Arguments": {
+        "symbolName": "GetContributorByIdRequest.BuildRoute",
+        "file": "src/Clean.Architecture.Web/Contributors/GetById.GetContributorByIdRequest.cs",
+        "line": "6",
+        "depth": "2"
+      },
+      "Status": "ok",
+      "ColdMs": 2.4,
+      "WarmMedianMs": 0.3,
+      "WarmP95Ms": 0.5,
+      "WarmSamples": 5,
+      "Bytes": 104,
+      "Tokens": 30,
+      "Truncated": false
+    },
+    {
+      "Tool": "detect_circular_dependencies",
+      "Arguments": {
+        "scope": "projects"
+      },
+      "Status": "ok",
+      "ColdMs": 2.9,
+      "WarmMedianMs": 0.2,
+      "WarmP95Ms": 0.5,
+      "WarmSamples": 5,
+      "Bytes": 23,
+      "Tokens": 7
+    },
+    {
+      "Tool": "get_diagnostics",
+      "Arguments": {
+        "scope": "file",
+        "path": "src/Clean.Architecture.Infrastructure/Data/AppDbContext.cs",
+        "maxResults": "100"
+      },
+      "Status": "ok",
+      "ColdMs": 5.9,
+      "WarmMedianMs": 0.3,
+      "WarmP95Ms": 0.5,
+      "WarmSamples": 5,
+      "Bytes": 76,
+      "Tokens": 22
+    },
+    {
+      "Tool": "resolve_stack_trace",
+      "Arguments": {
+        "stackTrace": "<536 chars>",
+        "maxResults": "50"
+      },
+      "Status": "n/a",
+      "ColdMs": 0,
+      "WarmSamples": 0,
+      "Bytes": 0,
+      "Tokens": 0,
+      "Note": "Tool not exposed by this build."
+    },
+    {
+      "Tool": "get_nuget_packages",
+      "Arguments": {
+        "maxResults": "100"
+      },
+      "Status": "ok",
+      "ColdMs": 6.3,
+      "WarmMedianMs": 3.2,
+      "WarmP95Ms": 3.8,
+      "WarmSamples": 5,
+      "Bytes": 4392,
+      "Tokens": 1255
+    },
+    {
+      "Tool": "analyze_change_impact",
+      "Arguments": {
+        "symbolName": "GetContributorByIdRequest.BuildRoute",
+        "file": "src/Clean.Architecture.Web/Contributors/GetById.GetContributorByIdRequest.cs",
+        "line": "6",
+        "depth": "2"
+      },
+      "Status": "n/a",
+      "ColdMs": 0,
+      "WarmSamples": 0,
+      "Bytes": 0,
+      "Tokens": 0,
+      "Note": "Tool not exposed by this build."
+    },
+    {
+      "Tool": "get_di_registrations",
+      "Arguments": {
+        "maxResults": "100"
+      },
+      "Status": "ok",
+      "ColdMs": 19.4,
+      "WarmMedianMs": 11.2,
+      "WarmP95Ms": 11.5,
+      "WarmSamples": 5,
+      "Bytes": 2386,
+      "Tokens": 682
+    },
+    {
+      "Tool": "get_endpoint_map",
+      "Arguments": {
+        "maxResults": "100"
+      },
+      "Status": "ok",
+      "ColdMs": 26,
+      "WarmMedianMs": 21.3,
+      "WarmP95Ms": 21.8,
+      "WarmSamples": 5,
+      "Bytes": 41,
+      "Tokens": 12
+    },
+    {
+      "Tool": "get_test_coverage_map",
+      "Arguments": {
+        "maxResults": "50"
+      },
+      "Status": "ok",
+      "ColdMs": 893.9,
+      "WarmMedianMs": 430.5,
+      "WarmP95Ms": 456.3,
+      "WarmSamples": 5,
+      "Bytes": 8688,
+      "Tokens": 2482
+    },
+    {
+      "Tool": "detect_antipatterns",
+      "Arguments": {
+        "maxResults": "100"
+      },
+      "Status": "ok",
+      "ColdMs": 305.1,
+      "WarmMedianMs": 266.4,
+      "WarmP95Ms": 276.4,
+      "WarmSamples": 5,
+      "Bytes": 34493,
+      "Tokens": 9855
+    },
+    {
+      "Tool": "find_dead_code",
+      "Arguments": {
+        "scope": "solution",
+        "maxResults": "50"
+      },
+      "Status": "ok",
+      "ColdMs": 491.1,
+      "WarmMedianMs": 247.9,
+      "WarmP95Ms": 356.2,
+      "WarmSamples": 5,
+      "Bytes": 1762,
+      "Tokens": 503
+    }
+  ],
+  "Tasks": [
+    {
+      "Id": "locate-type",
+      "Title": "Locate the definition of AppDbContext",
+      "Tool": "find_symbol",
+      "NavigatorStatus": "ok",
+      "NavigatorTokens": 59,
+      "NavigatorCalls": 1,
+      "NavigatorMeasuredMs": 0.4,
+      "GrepPattern": "\\b(class|record|struct|interface|enum)\\s+AppDbContext\\b",
+      "GrepMatches": 1,
+      "GrepLinesShown": 1,
+      "GrepTokens": 42,
+      "GrepMeasuredMs": 16.4,
+      "FilesRead": 1,
+      "FileTokens": 163,
+      "FileReadMeasuredMs": 0.2,
+      "ManualTokens": 205,
+      "ManualCalls": 2,
+      "ManualMeasuredMs": 16.6,
+      "SavedTokens": 146,
+      "SavingsPercent": 71.2,
+      "Multiplier": 3.5,
+      "ModelledSecondsSaved": 0.01
+    },
+    {
+      "Id": "interface-usages",
+      "Title": "Find all usages of IEmailSender",
+      "Tool": "find_references",
+      "NavigatorStatus": "ok",
+      "NavigatorTokens": 364,
+      "NavigatorCalls": 1,
+      "NavigatorMeasuredMs": 1.2,
+      "GrepPattern": "\\bIEmailSender\\b",
+      "GrepMatches": 8,
+      "GrepLinesShown": 8,
+      "GrepTokens": 315,
+      "GrepMeasuredMs": 7.2,
+      "FilesRead": 5,
+      "FileTokens": 1311,
+      "FileReadMeasuredMs": 0.4,
+      "ManualTokens": 1626,
+      "ManualCalls": 6,
+      "ManualMeasuredMs": 7.6,
+      "SavedTokens": 1262,
+      "SavingsPercent": 77.6,
+      "Multiplier": 4.5,
+      "ModelledSecondsSaved": 0.13
+    },
+    {
+      "Id": "implementations",
+      "Title": "List implementations of IEmailSender",
+      "Tool": "find_implementations",
+      "NavigatorStatus": "ok",
+      "NavigatorTokens": 77,
+      "NavigatorCalls": 1,
+      "NavigatorMeasuredMs": 0.7,
+      "GrepPattern": "[:,]\\s*IEmailSender\\b",
+      "GrepMatches": 2,
+      "GrepLinesShown": 2,
+      "GrepTokens": 80,
+      "GrepMeasuredMs": 6.5,
+      "FilesRead": 2,
+      "FileTokens": 481,
+      "FileReadMeasuredMs": 0.2,
+      "ManualTokens": 561,
+      "ManualCalls": 3,
+      "ManualMeasuredMs": 6.7,
+      "SavedTokens": 484,
+      "SavingsPercent": 86.3,
+      "Multiplier": 7.3,
+      "ModelledSecondsSaved": 0.05
+    },
+    {
+      "Id": "outline-file",
+      "Title": "Outline Extensions.cs (largest file)",
+      "Tool": "get_file_outline",
+      "NavigatorStatus": "not-ready",
+      "NavigatorTokens": 37,
+      "NavigatorCalls": 1,
+      "NavigatorMeasuredMs": 0.2,
+      "GrepMatches": 0,
+      "GrepLinesShown": 0,
+      "GrepTokens": 0,
+      "GrepMeasuredMs": 0,
+      "FilesRead": 1,
+      "FileTokens": 1372,
+      "FileReadMeasuredMs": 0.1,
+      "ManualTokens": 1372,
+      "ManualCalls": 1,
+      "ManualMeasuredMs": 0.1
+    },
+    {
+      "Id": "read-method",
+      "Title": "Read the body of GetContributorByIdRequest.BuildRoute",
+      "Tool": "get_symbol_source",
+      "NavigatorStatus": "ok",
+      "NavigatorTruncated": false,
+      "NavigatorTokens": 89,
+      "NavigatorCalls": 1,
+      "NavigatorMeasuredMs": 0.4,
+      "GrepPattern": "\\bBuildRoute\\s*\\(",
+      "GrepMatches": 5,
+      "GrepLinesShown": 5,
+      "GrepTokens": 265,
+      "GrepMeasuredMs": 5.9,
+      "FilesRead": 1,
+      "FileTokens": 95,
+      "FileReadMeasuredMs": 0.1,
+      "ManualTokens": 360,
+      "ManualCalls": 2,
+      "ManualMeasuredMs": 6,
+      "SavedTokens": 271,
+      "SavingsPercent": 75.3,
+      "Multiplier": 4,
+      "ModelledSecondsSaved": 0.03
+    },
+    {
+      "Id": "find-callers",
+      "Title": "Find callers of GetContributorByIdRequest.BuildRoute",
+      "Tool": "find_callers",
+      "NavigatorStatus": "ok",
+      "NavigatorTokens": 111,
+      "NavigatorCalls": 1,
+      "NavigatorMeasuredMs": 1.4,
+      "GrepPattern": "\\bBuildRoute\\s*\\(",
+      "GrepMatches": 5,
+      "GrepLinesShown": 5,
+      "GrepTokens": 265,
+      "GrepMeasuredMs": 5.8,
+      "FilesRead": 1,
+      "FileTokens": 248,
+      "FileReadMeasuredMs": 0.1,
+      "ManualTokens": 513,
+      "ManualCalls": 2,
+      "ManualMeasuredMs": 5.8,
+      "SavedTokens": 402,
+      "SavingsPercent": 78.4,
+      "Multiplier": 4.6,
+      "ModelledSecondsSaved": 0.04
+    },
+    {
+      "Id": "type-hierarchy",
+      "Title": "Type hierarchy of AppDbContext",
+      "Tool": "get_type_hierarchy",
+      "NavigatorStatus": "ok",
+      "NavigatorTokens": 68,
+      "NavigatorCalls": 1,
+      "NavigatorMeasuredMs": 0.4,
+      "GrepPattern": ":\\s*[^;{]*\\bAppDbContext\\b",
+      "GrepMatches": 0,
+      "GrepLinesShown": 0,
+      "GrepTokens": 0,
+      "GrepMeasuredMs": 10.6,
+      "FilesRead": 0,
+      "FileTokens": 0,
+      "FileReadMeasuredMs": 0,
+      "ManualTokens": 0,
+      "ManualCalls": 1,
+      "ManualMeasuredMs": 10.6,
+      "SavedTokens": -68,
+      "ModelledSecondsSaved": -0.01
+    },
+    {
+      "Id": "project-graph",
+      "Title": "Project dependency graph",
+      "Tool": "get_project_graph",
+      "NavigatorStatus": "ok",
+      "NavigatorTokens": 975,
+      "NavigatorCalls": 1,
+      "NavigatorMeasuredMs": 1.4,
+      "GrepPattern": "<ProjectReference",
+      "GrepMatches": 14,
+      "GrepLinesShown": 14,
+      "GrepTokens": 732,
+      "GrepMeasuredMs": 2.7,
+      "FilesRead": 9,
+      "FileTokens": 2839,
+      "FileReadMeasuredMs": 0.7,
+      "ManualTokens": 3571,
+      "ManualCalls": 10,
+      "ManualMeasuredMs": 3.4,
+      "SavedTokens": 2596,
+      "SavingsPercent": 72.7,
+      "Multiplier": 3.7,
+      "ModelledSecondsSaved": 0.26
+    },
+    {
+      "Id": "di-registrations",
+      "Title": "DI registrations",
+      "Tool": "get_di_registrations",
+      "NavigatorStatus": "ok",
+      "NavigatorTokens": 682,
+      "NavigatorCalls": 1,
+      "NavigatorMeasuredMs": 11.2,
+      "GrepPattern": "\\.(TryAdd|Add)(Keyed)?(Scoped|Transient|Singleton|Enumerable)\\b",
+      "GrepMatches": 13,
+      "GrepLinesShown": 13,
+      "GrepTokens": 525,
+      "GrepMeasuredMs": 7,
+      "FilesRead": 3,
+      "FileTokens": 1468,
+      "FileReadMeasuredMs": 0.3,
+      "ManualTokens": 1993,
+      "ManualCalls": 4,
+      "ManualMeasuredMs": 7.3,
+      "SavedTokens": 1311,
+      "SavingsPercent": 65.8,
+      "Multiplier": 2.9,
+      "ModelledSecondsSaved": 0.13
+    },
+    {
+      "Id": "endpoint-map",
+      "Title": "HTTP endpoint map",
+      "Tool": "get_endpoint_map",
+      "NavigatorStatus": "ok",
+      "NavigatorTokens": 12,
+      "NavigatorCalls": 1,
+      "NavigatorMeasuredMs": 21.3,
+      "GrepPattern": "\\.Map(Get|Post|Put|Delete|Patch|Methods|Group)\\s*\\(|\\[(Http(Get|Post|Put|Delete|Patch)|Route)\\b",
+      "GrepMatches": 0,
+      "GrepLinesShown": 0,
+      "GrepTokens": 0,
+      "GrepMeasuredMs": 9.7,
+      "FilesRead": 0,
+      "FileTokens": 0,
+      "FileReadMeasuredMs": 0,
+      "ManualTokens": 0,
+      "ManualCalls": 1,
+      "ManualMeasuredMs": 9.7,
+      "SavedTokens": -12,
+      "ModelledSecondsSaved": -0
+    },
+    {
+      "Id": "stack-trace",
+      "Title": "Resolve a stack trace to source",
+      "Tool": "resolve_stack_trace",
+      "NavigatorStatus": "n/a",
+      "NavigatorTokens": 0,
+      "NavigatorCalls": 1,
+      "GrepPattern": "\\b(BuildRoute|ReturnsSeedContributorGivenId1|ReturnsNotFoundGivenId1000)\\s*\\(",
+      "GrepMatches": 7,
+      "GrepLinesShown": 7,
+      "GrepTokens": 340,
+      "GrepMeasuredMs": 6.5,
+      "FilesRead": 0,
+      "FileTokens": 0,
+      "FileReadMeasuredMs": 0,
+      "ManualTokens": 340,
+      "ManualCalls": 1,
+      "ManualMeasuredMs": 6.5
+    },
+    {
+      "Id": "file-diagnostics",
+      "Title": "Diagnostics for AppDbContext.cs",
+      "Tool": "get_diagnostics",
+      "NavigatorStatus": "ok",
+      "NavigatorTokens": 22,
+      "NavigatorCalls": 1,
+      "NavigatorMeasuredMs": 0.3,
+      "GrepMatches": 0,
+      "GrepLinesShown": 0,
+      "GrepTokens": 0,
+      "GrepMeasuredMs": 0,
+      "FilesRead": 1,
+      "FileTokens": 163,
+      "FileReadMeasuredMs": 0.1,
+      "ManualTokens": 163,
+      "ManualCalls": 1,
+      "ManualMeasuredMs": 0.1,
+      "SavedTokens": 141,
+      "SavingsPercent": 86.5,
+      "Multiplier": 7.4,
+      "ModelledSecondsSaved": 0.01
+    }
+  ]
+}

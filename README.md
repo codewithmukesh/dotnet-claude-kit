@@ -66,7 +66,7 @@ An **action layer** on top of the knowledge layer — Claude doesn't just know t
 
 | Capability | What It Does |
 |-----------|-------------|
-| **Surgical Code Analysis** | 26 Roslyn-powered MCP tools with guaranteed bounded responses. `get_symbol_source` reads ONE method body instead of the whole file. `get_file_outline` shows what's in a file before reading it. `resolve_stack_trace` turns an exception into file:line in your own code. `analyze_change_impact` answers "what breaks if I change this?" in one call. Every list-returning tool reports `Truncated` — no tool can blow your context window. |
+| **Surgical Code Analysis** | 26 Roslyn-powered MCP tools with guaranteed bounded responses. `get_symbol_source` reads ONE method body instead of the whole file. `get_file_outline` shows what's in a file before reading it. `resolve_stack_trace` turns an exception into file:line in your own code. `analyze_change_impact` answers "what breaks if I change this?" in one call. Every list-returning tool reports `Truncated` — no tool can blow your context window. On five real open-source solutions it used **75–97% fewer tokens** than grep + read for the same answers ([benchmarks](#benchmarks)). |
 | **Architecture Enforcement** | `/arch-check` verifies the code still matches its declared architecture (VSA, Clean, DDD, Modular Monolith): dependency direction, layer violations, module leaks, cycles — with file:line evidence and fixes. |
 | **Dependency Health** | `/outdated` reports stale packages, CVEs, and commercial-license traps (MediatR 13+, MassTransit 9+, FluentAssertions 8+, AutoMapper 15+) before an innocent update-all changes your legal position. |
 | **Security Mapping** | `get_endpoint_map` inventories every route with its auth posture (`authorized`/`anonymous`/`unmarked`) in one token-cheap call — `/security-scan` starts every auth audit there. |
@@ -377,10 +377,49 @@ Token-efficient codebase navigation via Roslyn semantic analysis. Instead of Cla
 | `resolve_stack_trace` | Maps an exception's frames to file:line in your own code | Reading the trace and hunting for each method |
 | `analyze_change_impact` | "What breaks if I change this?" — callers, implementers, affected tests | Chaining several reference searches |
 | `get_token_savings` | Measured tokens saved in this repo, per-tool leaderboard (opt-in, local only) | Guessing whether the tools pay off |
+| `get_symbol_at` | The symbol at a file position: kind, signature, definition, declared types | Reading the file around a line number |
+| `preview_rename` | What a semantic rename would change, without writing anything | Grepping the name and guessing which hits are real |
+| `get_workspace_status` | What is loaded, warm-up progress, and any project that loaded incompletely | Wondering why a search came back empty |
 
 Once the `CWM.RoslynNavigator` global tool is installed, the plugin's `.mcp.json` starts the server automatically. The server loads analyzers from shadow copies, so it never locks files in `~/.nuget/packages` or blocks `dotnet restore`.
 
 See [mcp/CWM.RoslynNavigator/README.md](mcp/CWM.RoslynNavigator/README.md) for details.
+
+### Benchmarks
+
+We benchmarked the navigator on five open-source .NET solutions, from a 9-project template to a 270-project framework. Each one gets the same 12 everyday agent tasks: find a definition, find usages, list implementations, outline a file, read one method, find callers, type hierarchy, project graph, DI registrations, endpoint map, resolve a stack trace, and diagnostics for a file. Everything was measured on one machine in one session (Windows, 24 threads, .NET SDK 10.0.403, 2026-11-04).
+
+**Tokens: navigator vs grep + read.** "Grep + read" is what an agent does without the navigator: run the search, then read every file the answer lives in, each file once. That is the cheapest the manual route can be, so the real gap is usually bigger.
+
+| Size | Solution | Projects | .cs files | Navigator | Grep + read | Tokens saved | Agent tool calls |
+|---|---|---:|---:|---:|---:|---:|---:|
+| Small | [CleanArchitecture](https://github.com/ardalis/CleanArchitecture) | 9 | 95 | 2,800 | 11,210 | **75%** (4×) | 12 vs 37 |
+| Small | [eShop](https://github.com/dotnet/eShop) | 28 | 545 | 9,458 | 71,699 | **87%** (7.6×) | 12 vs 81 |
+| Medium | [Jellyfin](https://github.com/jellyfin/jellyfin) | 41 | 2,248 | 23,487 | 670,085 | **97%** (28.5×) | 12 vs 132 |
+| Large | [OrchardCore](https://github.com/OrchardCMS/OrchardCore) | 257 | 6,451 | 43,417 | 474,615 | **91%** (10.9×) | 12 vs 319 |
+| XL | [ABP Framework](https://github.com/abpframework/abp) | 270 | 4,639 | 25,161 | 282,739 | **91%** (11.2×) | 12 vs 274 |
+
+The agent also makes far fewer tool calls, and every call it skips is a model round trip it doesn't wait for. If we count only the time to read the extra tokens (modelled at 10,000 input tokens per second, so a floor), the 12 tasks save 0.8 s on CleanArchitecture, 6 s on eShop, 65 s on Jellyfin, 43 s on OrchardCore and 26 s on ABP.
+
+**Seconds: the published 0.8.0 vs the current build.** "Ready" is the time from server start until it answers instead of saying "loading".
+
+| Solution | Ready (before → after) | `find_dead_code` | `get_test_coverage_map` | `detect_antipatterns` |
+|---|---:|---:|---:|---:|
+| CleanArchitecture | 7.6 s → **3.2 s** | 0.49 s → **0.08 s** | 0.89 s → **0.02 s** | 0.31 s → **0.12 s** |
+| eShop | 8.5 s → **4.5 s** | 1.3 s → **0.16 s** | 4.6 s → **0.05 s** | 0.62 s → **0.23 s** |
+| Jellyfin | 12.7 s → **8.5 s** | 13.7 s → **1.0 s** | 16.0 s → **0.16 s** | 2.8 s → **2.4 s** |
+| OrchardCore | 93.5 s → **44.4 s** | 25.1 s → **0.9 s** | 11.4 s → **0.18 s** | 50.0 s → **0.3 s** |
+| ABP Framework | 77.2 s → **47.2 s** | 15.5 s → **0.9 s** | 12.6 s → **0.26 s** | 4.9 s → **0.39 s** |
+
+Tool times are the first call after warm-up, so they include any compilation the tool needs. After that, navigation calls such as `find_symbol`, `get_symbol_source` and `get_type_hierarchy` answer in 1–10 ms at every size, and `analyze_change_impact` (new since 0.8.0) answers in about 1 s on OrchardCore, down from 54 s in an earlier build.
+
+A few honest notes:
+
+- Token counts are estimated as bytes ÷ 3.5 and haven't been calibrated against a real tokenizer yet. Both columns use the same divisor, so the percentages hold, but the absolute counts are approximate.
+- Some first calls are no faster than 0.8.0. On OrchardCore, the first `find_references` and `find_callers` take 1.6–1.8 s against 1.0–1.2 s, because those searches now cover interface and base-class callers.
+- Faster loading on eShop and ABP comes from loading through several MSBuild processes at once, which uses more memory while it runs (ABP peaked at 4.5 GB). Use `--load-parallelism 1` if memory matters more than startup time.
+
+The full results, including per-task tokens, per-tool latency and memory, are in [the benchmark report](mcp/CWM.RoslynNavigator/bench/results/2026-11-04-final/report.md). To run it yourself, see [the benchmark harness](mcp/CWM.RoslynNavigator/bench/README.md).
 
 ## Knowledge Base
 
