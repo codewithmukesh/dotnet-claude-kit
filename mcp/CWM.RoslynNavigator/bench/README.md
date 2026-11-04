@@ -100,6 +100,10 @@ Other verbs:
 - `call --corpus <def> --corpus-root <dir> --server <label=path> --tool <name> --args <json>`
   makes one call and prints the response. `--warm` waits for warm-up first, `--repeat N`
   repeats the call N times for warm timings out of process, and `--quiet` skips the payload.
+  `--calls-file <json>` runs a JSON array of `{"tool": ..., "args": {...}}` in one session
+  instead, writing each payload to `--out-dir` and printing its size, so one solution load
+  serves a whole before/after comparison. `--server-args "<switches>"` passes server switches,
+  such as `--load-parallelism 1` to keep memory down on ABP or OrchardCore.
 - `run ... --date <name>` writes into `results/<name>` instead of today's date, so a
   follow-up run never overwrites a committed folder.
 - `select --corpus <def> --corpus-root <dir> --server <label=path>` regenerates a corpus's

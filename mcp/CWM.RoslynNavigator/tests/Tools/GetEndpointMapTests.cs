@@ -150,14 +150,14 @@ public class GetEndpointMapTests(TestSolutionFixture fixture)
             [Route("[controller]")]
             [Authorize]
             public class BaseApiController : ControllerBase { }
-            """).GetRoot(TestContext.Current.CancellationToken);
+            """, cancellationToken: TestContext.Current.CancellationToken).GetRoot(TestContext.Current.CancellationToken);
         var root = CSharpSyntaxTree.ParseText("""
             public class ItemsController : BaseApiController
             {
                 [HttpGet("{id}")]
                 public IActionResult Get(int id) => Ok();
             }
-            """).GetRoot(TestContext.Current.CancellationToken);
+            """, cancellationToken: TestContext.Current.CancellationToken).GetRoot(TestContext.Current.CancellationToken);
         var index = new ControllerIndex();
         index.Add(ControllerIndex.Collect(baseRoot));
         index.Add(ControllerIndex.Collect(root));
